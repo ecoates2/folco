@@ -12,6 +12,7 @@
 #include <QTemporaryFile>
 
 #include <QRandomGenerator>
+#include <QDateTime>
 
 #include <list>
 #include <iostream>

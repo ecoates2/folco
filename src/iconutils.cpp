@@ -16,7 +16,7 @@ WinIconUtils::dumpDefaultFolderIcons(folderPathIn);
 
 }
 
-void IconUtils::createIconAndApply(const QList<QImage>& images, const QString &folderPathIn) {
+void IconUtils::createIconAndApply(const QList<QImage> &images, const QString &folderPathIn) {
 
 #if defined(Q_OS_MACOS)
 
@@ -44,7 +44,7 @@ WinIconUtils::resetFolderIconToDefault(folderPathIn);
 
 }
 
-QList<QImage> IconUtils::getDefaultFolderIcons(const QString folderPathIn) {
+QList<QImage> IconUtils::getDefaultFolderIcons(const QString &folderPathIn) {
 
 QList<QImage> images;
 
@@ -56,7 +56,7 @@ QDir dir = folderPathIn + "/" + "FolderDark";
 
 #elif defined(Q_OS_WIN)
 
-QDir dir = folderPathIn + "\\" + "default_icons";
+QDir dir = folderPathIn;
 
 #endif
 
@@ -74,4 +74,5 @@ std::sort(images.begin(), images.end(), [](const QImage& first, const QImage& se
     });
 
 return images;
+
 }

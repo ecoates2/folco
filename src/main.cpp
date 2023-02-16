@@ -3,8 +3,6 @@
 #include "../inc/iconutils.h"
 
 #include <QApplication>
-#include <QStandardPaths>
-#include <QDir>
 
 #include <QDebug>
 
@@ -18,6 +16,13 @@ int main(int argc, char *argv[])
     w.setWindowIcon(QIcon(":/res/icon.svg"));
 
 
+
+
+
+
+
+
+/*
 
     // TEST CODE
 
@@ -37,11 +42,7 @@ int main(int argc, char *argv[])
         }
       }
 
-    QList<QImage> defaultSet = IconUtils::getDefaultFolderIcons(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
-
-    for (const QImage &image : defaultSet) {
-        qDebug() << image.width();
-    }
+    //QList<QImage> defaultSet = IconUtils::getDefaultFolderIcons(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
 
     //IconUtils::createIconAndApply(images, QDir::toNativeSeparators("C:\\Users\\welma\\Desktop\\colortest5"));
 
@@ -49,7 +50,7 @@ int main(int argc, char *argv[])
 
 
     //IconUtils::dumpDefaultFolderIcons(data_directory);
-
+*/
 
     w.show();
     return a.exec();

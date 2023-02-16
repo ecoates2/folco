@@ -4,7 +4,7 @@
 
 QRegularExpression getFileNameRegExp()
 {
-    static QRegularExpression fileNameRegExp("^folco-[a-zA-Z0-9]{12}$");
+    static QRegularExpression fileNameRegExp("^folco-");
     return fileNameRegExp;
 }
 
@@ -127,12 +127,6 @@ BITMAP_AND_BYTES WinIconUtils::createAlphaChannelBitmapFromIcon(HICON hIcon) {
 
 void WinIconUtils::dumpDefaultFolderIcons(const QString &folderPathIn) {
 
-    QString data_directory = folderPathIn + "\\" + "default_icons";
-    QDir dumpDir(data_directory);
-    if (!dumpDir.exists()) {
-        dumpDir.mkpath(".");
-    }
-
     wchar_t system_directory[MAX_PATH];
     GetSystemDirectoryW(system_directory, MAX_PATH);
 
@@ -192,15 +186,7 @@ void WinIconUtils::createICOAndApply(const QList<QImage>& images, const QString 
 
     // From testing, it's necessary for an updated icon to have a different name from the previous one, or else it'll have trouble updating the change.
 
-    if (iconExists) {
-        prevIconIdentifier = previousIconIdentifier(folderPathIn);
-        currIconIdentifier = "folco-" + generateRandomString(12);
-        while (currIconIdentifier.compare(prevIconIdentifier) == 0) { // Happened to generate the same random string as the previous icon.
-            currIconIdentifier = "folco-" + generateRandomString(12);
-        }
-    } else {
-        currIconIdentifier = "folco-" + generateRandomString(12);
-    }
+    currIconIdentifier = QString("folco-%1-%2").arg(QDateTime::currentDateTime().toMSecsSinceEpoch()).arg(generateRandomString(6));
 
     const QString icoPath = folderPathIn + "\\" + currIconIdentifier + ".ico";
 
