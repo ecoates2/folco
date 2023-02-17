@@ -4,7 +4,7 @@
 
 QRegularExpression getFileNameRegExp()
 {
-    static QRegularExpression fileNameRegExp("^folco-");
+    static QRegularExpression fileNameRegExp("^folco-[0-9]{13}-[0-9a-zA-Z]{6}$");
     return fileNameRegExp;
 }
 
@@ -183,6 +183,10 @@ void WinIconUtils::createICOAndApply(const QList<QImage>& images, const QString 
     QString prevIconIdentifier;
 
     QString currIconIdentifier;
+
+    if (iconExists) {
+        prevIconIdentifier = previousIconIdentifier(folderPathIn);
+    }
 
     // From testing, it's necessary for an updated icon to have a different name from the previous one, or else it'll have trouble updating the change.
 

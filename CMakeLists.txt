@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Folco VERSION 0.1 LANGUAGES CXX)
+project(Folco LANGUAGES CXX)
+
+set(PROJECT_VERSION_MAJOR 0)
+set(PROJECT_VERSION_MINOR 1)
+set(PROJECT_VERSION_PATCH 0)
+set(PROJECT_VERSION_TWEAK 0)
+
+set(PROJECT_VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK})
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -12,6 +19,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
+configure_file(
+    inc/version.h.in
+    ${CMAKE_BINARY_DIR}/version.h
+)
+
 set(PROJECT_SOURCES
         src/main.cpp
         src/mainwindow.cpp
@@ -19,7 +31,10 @@ set(PROJECT_SOURCES
         src/mainwindow.ui
         inc/iconutils.h
         src/iconutils.cpp
+        ${CMAKE_BINARY_DIR}/version.h
 )
+
+include_directories("${CMAKE_BINARY_DIR}")
 
 if (APPLE)
     set(PLATFORM_SPECIFIC_SOURCES inc/macos/macosiconutils.h src/macos/macosiconutils.mm)
@@ -35,6 +50,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         set_source_files_properties(${app_icon_resource} PROPERTIES
                MACOSX_PACKAGE_LOCATION "Resources")
     elseif(WIN32)
+        # TODO: Figure out how to automatically pass in version numbers into our resource file. For now the version fields are all zeros.
         set(app_icon_resource res/folco.rc)
     endif()
 
