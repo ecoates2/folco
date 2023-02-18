@@ -18,15 +18,7 @@ int main(int argc, char *argv[])
     w.setWindowTitle("Folco");
     w.setWindowIcon(QIcon(":/res/icon.svg"));
 
-
-
-
-
-
-
-
-
-
+/*
 
     // TEST CODE
 
@@ -55,7 +47,7 @@ int main(int argc, char *argv[])
 
     //IconUtils::dumpDefaultFolderIcons(data_directory);
 
-
+*/
     w.show();
     return a.exec();
 }

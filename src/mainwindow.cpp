@@ -15,17 +15,28 @@ MainWindow::MainWindow(QWidget *parent)
 
     defaultIcons = IconUtils::getDefaultFolderIcons(dataDir.absolutePath());
 
-    for (const QImage &image : defaultIcons) {
-        qDebug() << image.width();
-    }
-
-
-
     ui->setupUi(this);
 
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
     connect(ui->actionAbout_Qt, &QAction::triggered, qApp, &QApplication::aboutQt);
+
+    dirListSelectionModel = ui->dirListWidget->selectionModel();
+    connect(dirListSelectionModel, &QItemSelectionModel::selectionChanged, this, [=]() {
+        ui->removeDirButton->setEnabled(!dirListSelectionModel->selectedIndexes().isEmpty());
+    });
+
+    dirListItemModel = ui->dirListWidget->model();
+    connect(dirListItemModel, &QAbstractItemModel::rowsInserted, this, [=]() {
+        ui->clearDirsButton->setEnabled(ui->dirListWidget->count() > 0);
+    });
+    connect(dirListItemModel, &QAbstractItemModel::rowsRemoved, this, [=]() {
+        ui->clearDirsButton->setEnabled(ui->dirListWidget->count() > 0);
+    });
+
+
+
+
 }
 
 MainWindow::~MainWindow()
@@ -41,3 +52,28 @@ void MainWindow::about()
     QMessageBox::about(this, "About Folco",
                 contents);
 }
+
+void MainWindow::on_addDirButton_clicked()
+{
+    QString directory = QFileDialog::getExistingDirectory(this, tr("Select Directory"), QDir::homePath());
+    if (!directory.isEmpty() && ui->dirListWidget->findItems(directory, Qt::MatchFixedString | Qt::MatchCaseSensitive).isEmpty()) {
+        ui->dirListWidget->addItem(directory);
+    }
+}
+
+
+void MainWindow::on_removeDirButton_clicked()
+{
+    qDeleteAll(ui->dirListWidget->selectedItems());
+}
+
+
+void MainWindow::on_clearDirsButton_clicked()
+{
+    QList<QListWidgetItem*> itemsToDelete;
+    for (int i = 0; i < ui->dirListWidget->count(); ++i) {
+        itemsToDelete.append(ui->dirListWidget->item(i));
+    }
+    qDeleteAll(itemsToDelete);
+}
+

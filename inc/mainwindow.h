@@ -12,6 +12,11 @@
 
 #include <QMessageBox>
 
+#include <QStringList>
+#include <QStringListModel>
+#include <QAbstractItemView>
+#include <QFileDialog>
+#include <QListWidget>
 
 
 QT_BEGIN_NAMESPACE
@@ -31,7 +36,15 @@ public:
 private slots:
     void about();
 
+    void on_addDirButton_clicked();
+
+    void on_removeDirButton_clicked();
+
+    void on_clearDirsButton_clicked();
+
 private:
     Ui::MainWindow *ui;
+    QItemSelectionModel* dirListSelectionModel;
+    QAbstractItemModel* dirListItemModel;
 };
 #endif // MAINWINDOW_H

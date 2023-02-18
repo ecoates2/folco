@@ -4,7 +4,7 @@
 
 QRegularExpression getFileNameRegExp()
 {
-    static QRegularExpression fileNameRegExp("^folco-[0-9]{13}-[0-9a-zA-Z]{6}$");
+    static QRegularExpression fileNameRegExp("^folco-");
     return fileNameRegExp;
 }
 
