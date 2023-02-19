@@ -18,6 +18,8 @@
 #include <QFileDialog>
 #include <QListWidget>
 
+#include "../inc/dirlistwidget.h"
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -46,5 +48,6 @@ private:
     Ui::MainWindow *ui;
     QItemSelectionModel* dirListSelectionModel;
     QAbstractItemModel* dirListItemModel;
+    DirListWidget *dirListWidget;
 };
 #endif // MAINWINDOW_H

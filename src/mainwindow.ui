@@ -34,19 +34,6 @@
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
-      <widget class="QListWidget" name="dirListWidget">
-       <property name="acceptDrops">
-        <bool>false</bool>
-       </property>
-       <property name="dragEnabled">
-        <bool>false</bool>
-       </property>
-       <property name="dragDropMode">
-        <enum>QAbstractItemView::NoDragDrop</enum>
-       </property>
-      </widget>
-     </item>
-     <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <spacer name="horizontalSpacer">

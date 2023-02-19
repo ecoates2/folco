@@ -1,6 +1,8 @@
 #include "../inc/mainwindow.h"
 #include "./ui_mainwindow.h"
 
+
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -15,24 +17,35 @@ MainWindow::MainWindow(QWidget *parent)
 
     defaultIcons = IconUtils::getDefaultFolderIcons(dataDir.absolutePath());
 
+    /* Right now, we're using a mix of Qt designer and declaring the UI code by hand. This is messy
+     * and difficult to read, so i'm considering moving to just code once everything is finished.
+     */
+
     ui->setupUi(this);
+
+    dirListWidget = new DirListWidget(ui->dirListGroup);
+    dirListWidget->setObjectName("dirListWidget");
+
+    ui->verticalLayout_2->insertWidget(0, dirListWidget);
 
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
     connect(ui->actionAbout_Qt, &QAction::triggered, qApp, &QApplication::aboutQt);
 
-    dirListSelectionModel = ui->dirListWidget->selectionModel();
+    dirListSelectionModel = dirListWidget->selectionModel();
     connect(dirListSelectionModel, &QItemSelectionModel::selectionChanged, this, [=]() {
         ui->removeDirButton->setEnabled(!dirListSelectionModel->selectedIndexes().isEmpty());
     });
 
-    dirListItemModel = ui->dirListWidget->model();
+    dirListItemModel = dirListWidget->model();
     connect(dirListItemModel, &QAbstractItemModel::rowsInserted, this, [=]() {
-        ui->clearDirsButton->setEnabled(ui->dirListWidget->count() > 0);
+        ui->clearDirsButton->setEnabled(dirListWidget->count() > 0);
     });
     connect(dirListItemModel, &QAbstractItemModel::rowsRemoved, this, [=]() {
-        ui->clearDirsButton->setEnabled(ui->dirListWidget->count() > 0);
+        ui->clearDirsButton->setEnabled(dirListWidget->count() > 0);
     });
+
+
 
 
 
@@ -56,23 +69,23 @@ void MainWindow::about()
 void MainWindow::on_addDirButton_clicked()
 {
     QString directory = QFileDialog::getExistingDirectory(this, tr("Select Directory"), QDir::homePath());
-    if (!directory.isEmpty() && ui->dirListWidget->findItems(directory, Qt::MatchFixedString | Qt::MatchCaseSensitive).isEmpty()) {
-        ui->dirListWidget->addItem(directory);
+    if (!directory.isEmpty() && dirListWidget->findItems(directory, Qt::MatchFixedString | Qt::MatchCaseSensitive).isEmpty()) {
+        dirListWidget->addItem(directory);
     }
 }
 
 
 void MainWindow::on_removeDirButton_clicked()
 {
-    qDeleteAll(ui->dirListWidget->selectedItems());
+    qDeleteAll(dirListWidget->selectedItems());
 }
 
 
 void MainWindow::on_clearDirsButton_clicked()
 {
     QList<QListWidgetItem*> itemsToDelete;
-    for (int i = 0; i < ui->dirListWidget->count(); ++i) {
-        itemsToDelete.append(ui->dirListWidget->item(i));
+    for (int i = 0; i < dirListWidget->count(); ++i) {
+        itemsToDelete.append(dirListWidget->item(i));
     }
     qDeleteAll(itemsToDelete);
 }

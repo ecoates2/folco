@@ -31,6 +31,8 @@ set(PROJECT_SOURCES
         src/mainwindow.ui
         inc/iconutils.h
         src/iconutils.cpp
+        inc/dirlistwidget.h
+        src/dirlistwidget.cpp
         ${CMAKE_BINARY_DIR}/version.h
 )
 
