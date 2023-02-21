@@ -78,7 +78,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Reset to Default</string>
+      <string>Reset Folder(s)</string>
      </property>
     </widget>
    </widget>

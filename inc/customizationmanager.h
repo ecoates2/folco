@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QColor>
 #include <QStandardPaths>
+#include <QPixmap>
 
 #include "iconutils.h"
 

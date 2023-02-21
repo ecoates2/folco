@@ -40,8 +40,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     colorPicker = new QColorDialog(this);
 
-    ui->previewLabel->setStyleSheet("QLabel { background-color : white}");
-
     ui->previewLabel->setFrameStyle(QFrame::StyledPanel);
     ui->previewLabel->setPixmap(customizationManager->getPreview());
 
@@ -89,6 +87,9 @@ void MainWindow::on_selectColorButton_clicked()
 {
     QColor currColor = customizationManager->getColor();
     QColor newColor = colorPicker->getColor(currColor, this, "Set color");
+    if (!newColor.isValid()) {
+        newColor = currColor;
+    }
     customizationManager->usingCustomColor = true;
     customizationManager->setColor(newColor);
 
