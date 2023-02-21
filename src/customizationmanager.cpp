@@ -21,21 +21,38 @@ CustomizationManager::CustomizationManager(QObject *parent)
     }
 
     color = QColor(Qt::blue);
+    customizationEnabled = true;
+    usingCustomColor = false;
 
 }
 
 void CustomizationManager::applyCustomization(QList<QString> &folders)
 {
-    QList<QImage> customizedIcons;
-    for (const QImage &image : grayscaleAndAdjustedIcons) {
-        QImage customizedImage = QImage(image);
-        colorize(customizedImage, color);
-        customizedIcons.append(customizedImage);
+    if (customizationEnabled) {
+        if (usingCustomColor) {
+            QList<QImage> customizedIcons;
+            for (const QImage &image : grayscaleAndAdjustedIcons) {
+                QImage customizedImage = QImage(image);
+                colorize(customizedImage, color);
+                customizedIcons.append(customizedImage);
+            }
+
+            for (const QString &folder : folders) {
+                qDebug() << folder;
+                IconUtils::createIconAndApply(customizedIcons, QDir::toNativeSeparators(folder));
+            }
+        } else {
+            for (const QString &folder : folders) {
+                IconUtils::createIconAndApply(defaultIcons, QDir::toNativeSeparators(folder));
+            }
+        }
+
+    } else {
+        for (const QString &folder : folders) {
+            IconUtils::resetFolderIconToDefault(QDir::toNativeSeparators(folder));
+        }
     }
 
-    for (const QString &folder : folders) {
-        IconUtils::createIconAndApply(customizedIcons, folder);
-    }
 }
 
 void CustomizationManager::colorize(QImage& inoutImage, const QColor& tintColor)
@@ -147,7 +164,18 @@ QColor CustomizationManager::getColor()
 
 QPixmap CustomizationManager::getPreview()
 {
-    QImage colorized = QImage(grayscaleAndAdjustedIcons[0]);
-    colorize(colorized, color);
-    return QPixmap::fromImage(colorized);
+    if (customizationEnabled) {
+        if (usingCustomColor) {
+            QImage customized = QImage(grayscaleAndAdjustedIcons[0]);
+            colorize(customized, color);
+            return QPixmap::fromImage(customized);
+        } else {
+            QImage defaultIcon = defaultIcons[0];
+            return QPixmap::fromImage(defaultIcon);
+        }
+
+    } else {
+        QImage defaultIcon = defaultIcons[0];
+        return QPixmap::fromImage(defaultIcon);
+    }
 }

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>430</width>
+    <height>530</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,29 +17,16 @@
    <property name="acceptDrops">
     <bool>false</bool>
    </property>
-   <widget class="Line" name="line">
-    <property name="geometry">
-     <rect>
-      <x>9</x>
-      <y>535</y>
-      <width>782</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-   </widget>
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>9</x>
-      <y>544</y>
-      <width>214</width>
-      <height>26</height>
+      <x>10</x>
+      <y>470</y>
+      <width>411</width>
+      <height>31</height>
      </rect>
     </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <layout class="QHBoxLayout" name="finalizeLayout">
      <item>
       <spacer name="horizontalSpacer_2">
        <property name="orientation">
@@ -54,14 +41,14 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="pushButton">
+      <widget class="QPushButton" name="applyButton">
        <property name="text">
         <string>Apply</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="pushButton_2">
+      <widget class="QPushButton" name="cancelButton">
        <property name="text">
         <string>Cancel</string>
        </property>
@@ -69,39 +56,39 @@
      </item>
     </layout>
    </widget>
-   <widget class="QGroupBox" name="groupBox">
+   <widget class="QGroupBox" name="optionsGroup">
     <property name="geometry">
      <rect>
-      <x>470</x>
-      <y>80</y>
-      <width>181</width>
-      <height>71</height>
+      <x>10</x>
+      <y>290</y>
+      <width>160</width>
+      <height>70</height>
      </rect>
     </property>
     <property name="title">
      <string>Options</string>
     </property>
-    <widget class="QCheckBox" name="checkBox">
+    <widget class="QCheckBox" name="resetCheckbox">
      <property name="geometry">
       <rect>
        <x>10</x>
        <y>30</y>
-       <width>171</width>
+       <width>111</width>
        <height>22</height>
       </rect>
      </property>
      <property name="text">
-      <string>Reset Folder(s) to Default</string>
+      <string>Reset to Default</string>
      </property>
     </widget>
    </widget>
    <widget class="QGroupBox" name="dirListGroup">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>50</y>
-      <width>379</width>
-      <height>111</height>
+      <x>10</x>
+      <y>10</y>
+      <width>410</width>
+      <height>170</height>
      </rect>
     </property>
     <property name="acceptDrops">
@@ -110,9 +97,9 @@
     <property name="title">
      <string>Folder(s)</string>
     </property>
-    <layout class="QVBoxLayout" name="verticalLayout_2">
+    <layout class="QVBoxLayout" name="dirListGroupLayout">
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout">
+      <layout class="QHBoxLayout" name="dirListButtonLayout">
        <item>
         <spacer name="horizontalSpacer">
          <property name="orientation">
@@ -157,44 +144,60 @@
      </item>
     </layout>
    </widget>
-   <widget class="QWidget" name="verticalLayoutWidget">
+   <widget class="QGroupBox" name="customizationGroup">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>180</y>
-      <width>231</width>
-      <height>251</height>
+      <x>10</x>
+      <y>200</y>
+      <width>160</width>
+      <height>70</height>
      </rect>
     </property>
-    <layout class="QVBoxLayout" name="previewLayout">
-     <item>
-      <widget class="QGraphicsView" name="graphicsView"/>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <item>
-        <spacer name="horizontalSpacer_3">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_3">
-         <property name="text">
-          <string>Color</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
+    <property name="title">
+     <string>Customization</string>
+    </property>
+    <widget class="QPushButton" name="selectColorButton">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>30</y>
+       <width>141</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Color</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="Line" name="line">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>450</y>
+      <width>411</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="previewLabel">
+    <property name="geometry">
+     <rect>
+      <x>190</x>
+      <y>200</y>
+      <width>230</width>
+      <height>230</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="scaledContents">
+     <bool>true</bool>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -202,7 +205,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>430</width>
      <height>21</height>
     </rect>
    </property>

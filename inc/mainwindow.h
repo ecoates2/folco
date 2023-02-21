@@ -19,6 +19,7 @@
 #include <QListWidget>
 #include <QColorDialog>
 #include <QGraphicsScene>
+#include <QGraphicsPixmapItem>
 
 #include "../inc/dirlistwidget.h"
 #include "../inc/customizationmanager.h"
@@ -45,7 +46,13 @@ private slots:
 
     void on_clearDirsButton_clicked();
 
-    void on_pushButton_3_clicked();
+    void on_selectColorButton_clicked();
+
+    void on_resetCheckbox_stateChanged(int state);
+
+    void on_cancelButton_clicked();
+
+    void on_applyButton_clicked();
 
 private:
     Ui::MainWindow *ui;
@@ -54,6 +61,5 @@ private:
     DirListWidget *dirListWidget;
     QColorDialog *colorPicker;
     CustomizationManager *customizationManager;
-    QGraphicsScene *previewScene;
 };
 #endif // MAINWINDOW_H

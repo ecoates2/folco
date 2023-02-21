@@ -6,7 +6,6 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , previewScene(new QGraphicsScene(this))
 {
 
     customizationManager = new CustomizationManager(this);
@@ -20,7 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     dirListWidget = new DirListWidget(ui->dirListGroup);
     dirListWidget->setObjectName("dirListWidget");
 
-    ui->verticalLayout_2->insertWidget(0, dirListWidget);
+    ui->dirListGroupLayout->insertWidget(0, dirListWidget);
 
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
@@ -41,15 +40,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     colorPicker = new QColorDialog(this);
 
-    previewScene
+    ui->previewLabel->setStyleSheet("QLabel { background-color : white}");
 
-
-
-
-
-
-
-
+    ui->previewLabel->setFrameStyle(QFrame::StyledPanel);
+    ui->previewLabel->setPixmap(customizationManager->getPreview());
 
 }
 
@@ -91,11 +85,49 @@ void MainWindow::on_clearDirsButton_clicked()
     qDeleteAll(itemsToDelete);
 }
 
-
-void MainWindow::on_pushButton_3_clicked()
+void MainWindow::on_selectColorButton_clicked()
 {
     QColor currColor = customizationManager->getColor();
     QColor newColor = colorPicker->getColor(currColor, this, "Set color");
+    customizationManager->usingCustomColor = true;
     customizationManager->setColor(newColor);
+
+    // Update preview here
+    ui->previewLabel->setPixmap(customizationManager->getPreview());
+}
+
+
+void MainWindow::on_resetCheckbox_stateChanged(int state)
+{
+    if (state == Qt::Checked) {
+        customizationManager->customizationEnabled = false;
+        ui->customizationGroup->setEnabled(false);
+    } else {
+        customizationManager->customizationEnabled = true;
+        ui->customizationGroup->setEnabled(true);
+    }
+
+    // Update preview here
+    ui->previewLabel->setPixmap(customizationManager->getPreview());
+}
+
+
+
+
+void MainWindow::on_cancelButton_clicked()
+{
+    QApplication::quit();
+}
+
+
+void MainWindow::on_applyButton_clicked()
+{
+    QList<QString> folderList;
+
+    for (int i = 0; i < dirListWidget->count(); ++i) {
+        folderList.append(dirListWidget->item(i)->text());
+    }
+    customizationManager->applyCustomization(folderList);
+    QApplication::quit();
 }
 

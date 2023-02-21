@@ -20,40 +20,8 @@ int main(int argc, char *argv[])
     w.setWindowTitle("Folco");
     w.setWindowIcon(QIcon(":/res/icon.svg"));
 
-    //w.setFixedSize(500,600);
+    w.setFixedSize(430,530);
 
-    w.setFixedSize(800,600);
-
-/*
-
-    // TEST CODE
-
-    //QString directory = "/Users/johndoe/Downloads/Macos icon sizes/MyIcon.iconset";
-
-    QString directory = "C:\\Users\\welma\\Desktop\\windows_icon_test_source";
-
-      QDir dir2(directory);
-      QFileInfoList fileList = dir2.entryInfoList(QDir::Files);
-      QList<QImage> images;
-
-      for (int i = 0; i < fileList.size(); ++i) {
-        QFileInfo fileInfo = fileList.at(i);
-        QImage image;
-        if (image.load(fileInfo.absoluteFilePath())) {
-          images.append(image);
-        }
-      }
-
-    //QList<QImage> defaultSet = IconUtils::getDefaultFolderIcons(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
-
-    IconUtils::createIconAndApply(images, QDir::toNativeSeparators("C:\\Users\\welma\\Desktop\\colortest5"));
-
-    //IconUtils::resetFolderIconToDefault(QDir::toNativeSeparators("C:\\Users\\welma\\Desktop\\colortest5"));
-
-
-    //IconUtils::dumpDefaultFolderIcons(data_directory);
-
-*/
     w.show();
     return a.exec();
 }

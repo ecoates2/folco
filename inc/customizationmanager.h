@@ -16,10 +16,13 @@ public:
     void setColor(QColor &colorIn);
     QColor getColor();
     QPixmap getPreview();
+    bool customizationEnabled;
+    bool usingCustomColor;
 private:
     QList<QImage> defaultIcons;
     QList<QImage> grayscaleAndAdjustedIcons;
     QColor color;
+
     QImage convertToGrayScale(const QImage &srcImage);
     void adjustContrast(QImage &image, int contrast);
     void colorize(QImage& inoutImage, const QColor& tintColor);
