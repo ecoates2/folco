@@ -33,6 +33,8 @@ set(PROJECT_SOURCES
         src/iconutils.cpp
         inc/dirlistwidget.h
         src/dirlistwidget.cpp
+        inc/customizationmanager.h
+        src/customizationmanager.cpp
         ${CMAKE_BINARY_DIR}/version.h
 )
 

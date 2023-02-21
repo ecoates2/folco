@@ -17,8 +17,11 @@
 #include <QAbstractItemView>
 #include <QFileDialog>
 #include <QListWidget>
+#include <QColorDialog>
+#include <QGraphicsScene>
 
 #include "../inc/dirlistwidget.h"
+#include "../inc/customizationmanager.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -33,8 +36,6 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    QList<QImage> defaultIcons;
-
 private slots:
     void about();
 
@@ -44,10 +45,15 @@ private slots:
 
     void on_clearDirsButton_clicked();
 
+    void on_pushButton_3_clicked();
+
 private:
     Ui::MainWindow *ui;
     QItemSelectionModel* dirListSelectionModel;
     QAbstractItemModel* dirListItemModel;
     DirListWidget *dirListWidget;
+    QColorDialog *colorPicker;
+    CustomizationManager *customizationManager;
+    QGraphicsScene *previewScene;
 };
 #endif // MAINWINDOW_H

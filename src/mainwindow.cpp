@@ -6,16 +6,10 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , previewScene(new QGraphicsScene(this))
 {
 
-    QDir dataDir = QDir::toNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/" + "default_icons");
-
-    if (!dataDir.exists()) {
-        dataDir.mkpath(".");
-        IconUtils::dumpDefaultFolderIcons(dataDir.absolutePath());
-    }
-
-    defaultIcons = IconUtils::getDefaultFolderIcons(dataDir.absolutePath());
+    customizationManager = new CustomizationManager(this);
 
     /* Right now, we're using a mix of Qt designer and declaring the UI code by hand. This is messy
      * and difficult to read, so i'm considering moving to just code once everything is finished.
@@ -44,6 +38,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(dirListItemModel, &QAbstractItemModel::rowsRemoved, this, [=]() {
         ui->clearDirsButton->setEnabled(dirListWidget->count() > 0);
     });
+
+    colorPicker = new QColorDialog(this);
+
+    previewScene
+
+
+
 
 
 
@@ -88,5 +89,13 @@ void MainWindow::on_clearDirsButton_clicked()
         itemsToDelete.append(dirListWidget->item(i));
     }
     qDeleteAll(itemsToDelete);
+}
+
+
+void MainWindow::on_pushButton_3_clicked()
+{
+    QColor currColor = customizationManager->getColor();
+    QColor newColor = colorPicker->getColor(currColor, this, "Set color");
+    customizationManager->setColor(newColor);
 }
 

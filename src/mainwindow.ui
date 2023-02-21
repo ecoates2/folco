@@ -17,20 +17,98 @@
    <property name="acceptDrops">
     <bool>false</bool>
    </property>
+   <widget class="Line" name="line">
+    <property name="geometry">
+     <rect>
+      <x>9</x>
+      <y>535</y>
+      <width>782</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
+    </property>
+   </widget>
+   <widget class="QWidget" name="horizontalLayoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>9</x>
+      <y>544</y>
+      <width>214</width>
+      <height>26</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton">
+       <property name="text">
+        <string>Apply</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_2">
+       <property name="text">
+        <string>Cancel</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QGroupBox" name="groupBox">
+    <property name="geometry">
+     <rect>
+      <x>470</x>
+      <y>80</y>
+      <width>181</width>
+      <height>71</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Options</string>
+    </property>
+    <widget class="QCheckBox" name="checkBox">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>30</y>
+       <width>171</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Reset Folder(s) to Default</string>
+     </property>
+    </widget>
+   </widget>
    <widget class="QGroupBox" name="dirListGroup">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>60</y>
-      <width>481</width>
-      <height>141</height>
+      <x>40</x>
+      <y>50</y>
+      <width>379</width>
+      <height>111</height>
      </rect>
     </property>
     <property name="acceptDrops">
      <bool>false</bool>
     </property>
     <property name="title">
-     <string>Directories</string>
+     <string>Folder(s)</string>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
@@ -79,6 +157,45 @@
      </item>
     </layout>
    </widget>
+   <widget class="QWidget" name="verticalLayoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>40</x>
+      <y>180</y>
+      <width>231</width>
+      <height>251</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="previewLayout">
+     <item>
+      <widget class="QGraphicsView" name="graphicsView"/>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <spacer name="horizontalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButton_3">
+         <property name="text">
+          <string>Color</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -105,16 +222,12 @@
    <addaction name="menuFile"/>
    <addaction name="menuHelp"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionExit">
    <property name="text">
     <string>E&amp;xit</string>
    </property>
    <property name="toolTip">
     <string>Exit</string>
-   </property>
-   <property name="statusTip">
-    <string>Exit the application</string>
    </property>
    <property name="iconVisibleInMenu">
     <bool>true</bool>
@@ -127,16 +240,10 @@
    <property name="toolTip">
     <string>About</string>
    </property>
-   <property name="statusTip">
-    <string>Show the application's About box</string>
-   </property>
   </action>
   <action name="actionAbout_Qt">
    <property name="text">
     <string>About &amp;Qt</string>
-   </property>
-   <property name="statusTip">
-    <string>Show the Qt library's About box</string>
    </property>
   </action>
  </widget>

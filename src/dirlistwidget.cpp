@@ -31,9 +31,11 @@ void DirListWidget::dragEnterEvent(QDragEnterEvent *event)
 
 void DirListWidget::dropEvent(QDropEvent *event)
 {
-    qDebug() << "Entered dropEvent";
     for (const QUrl &url : event->mimeData()->urls()) {
-        addItem(url.toLocalFile());
+        QString directory = url.toLocalFile();
+        if (findItems(directory, Qt::MatchFixedString | Qt::MatchCaseSensitive).isEmpty()) {
+            addItem(directory);
+        }
     }
     event->acceptProposedAction();
 }

@@ -16,7 +16,7 @@ BEGIN
         BLOCK "000004b0"
         BEGIN
             VALUE "CompanyName", "Ethan Coates"
-            VALUE "FileDescription", "An open-source, cross-platform application to customize folder icons"
+            VALUE "FileDescription", "Folco"
             VALUE "FileVersion", "0.0.0.0"
             VALUE "LegalCopyright", "Copyright (C) 2023 Ethan Coates"
             VALUE "InternalName", "Folco"
