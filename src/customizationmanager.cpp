@@ -15,8 +15,16 @@ CustomizationManager::CustomizationManager(QObject *parent)
 
     for (const QImage &icon : defaultIcons) {
         QImage grayscale = convertToGrayScale(icon);
+
+        #if defined(Q_OS_MACOS)
+
+        adjustBrightness(grayscale, BRIGHTNESS_ADJUSTMENT);
+
+        #endif
+
         // Adjusting the contrast gives a much better looking result; more variance in shading.
-        adjustContrast(grayscale, 35);
+        adjustContrast(grayscale, CONTRAST_ADJUSTMENT);
+
         grayscaleAndAdjustedIcons.append(grayscale);
     }
 
@@ -37,20 +45,13 @@ void CustomizationManager::applyCustomization(QList<QString> &folders)
                 customizedIcons.append(customizedImage);
             }
 
-            for (const QString &folder : folders) {
-                qDebug() << folder;
-                IconUtils::createIconAndApply(customizedIcons, QDir::toNativeSeparators(folder));
-            }
+            IconUtils::createIconAndApply(customizedIcons, folders);
         } else {
-            for (const QString &folder : folders) {
-                IconUtils::createIconAndApply(defaultIcons, QDir::toNativeSeparators(folder));
-            }
+            IconUtils::createIconAndApply(defaultIcons, folders);
         }
 
     } else {
-        for (const QString &folder : folders) {
-            IconUtils::resetFolderIconToDefault(QDir::toNativeSeparators(folder));
-        }
+        IconUtils::resetFolderIconToDefault(folders);
     }
 
 }
@@ -151,6 +152,34 @@ QImage CustomizationManager::convertToGrayScale(const QImage &srcImage)
 
                  return dstImage;
 }
+
+void CustomizationManager::adjustBrightness(QImage& image, int brightness)
+        {
+            // Make sure the brightness value is within the valid range
+            brightness = qBound(-255, brightness, 255);
+
+            // Iterate over the image pixels and apply the brightness adjustment
+            for (int y = 0; y < image.height(); ++y)
+            {
+                QRgb* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+                for (int x = 0; x < image.width(); ++x)
+                {
+                    QRgb pixel = line[x];
+                    int alpha = qAlpha(pixel);
+                    int red = qRed(pixel);
+                    int green = qGreen(pixel);
+                    int blue = qBlue(pixel);
+
+                    // Adjust the brightness of each color channel
+                    red = qBound(0, red + brightness, 255);
+                    green = qBound(0, green + brightness, 255);
+                    blue = qBound(0, blue + brightness, 255);
+
+                    // Set the adjusted pixel value back to the image
+                    line[x] = qRgba(red, green, blue, alpha);
+                }
+            }
+        }
 
 void CustomizationManager::setColor(QColor &colorIn)
 {

@@ -238,7 +238,7 @@ void MacOSIconUtils::dumpDefaultFolderIcons(const QString &folderPathIn) {
     }];
 }
 
-void MacOSIconUtils::createICNSAndApply(const QList<QImage>& images, const QString &folderPathIn) {
+void MacOSIconUtils::createICNSAndApply(const QList<QImage>& images, const QList<QString> &folderPathsIn) {
 
     CFStringRef format = kUTTypeAppleICNS;
 
@@ -278,25 +278,26 @@ void MacOSIconUtils::createICNSAndApply(const QList<QImage>& images, const QStri
     }
 
 
-    NSString* folderPath = folderPathIn.toNSString();
+
 
     NSData *iconData = [NSData dataWithBytesNoCopy:CFDataGetMutableBytePtr(dataRef) length:CFDataGetLength(dataRef) freeWhenDone:NO];
 
     NSImage *icon = [[NSImage alloc] initWithData:iconData];
 
-    [[NSWorkspace sharedWorkspace] setIcon:icon forFile:folderPath options:0];
+    for (const QString &folder : folderPathsIn) {
+        [[NSWorkspace sharedWorkspace] setIcon:icon forFile:folder.toNSString() options:0];
+    }
 
     [icon release];
     CFRelease(destination);
     CFRelease(dataRef);
 }
 
-void MacOSIconUtils::resetFolderIconToDefault(const QString &folderPathIn) {
+void MacOSIconUtils::resetFolderIconToDefault(const QList<QString> &folderPathsIn) {
 
-    NSString* folderPath = folderPathIn.toNSString();
-
-    [[NSWorkspace sharedWorkspace] setIcon:nil forFile:folderPath options:0];
-
+    for (const QString &folder : folderPathsIn) {
+        [[NSWorkspace sharedWorkspace] setIcon:nil forFile:folder.toNSString() options:0];
+    }
 }
 
 

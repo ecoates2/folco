@@ -16,29 +16,29 @@ WinIconUtils::dumpDefaultFolderIcons(folderPathIn);
 
 }
 
-void IconUtils::createIconAndApply(const QList<QImage> &images, const QString &folderPathIn) {
+void IconUtils::createIconAndApply(const QList<QImage> &images, const QList<QString> &folderPathsIn) {
 
 #if defined(Q_OS_MACOS)
 
-MacOSIconUtils::createICNSAndApply(images, folderPathIn);
+MacOSIconUtils::createICNSAndApply(images, folderPathsIn);
 
 #elif defined(Q_OS_WIN)
 
-WinIconUtils::createICOAndApply(images, folderPathIn);
+WinIconUtils::createICOAndApply(images, folderPathsIn);
 
 #endif
 
 }
 
-void IconUtils::resetFolderIconToDefault(const QString &folderPathIn) {
+void IconUtils::resetFolderIconToDefault(const QList<QString> &folderPathsIn) {
 
 #if defined(Q_OS_MACOS)
 
-MacOSIconUtils::resetFolderIconToDefault(folderPathIn);
+MacOSIconUtils::resetFolderIconToDefault(folderPathsIn);
 
 #elif defined(Q_OS_WIN)
 
-WinIconUtils::resetFolderIconToDefault(folderPathIn);
+WinIconUtils::resetFolderIconToDefault(folderPathsIn);
 
 #endif
 
@@ -48,11 +48,11 @@ QList<QImage> IconUtils::getDefaultFolderIcons(const QString &folderPathIn) {
 
 QList<QImage> images;
 
-// For MacOS, "FolderDark" is the default icon set for now, but a setting can be implemented in the future.
+// For MacOS, "Folder" is the default icon set for now, but a setting can be implemented in the future.
 
 #if defined(Q_OS_MACOS)
 
-QDir dir = folderPathIn + "/" + "FolderDark";
+QDir dir = folderPathIn + "/" + "Folder";
 
 #elif defined(Q_OS_WIN)
 

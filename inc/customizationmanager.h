@@ -8,6 +8,17 @@
 
 #include "iconutils.h"
 
+#if defined(Q_OS_MACOS)
+
+#define CONTRAST_ADJUSTMENT 25
+#define BRIGHTNESS_ADJUSTMENT 45
+
+#elif defined(Q_OS_WIN)
+
+#define CONTRAST_ADJUSTMENT 35
+
+#endif
+
 class CustomizationManager: public QObject
 {
 Q_OBJECT
@@ -25,6 +36,7 @@ private:
     QColor color;
 
     QImage convertToGrayScale(const QImage &srcImage);
+    void adjustBrightness(QImage& image, int brightness);
     void adjustContrast(QImage &image, int contrast);
     void colorize(QImage& inoutImage, const QColor& tintColor);
 };

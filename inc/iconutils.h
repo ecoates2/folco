@@ -25,8 +25,8 @@ class IconUtils
 {
 public:
     static void dumpDefaultFolderIcons(const QString &folderPathIn);
-    static void createIconAndApply(const QList<QImage> &images, const QString &folderPathIn);
-    static void resetFolderIconToDefault(const QString &folderPath);
+    static void createIconAndApply(const QList<QImage> &images, const QList<QString> &folderPathsIn);
+    static void resetFolderIconToDefault(const QList<QString> &folderPaths);
     static QList<QImage> getDefaultFolderIcons(const QString &folderPathIn);
 };
 

@@ -8,8 +8,8 @@ class MacOSIconUtils
 {
 public:
     static void dumpDefaultFolderIcons(const QString &folderPathIn);
-    static void createICNSAndApply(const QList<QImage>& images, const QString& folderPath);
-    static void resetFolderIconToDefault(const QString &folderPath);
+    static void createICNSAndApply(const QList<QImage>& images, const QList<QString>& folderPaths);
+    static void resetFolderIconToDefault(const QList<QString> &folderPath);
 };
 
 #endif // MACOSICONUTILS_H

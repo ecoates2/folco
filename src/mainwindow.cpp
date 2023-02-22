@@ -33,9 +33,11 @@ MainWindow::MainWindow(QWidget *parent)
     dirListItemModel = dirListWidget->model();
     connect(dirListItemModel, &QAbstractItemModel::rowsInserted, this, [=]() {
         ui->clearDirsButton->setEnabled(dirListWidget->count() > 0);
+        ui->applyButton->setEnabled(dirListWidget->count() > 0);
     });
     connect(dirListItemModel, &QAbstractItemModel::rowsRemoved, this, [=]() {
         ui->clearDirsButton->setEnabled(dirListWidget->count() > 0);
+        ui->applyButton->setEnabled(dirListWidget->count() > 0);
     });
 
     colorPicker = new QColorDialog(this);
@@ -112,9 +114,6 @@ void MainWindow::on_resetCheckbox_stateChanged(int state)
     ui->previewLabel->setPixmap(customizationManager->getPreview());
 }
 
-
-
-
 void MainWindow::on_cancelButton_clicked()
 {
     QApplication::quit();
@@ -126,7 +125,7 @@ void MainWindow::on_applyButton_clicked()
     QList<QString> folderList;
 
     for (int i = 0; i < dirListWidget->count(); ++i) {
-        folderList.append(dirListWidget->item(i)->text());
+        folderList.append(QDir::toNativeSeparators(dirListWidget->item(i)->text()));
     }
     customizationManager->applyCustomization(folderList);
     QApplication::quit();
