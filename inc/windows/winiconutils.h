@@ -86,8 +86,8 @@ private:
 
 public:
     static void dumpDefaultFolderIcons(const QString &folderPathIn);
-    static void createICOAndApply(const QList<QImage>& images, const QString& folderPath);
-    static void resetFolderIconToDefault(const QString &folderPath);
+    static void createICOAndApply(const QList<QImage>& images, const QList<QString>& folderPaths);
+    static void resetFolderIconToDefault(const QList<QString> &folderPaths);
 };
 
 #endif // WINICONUTILS_H

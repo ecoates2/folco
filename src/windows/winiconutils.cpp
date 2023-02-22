@@ -176,95 +176,107 @@ void WinIconUtils::dumpDefaultFolderIcons(const QString &folderPathIn) {
 
 }
 
-void WinIconUtils::createICOAndApply(const QList<QImage>& images, const QString &folderPathIn) {
+void WinIconUtils::createICOAndApply(const QList<QImage>& images, const QList<QString> &folderPathsIn) {
 
-    bool iconExists = previousIconExists(folderPathIn);
+    QList<QString> deleteFiles;
 
-    QString prevIconIdentifier;
+    for (const QString &folder : folderPathsIn) {
 
-    QString currIconIdentifier;
+        QDir directory(folder);
+        QStringList filters;
+        filters << "*.ico";
+        directory.setNameFilters(filters);
 
-    if (iconExists) {
-        prevIconIdentifier = previousIconIdentifier(folderPathIn);
+        directory.setFilter(QDir::Files | QDir::System | QDir::Hidden);
+        QFileInfoList fileInfoList = directory.entryInfoList();
+
+        for (const QFileInfo &fileInfo : fileInfoList) {
+            QRegularExpressionMatch match = getFileNameRegExp().match(fileInfo.baseName());
+            if (match.hasMatch()) {
+                deleteFiles.append(fileInfo.absoluteFilePath());
+            }
+        }
+
+        // From testing, it's necessary for an updated icon to have a different name from the previous one, or else it'll have trouble updating the change.
+
+        QString currIconIdentifier = QString("folco-%1-%2").arg(QDateTime::currentDateTime().toMSecsSinceEpoch()).arg(generateRandomString(6));
+
+        const QString icoPath = folder + "\\" + currIconIdentifier + ".ico";
+
+        // Create the icon file
+
+        saveQImagesToICO(images, icoPath);
+
+        std::string desktopIniPath = (folder + "\\" + "desktop.ini").toStdString();
+
+        std::wstring folderPathW = folder.toStdWString();
+
+        std::wstring icoPathW = icoPath.toStdWString();
+
+        // Create an empty desktop.ini and notify the Windows shell that it exists. Necessary so that the newly applied icon updates immediately.
+
+        SHFOLDERCUSTOMSETTINGS fcs_noicon;
+
+        fcs_noicon.dwSize = sizeof(fcs_noicon);
+        fcs_noicon.dwMask = FCSM_ICONFILE;
+        fcs_noicon.pszIconFile = NULL;
+        fcs_noicon.cchIconFile = 0;
+        fcs_noicon.iIconIndex = 0;
+
+        SHGetSetFolderCustomSettings(&fcs_noicon, folderPathW.c_str(), FCS_FORCEWRITE);
+
+        // For future reference: SHCNF_FLUSH can be used to wait for an explorer refresh to complete
+
+        SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, desktopIniPath.c_str(), NULL);
+
+        // Overwrite with pszIconFile pointing to the new icon, notify again
+
+        SHFOLDERCUSTOMSETTINGS fcs;
+
+        fcs.dwSize = sizeof(fcs);
+        fcs.dwMask = FCSM_ICONFILE;
+        fcs.pszIconFile = icoPathW.data();
+        fcs.cchIconFile = 0;
+        fcs.iIconIndex = 0;
+
+        SHGetSetFolderCustomSettings(&fcs, folderPathW.c_str(), FCS_FORCEWRITE);
+
+        SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH, desktopIniPath.c_str(), NULL);
     }
 
-    // From testing, it's necessary for an updated icon to have a different name from the previous one, or else it'll have trouble updating the change.
+    // Remove all old icons
 
-    currIconIdentifier = QString("folco-%1-%2").arg(QDateTime::currentDateTime().toMSecsSinceEpoch()).arg(generateRandomString(6));
-
-    const QString icoPath = folderPathIn + "\\" + currIconIdentifier + ".ico";
-
-    // Create the icon file
-
-    saveQImagesToICO(images, icoPath);
-
-    std::string desktopIniPath = (folderPathIn + "\\" + "desktop.ini").toStdString();
-
-    std::wstring folderPathW = folderPathIn.toStdWString();
-
-    std::wstring icoPathW = icoPath.toStdWString();
-
-    // Create an empty desktop.ini and notify the Windows shell that it exists. Necessary so that the newly applied icon updates immediately.
-
-    SHFOLDERCUSTOMSETTINGS fcs_noicon;
-
-    fcs_noicon.dwSize = sizeof(fcs_noicon);
-    fcs_noicon.dwMask = FCSM_ICONFILE;
-    fcs_noicon.pszIconFile = NULL;
-    fcs_noicon.cchIconFile = 0;
-    fcs_noicon.iIconIndex = 0;
-
-    SHGetSetFolderCustomSettings(&fcs_noicon, folderPathW.c_str(), FCS_FORCEWRITE);
-
-    SHChangeNotify(SHCNE_CREATE, SHCNF_PATH | SHCNF_FLUSH, desktopIniPath.c_str(), NULL);
-
-    // Overwrite with pszIconFile pointing to the new icon, notify again
-
-    SHFOLDERCUSTOMSETTINGS fcs;
-
-    fcs.dwSize = sizeof(fcs);
-    fcs.dwMask = FCSM_ICONFILE;
-    fcs.pszIconFile = icoPathW.data();
-    fcs.cchIconFile = 0;
-    fcs.iIconIndex = 0;
-
-    SHGetSetFolderCustomSettings(&fcs, folderPathW.c_str(), FCS_FORCEWRITE);
-
-    SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSH, desktopIniPath.c_str(), NULL);
-
-    // Remove the old icon, if it exists.
-
-    if (iconExists) {
-        QString prevIconPathFull = folderPathIn + "\\" + prevIconIdentifier + ".ico";
-        QFile file(prevIconPathFull);
-        file.remove();
+    for (const QString &file : deleteFiles) {
+        QFile delFile(file);
+        delFile.remove();
     }
 }
 
-void WinIconUtils::resetFolderIconToDefault(const QString &folderPathIn) {
+void WinIconUtils::resetFolderIconToDefault(const QList<QString> &folderPathsIn) {
 
-    std::string desktopIniPath = (folderPathIn + "\\" + "desktop.ini").toStdString();
+    for (const QString &folder : folderPathsIn) {
+        std::string desktopIniPath = (folder + "\\" + "desktop.ini").toStdString();
 
-    std::wstring folderPathW = folderPathIn.toStdWString();
+        std::wstring folderPathW = folder.toStdWString();
 
-    // Nullify pszIconFile
+        // Nullify pszIconFile
 
-    SHFOLDERCUSTOMSETTINGS fcs;
+        SHFOLDERCUSTOMSETTINGS fcs;
 
-    fcs.dwSize = sizeof(fcs);
-    fcs.dwMask = FCSM_ICONFILE;
-    fcs.pszIconFile = NULL;
-    fcs.cchIconFile = 0;
-    fcs.iIconIndex = 0;
+        fcs.dwSize = sizeof(fcs);
+        fcs.dwMask = FCSM_ICONFILE;
+        fcs.pszIconFile = NULL;
+        fcs.cchIconFile = 0;
+        fcs.iIconIndex = 0;
 
-    SHGetSetFolderCustomSettings(&fcs, folderPathW.c_str(), FCS_FORCEWRITE);
+        SHGetSetFolderCustomSettings(&fcs, folderPathW.c_str(), FCS_FORCEWRITE);
 
-    // Note: Don't remove desktop.ini altogether, since it could store other unrelated folder settings
+        // Note: Don't remove desktop.ini altogether, since it could store other unrelated folder settings
 
-    cleanUpIconsFromDir(folderPathIn);
+        cleanUpIconsFromDir(folder);
 
-    SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSH, desktopIniPath.c_str(), NULL);
-
+        SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH, desktopIniPath.c_str(), NULL);
+    }
 }
 
 void WinIconUtils::cleanUpIconsFromDir(const QString &folderPathIn) {
