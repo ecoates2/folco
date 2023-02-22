@@ -19,6 +19,10 @@
 
 #endif
 
+/* Class that handles image modifications and passing off image data to
+ * the platform-specific code
+ */
+
 class CustomizationManager: public QObject
 {
 Q_OBJECT

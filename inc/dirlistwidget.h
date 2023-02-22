@@ -6,6 +6,10 @@
 #include <QMimeData>
 #include <QFileInfo>
 
+/*
+ * Subclass of QListWidget that handles drag and drop. Only allows directories to be dropped in.
+ */
+
 class DirListWidget : public QListWidget
 {
     Q_OBJECT

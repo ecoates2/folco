@@ -24,6 +24,8 @@
 #include <gdiplus.h>
 using namespace Gdiplus;
 
+// The ID of the default folder icon in shell32.dll
+
 static const WORD FOLDER_ICON_ID = 4;
 
 #pragma pack( push )

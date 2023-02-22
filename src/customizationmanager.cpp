@@ -2,6 +2,9 @@
 
 CustomizationManager::CustomizationManager(QObject *parent)
 {
+
+    // Generate the default icon set if it doesn't already exist
+
     QDir dataDir = QDir::toNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/" + "default_icons");
 
     if (!dataDir.exists()) {
@@ -16,19 +19,25 @@ CustomizationManager::CustomizationManager(QObject *parent)
     for (const QImage &icon : defaultIcons) {
         QImage grayscale = convertToGrayScale(icon);
 
+        // Adjust the brightness/contrast as needed per platform
+
         #if defined(Q_OS_MACOS)
 
         adjustBrightness(grayscale, BRIGHTNESS_ADJUSTMENT);
 
         #endif
 
-        // Adjusting the contrast gives a much better looking result; more variance in shading.
         adjustContrast(grayscale, CONTRAST_ADJUSTMENT);
 
         grayscaleAndAdjustedIcons.append(grayscale);
     }
 
     color = QColor(Qt::blue);
+
+    /* This indicates whether the icons will be allowed any sort of customization.
+     * When "Reset Folder(s)" is enabled, this will be disabled.
+     */
+
     customizationEnabled = true;
     usingCustomColor = false;
 
@@ -55,6 +64,8 @@ void CustomizationManager::applyCustomization(QList<QString> &folders)
     }
 
 }
+
+// QImage colorization algorithm; works by multiplying the source pixels by the desired color
 
 void CustomizationManager::colorize(QImage& inoutImage, const QColor& tintColor)
         {
@@ -190,6 +201,8 @@ QColor CustomizationManager::getColor()
 {
     return color;
 }
+
+// Obtain a QPixmap to be displayed in the UI
 
 QPixmap CustomizationManager::getPreview()
 {

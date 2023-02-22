@@ -10,6 +10,10 @@
 
 NSURL* const ASSETS_LOCATION = [NSURL fileURLWithPath:@"/System/Library/PrivateFrameworks/IconFoundation.framework/Versions/A/Resources/Assets.car"];
 
+/*
+ * 4 types of folder icons found in Assets.car. MacOS uses these to construct system icons.
+ */
+
 NSString* const FOLDER_NAME = @"Folder";
 NSString* const FOLDER_DARK_NAME = @"FolderDark";
 NSString* const SMART_FOLDER_NAME = @"SmartFolder";
@@ -242,6 +246,8 @@ void MacOSIconUtils::createICNSAndApply(const QList<QImage>& images, const QList
 
     CFStringRef format = kUTTypeAppleICNS;
 
+    // Construct a .icns file in memory
+
     CFMutableDataRef dataRef = CFDataCreateMutable(NULL, 0);
 
     CGImageDestinationRef destination = CGImageDestinationCreateWithData(dataRef, format, images.size(), NULL);
@@ -267,7 +273,7 @@ void MacOSIconUtils::createICNSAndApply(const QList<QImage>& images, const QList
 
         NSDictionary *imageProperties = @{(__bridge id)kCGImagePropertyDPIHeight : DPIdim, (__bridge id)kCGImagePropertyDPIWidth : DPIdim};
 
-
+        // Add the current image to the .icns file
         CGImageDestinationAddImage(destination, cgImage, (__bridge CFDictionaryRef)imageProperties);
         CFRelease(cgImage);
 
@@ -279,11 +285,13 @@ void MacOSIconUtils::createICNSAndApply(const QList<QImage>& images, const QList
 
 
 
+    // Convert the CFData constructed above to NSData
 
     NSData *iconData = [NSData dataWithBytesNoCopy:CFDataGetMutableBytePtr(dataRef) length:CFDataGetLength(dataRef) freeWhenDone:NO];
 
     NSImage *icon = [[NSImage alloc] initWithData:iconData];
 
+    // Write the .icns to disk.
     for (const QString &folder : folderPathsIn) {
         [[NSWorkspace sharedWorkspace] setIcon:icon forFile:folder.toNSString() options:0];
     }

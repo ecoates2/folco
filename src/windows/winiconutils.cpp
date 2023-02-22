@@ -225,7 +225,9 @@ void WinIconUtils::createICOAndApply(const QList<QImage>& images, const QList<QS
 
         SHGetSetFolderCustomSettings(&fcs_noicon, folderPathW.c_str(), FCS_FORCEWRITE);
 
-        // For future reference: SHCNF_FLUSH can be used to wait for an explorer refresh to complete
+        /* For future reference: SHCNF_FLUSH can be used to wait for an explorer refresh to complete,
+        / but it isn't necessary here.
+        */
 
         SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, desktopIniPath.c_str(), NULL);
 

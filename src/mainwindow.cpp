@@ -16,6 +16,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->setupUi(this);
 
+    // Continue setting up the UI and some signals/slots connections.
+
     dirListWidget = new DirListWidget(ui->dirListGroup);
     dirListWidget->setObjectName("dirListWidget");
 
@@ -89,6 +91,8 @@ void MainWindow::on_selectColorButton_clicked()
 {
     QColor currColor = customizationManager->getColor();
     QColor newColor = colorPicker->getColor(currColor, this, "Set color");
+
+    // If the user exits without selecting a color, set to the existing color
     if (!newColor.isValid()) {
         newColor = currColor;
     }

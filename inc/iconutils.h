@@ -21,6 +21,11 @@
 
 #include <algorithm>
 
+/*
+ * Utility class to handle all platform-specific code relating to extracting default icon sets
+ * and modifying the icons of directories.
+ */
+
 class IconUtils
 {
 public:

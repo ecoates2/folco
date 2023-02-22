@@ -6,6 +6,8 @@ DirListWidget::DirListWidget(QWidget *parent)
     setAcceptDrops(true);
 }
 
+// Only accepts directories.
+
 void DirListWidget::dragEnterEvent(QDragEnterEvent *event)
 {
     bool allDirs = true;
@@ -28,6 +30,8 @@ void DirListWidget::dragEnterEvent(QDragEnterEvent *event)
         setCursor(Qt::ForbiddenCursor);
     }
 }
+
+// Only adds directories to the list if they aren't already there.
 
 void DirListWidget::dropEvent(QDropEvent *event)
 {
