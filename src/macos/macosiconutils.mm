@@ -3,8 +3,6 @@
 #import <Cocoa/Cocoa.h>
 #import <ImageIO/ImageIO.h>
 
-#import <QDebug>
-
 
 // Constants
 
