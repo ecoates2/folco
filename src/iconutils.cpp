@@ -1,7 +1,5 @@
 #include "../inc/iconutils.h"
 
-#include <QDebug>
-
 void IconUtils::dumpDefaultFolderIcons(const QString &folderPathIn) {
 
 #if defined(Q_OS_MACOS)

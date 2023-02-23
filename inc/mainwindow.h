@@ -18,8 +18,6 @@
 #include <QFileDialog>
 #include <QListWidget>
 #include <QColorDialog>
-#include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
 
 #include "../inc/dirlistwidget.h"
 #include "../inc/customizationmanager.h"
