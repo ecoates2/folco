@@ -225,11 +225,16 @@ void WinIconUtils::createICOAndApply(const QList<QImage>& images, const QList<QS
 
         SHGetSetFolderCustomSettings(&fcs_noicon, folderPathW.c_str(), FCS_FORCEWRITE);
 
-        /* For future reference: SHCNF_FLUSH can be used to wait for an explorer refresh to complete,
-        / but it isn't necessary here.
+        /* SHCNF_FLUSH can be used as a blocking wait for an explorer refresh to complete.
+        / From testing, this is necessary for folders that have preview icons to update immediately.
+        / One disadvantage of this is that it locks up the UI and takes a long time for a list
+        / of folders to update.
         */
 
-        SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, desktopIniPath.c_str(), NULL);
+        // TODO/Goal: Find a way to instantly update any kind of folder icon, without freezing execution.
+
+
+        SHChangeNotify(SHCNE_CREATE, SHCNF_PATH | SHCNF_FLUSH, desktopIniPath.c_str(), NULL);
 
         // Overwrite with pszIconFile pointing to the new icon, notify again
 
