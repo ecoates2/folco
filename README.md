@@ -1,5 +1,9 @@
+![alt text](https://github.com/ecoates2/folco/blob/main/images/logo.png?raw=true)
+
 # Folco
 An open-source, cross-platform application to customize folder icons
+
+![alt text](https://github.com/ecoates2/folco/blob/main/images/screenshot_windows.png?raw=true)
 
 # Features
 * Set custom colors for either single folders or for an entire group
