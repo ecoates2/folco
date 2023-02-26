@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>Folco</Name>
+    <Version>0.1.0.0</Version>
+    <Title>Folco Installer</Title>
+    <Publisher>Folco Project</Publisher>
+    <ProductUrl>https://github.com/ecoates2/folco</ProductUrl>
+    <StartMenuDir>Folco</StartMenuDir>
+    <TargetDir>@ApplicationsDir@/Folco</TargetDir>
+</Installer>

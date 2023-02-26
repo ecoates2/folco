@@ -3,8 +3,8 @@
 IDI_ICON1               ICON    "windows_app_icon.ico"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,0,0,0
- PRODUCTVERSION 0,0,0,0
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
  FILEFLAGS 0x0L
  FILEFLAGSMASK 0x3fL
  FILEOS 0x00040004L
@@ -15,9 +15,9 @@ BEGIN
     BEGIN
         BLOCK "000004b0"
         BEGIN
-            VALUE "CompanyName", "Ethan Coates"
+            VALUE "CompanyName", "Folco Project"
             VALUE "FileDescription", "Folco"
-            VALUE "FileVersion", "0.0.0.0"
+            VALUE "FileVersion", "0.1.0.0"
             VALUE "LegalCopyright", "Copyright (C) 2023 Ethan Coates"
             VALUE "InternalName", "Folco"
             VALUE "OriginalFilename", "Folco.exe"
