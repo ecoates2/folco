@@ -14,7 +14,7 @@ the "Add" button or by dragging and dropping from Explorer/Finder. To colorize t
 "Color" button. Otherwise, to reset the folder(s) to default, hit the "Reset Folder(s)" checkbox. Finally,
 hit "Apply" to apply any changes.
 
-# TODO
+# Planned Features
 * Register context menu functionality for Windows
 * Command line/scripting capabilities
 * Implement more advanced customization options, such as textures, patterns, overlays and gradients
