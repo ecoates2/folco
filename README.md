@@ -26,6 +26,9 @@ hit "Apply" to apply any changes.
 * Possibly add support for some Linux desktop environments
 * Clean up the codebase and optimize performance
 
+# Development
+Check [BUILD.md](BUILD.md) for build instructions.
+
 # About
 The overall goal of this project is to provide a free and open-source solution for customizing folder icons. All of the current existing applications that accomplish this are closed-source.
 
