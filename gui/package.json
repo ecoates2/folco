@@ -19,7 +19,7 @@
 		"@tauri-apps/plugin-opener": "^2.5.4",
 		"iconify-picker": "^0.7.2",
 		"tailwindcss": "^4.3.1",
-		"folco-renderer-wasm": "file:../folco-renderer-wasm/pkg"
+		"folco-renderer-wasm": "file:../crates/folco-renderer-wasm/pkg"
 	},
 	"devDependencies": {
 		"@emoji-mart/data": "^1.2.1",
