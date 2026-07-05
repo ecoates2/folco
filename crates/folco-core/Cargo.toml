@@ -1,0 +1,24 @@
+[package]
+name = "folco-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+icon-sys = { workspace = true, features = ["folder-settings"] }
+folco-renderer = { path = "../folco-renderer", features = ["twemoji"] }
+
+clap = { version = "4", features = ["derive"], optional = true }
+palette = { version = "0.7", optional = true }
+thiserror.workspace = true
+image.workspace = true
+directories = "6"
+serde.workspace = true
+serde_json.workspace = true
+tokio = { version = "1", features = ["sync"] }
+
+[features]
+clap = ["dep:clap", "dep:palette", "folco-renderer/clap"]
+jsonschema = ["folco-renderer/jsonschema"]
+
+[dev-dependencies]
+tempfile = "3"

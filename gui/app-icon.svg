@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1024"
+   height="1024"
+   viewBox="0 0 270.93333 270.93333"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="new-folco-icon-expanded.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#000000"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.5759189"
+     inkscape:cx="397.22856"
+     inkscape:cy="510.49581"
+     inkscape:window-width="3840"
+     inkscape:window-height="2036"
+     inkscape:window-x="-12"
+     inkscape:window-y="-12"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke-width:0.315806"
+       id="rect1"
+       width="270.93332"
+       height="270.93332"
+       x="2.1316282e-14"
+       y="-3.5527137e-14"
+       rx="47.602982" />
+    <g
+       id="g3"
+       transform="matrix(1.1900745,0,0,1.1971372,-31.312606,-26.671672)">
+      <rect
+         style="fill:#c33c5f;fill-opacity:1;stroke-width:0.363806"
+         id="rect2"
+         width="100"
+         height="70"
+         x="65.141884"
+         y="82.938385" />
+      <rect
+         style="mix-blend-mode:darken;fill:#3cc3a0;fill-opacity:1;stroke-width:0.335784"
+         id="rect3"
+         width="100"
+         height="70"
+         x="115.14188"
+         y="117.93839" />
+      <path
+         d="m 165.14186,117.93854 h -50.00005 v 34.99993 h 50.00005 z"
+         style="mix-blend-mode:darken;fill:#3cc3a0;stroke-width:0.335784"
+         id="path3" />
+    </g>
+  </g>
+</svg>

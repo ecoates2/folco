@@ -1,0 +1,14 @@
+/target
+
+# Rust
+**/*.rs.bk
+*.pdb
+
+# GUI / frontend
+node_modules
+/gui/.svelte-kit
+/gui/build
+/gui/src-tauri/gen/schemas
+
+# Editor / OS
+.DS_Store

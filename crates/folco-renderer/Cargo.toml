@@ -1,0 +1,25 @@
+[package]
+name = "folco-renderer"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+twemoji = ["dep:twemoji-assets"]
+jsonschema = ["dep:schemars"]
+tsify = ["dep:tsify-next", "dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
+clap = ["dep:clap"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"], optional = true }
+image.workspace = true
+palette = "0.7"
+resvg = "0.44"
+schemars = { version = "0.8", optional = true }
+serde.workspace = true
+serde_json.workspace = true
+serde-wasm-bindgen = { version = "0.6", optional = true }
+thiserror.workspace = true
+tsify-next = { version = "0.5", optional = true }
+twemoji-assets = { version = "1.5", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
