@@ -30,7 +30,6 @@ pub struct OverlayLayers {
     pub overlay: Layer<ImageOverlayConfig>,
 }
 
-
 impl LayerSet for OverlayLayers {
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
         let versions = LayerVersions {

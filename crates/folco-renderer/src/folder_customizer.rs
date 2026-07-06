@@ -57,7 +57,6 @@ pub struct FolderLayers {
     pub overlay: Layer<ImageOverlayConfig>,
 }
 
-
 impl FolderLayers {
     /// Returns a snapshot of all layer versions.
     fn layer_versions(&self) -> LayerVersions {

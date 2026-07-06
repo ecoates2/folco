@@ -374,7 +374,6 @@ pub struct CompositeLayer {
     cache: HashMap<CacheKey, (IconImage, u64)>,
 }
 
-
 impl CompositeLayer {
     /// Returns the current version number.
     pub fn version(&self) -> u64 {
