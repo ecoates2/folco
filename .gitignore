@@ -10,5 +10,11 @@ node_modules
 /gui/build
 /gui/src-tauri/gen/schemas
 
+# Generated wasm package (built by wasm-pack, consumed by the GUI)
+/crates/folco-renderer-wasm/pkg
+
+# folco-cli staged as a Tauri sidecar during release builds
+/gui/src-tauri/binaries
+
 # Editor / OS
 .DS_Store

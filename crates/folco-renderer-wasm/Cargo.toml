@@ -8,6 +8,8 @@ license = "MIT OR Apache-2.0"
 homepage= "https://github.com/ecoates2/folco-renderer-wasm"
 repository = "https://github.com/ecoates2/folco-renderer-wasm"
 readme = "README.md"
+# Internal for now: built with wasm-pack and consumed by the GUI locally.
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]

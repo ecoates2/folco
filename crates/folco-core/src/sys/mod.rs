@@ -28,6 +28,8 @@ pub use macos::get_folder_icon_content_bounds;
 
 #[cfg(target_os = "linux")]
 pub use linux::get_folder_icon_content_bounds;
+#[cfg(target_os = "linux")]
+pub use linux::SURFACE_COLOR;
 
 // ============================================================================
 // PlatformSizeSpec

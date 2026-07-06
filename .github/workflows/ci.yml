@@ -1,0 +1,36 @@
+# Library + CLI CI for the folco workspace.
+#
+# All the heavy lifting (fmt, clippy, test on Linux + Windows, cargo-deny,
+# typos, conventional commits, cargo-hack, rustdoc, coverage) lives in the
+# central reusable workflow at ecoates2/.github. This wrapper only supplies
+# folco-specific inputs.
+#
+# NOTE: the Tauri app crate (folco-gui) is intentionally EXCLUDED here. It needs
+# a pre-built frontend (bun + wasm-pack) and webkit system libraries that this
+# pure-Rust workflow doesn't provide. The app is covered by app-ci.yml instead.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save runner time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ecoates2/.github/.github/workflows/rust-ci.yml@v1
+    # Forward repo secrets (CODECOV_TOKEN) to the reusable workflow.
+    secrets: inherit
+    with:
+      # gio CLI + folder icon themes for the icon-sys Linux backend that
+      # folco-core exercises in its tests.
+      linux-apt-packages: libglib2.0-bin adwaita-icon-theme hicolor-icon-theme
+      # Lint/test every crate EXCEPT the Tauri app (built separately in app-ci).
+      workspace-flag: "--workspace --exclude folco-gui"

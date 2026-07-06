@@ -1,0 +1,46 @@
+# cargo-deny configuration. https://embarkstudios.github.io/cargo-deny/
+# Checked in CI via the shared rust-ci workflow.
+
+[advisories]
+# RustSec advisory database checks. Vulnerabilities fail by default;
+# add reviewed advisory IDs here to ignore specific cases.
+ignore = []
+
+# Only fail on unmaintained advisories for crates we depend on directly.
+unmaintained = "workspace"
+
+[licenses]
+confidence-threshold = 0.9
+# folco's own crates are unpublished (publish = false); skip license checks on
+# them and only enforce licenses on third-party dependencies.
+private = { ignore = true }
+# List of explicitly allowed licenses.
+# See https://spdx.org/licenses/ for the full list of identifiers.
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "ISC",
+    "Zlib",
+    "NCSA",
+]
+
+[bans]
+# Duplicate versions only bloat the tree; warn rather than block.
+multiple-versions = "warn"
+# Wildcard version requirements are rejected by crates.io anyway.
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# icon-sys is consumed as a git dependency until it is published to crates.io.
+allow-git = [
+    "https://github.com/ecoates2/icon-sys",
+    "https://github.com/ecoates2/icon-sys.git",
+]

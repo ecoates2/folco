@@ -4,6 +4,8 @@ authors = ["Ethan Coates <ethancoates1567@gmail.com>"]
 description = "An open-source, cross-platform application to customize folder icons"
 version = "0.1.0"
 edition = "2024"
+# Distributed as prebuilt binaries via GitHub Releases, not crates.io.
+publish = false
 
 [dependencies]
 folco-core = { path = "../folco-core", features = ["clap", "jsonschema"] }
