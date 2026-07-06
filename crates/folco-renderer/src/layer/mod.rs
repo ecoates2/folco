@@ -368,19 +368,12 @@ impl<C: LayerConfig> Layer<C> {
 /// Unlike [`Layer<C>`], this has no configuration or enabled state.
 /// It purely caches the final rendered output and tracks a version
 /// for invalidation when any upstream layer changes.
+#[derive(Default)]
 pub struct CompositeLayer {
     version: u64,
     cache: HashMap<CacheKey, (IconImage, u64)>,
 }
 
-impl Default for CompositeLayer {
-    fn default() -> Self {
-        Self {
-            version: 0,
-            cache: HashMap::new(),
-        }
-    }
-}
 
 impl CompositeLayer {
     /// Returns the current version number.

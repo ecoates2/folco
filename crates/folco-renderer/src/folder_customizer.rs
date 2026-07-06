@@ -45,6 +45,7 @@ use crate::profile::CustomizationProfile;
 /// 1. **Color target** – Recolors to a target RGB color (mutates image)
 /// 2. **Decal** – Renders an SVG at the center (tile composited on top)
 /// 3. **Overlay** – Renders an image at a corner position (tile composited on top)
+#[derive(Default)]
 pub struct FolderLayers {
     /// Color target layer (root — no dependencies).
     pub folder_color_target: Layer<FolderColorTargetConfig>,
@@ -56,15 +57,6 @@ pub struct FolderLayers {
     pub overlay: Layer<ImageOverlayConfig>,
 }
 
-impl Default for FolderLayers {
-    fn default() -> Self {
-        Self {
-            folder_color_target: Layer::default(),
-            decal: Layer::default(),
-            overlay: Layer::default(),
-        }
-    }
-}
 
 impl FolderLayers {
     /// Returns a snapshot of all layer versions.

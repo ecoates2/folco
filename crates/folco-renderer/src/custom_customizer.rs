@@ -24,18 +24,12 @@ use crate::profile::CustomIconProfile;
 ///
 /// Custom images have no surface color metadata, so color target and
 /// decal layers are not applicable.
+#[derive(Default)]
 pub struct OverlayLayers {
     /// Image overlay layer.
     pub overlay: Layer<ImageOverlayConfig>,
 }
 
-impl Default for OverlayLayers {
-    fn default() -> Self {
-        Self {
-            overlay: Layer::default(),
-        }
-    }
-}
 
 impl LayerSet for OverlayLayers {
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {

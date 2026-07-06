@@ -257,9 +257,7 @@ impl std::str::FromStr for FolderColor {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s
             .to_lowercase()
-            .replace(' ', "")
-            .replace('-', "")
-            .replace('_', "")
+            .replace([' ', '-', '_'], "")
             .as_str()
         {
             "red" => Ok(FolderColor::Red),
