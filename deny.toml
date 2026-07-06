@@ -20,6 +20,8 @@ allow = [
     "MIT",
     "MIT-0",
     "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "CDLA-Permissive-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "MPL-2.0",
@@ -35,12 +37,15 @@ allow = [
 multiple-versions = "warn"
 # Wildcard version requirements are rejected by crates.io anyway.
 wildcards = "deny"
+# ...but intra-workspace `path` dependencies (e.g. folco-cli -> folco-core) have
+# no version and thus look like wildcards. Allow them for our private
+# (publish = false) crates; registry deps are still held to `wildcards = "deny"`.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# icon-sys is consumed as a git dependency until it is published to crates.io.
-allow-git = [
-    "https://github.com/ecoates2/icon-sys",
-    "https://github.com/ecoates2/icon-sys.git",
-]
+# TEMPORARY: icon-sys is consumed as a git dependency until it's published to
+# crates.io. Once published, switch the dependency to a normal version
+# requirement and delete this allow-git entry.
+allow-git = ["https://github.com/ecoates2/icon-sys"]

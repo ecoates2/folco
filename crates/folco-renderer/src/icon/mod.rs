@@ -18,9 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::RenderError;
 use crate::layer::ImageSource;
 
-pub use folder::{
-    FolderIconBase, SerializableFolderIconBase, SerializableIconImage, SurfaceColor,
-};
+pub use folder::{FolderIconBase, SerializableFolderIconBase, SerializableIconImage, SurfaceColor};
 
 // ============================================================================
 // IconBase
@@ -98,12 +96,22 @@ pub struct RectPx {
 impl RectPx {
     /// Creates a new rectangle with the given position and dimensions.
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     /// Creates a rectangle starting at origin (0, 0) with the given dimensions.
     pub fn from_size(width: u32, height: u32) -> Self {
-        Self { x: 0, y: 0, width, height }
+        Self {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }
     }
 
     /// Returns the right edge coordinate (x + width).
@@ -168,12 +176,20 @@ pub struct IconSizeSpec {
 impl IconSizeSpec {
     /// Creates a new icon size specification.
     pub fn new(width: u32, height: u32, scale: f32) -> Self {
-        Self { width, height, scale }
+        Self {
+            width,
+            height,
+            scale,
+        }
     }
 
     /// Creates a square icon size specification.
     pub fn square(size: u32, scale: f32) -> Self {
-        Self { width: size, height: size, scale }
+        Self {
+            width: size,
+            height: size,
+            scale,
+        }
     }
 
     /// Returns `true` if this spec is square (width == height).
@@ -375,10 +391,7 @@ mod tests {
 
     #[test]
     fn icon_image_logical_size() {
-        let img = IconImage::new_full_content(
-            RgbaImage::new(64, 64),
-            2.0,
-        );
+        let img = IconImage::new_full_content(RgbaImage::new(64, 64), 2.0);
         let (w, h) = img.logical_size();
         assert_eq!(w, 32.0);
         assert_eq!(h, 32.0);
@@ -389,14 +402,8 @@ mod tests {
         let mut set = IconSet::new();
         assert!(set.is_empty());
 
-        set.add_image(IconImage::new_full_content(
-            RgbaImage::new(16, 16),
-            1.0,
-        ));
-        set.add_image(IconImage::new_full_content(
-            RgbaImage::new(32, 32),
-            1.0,
-        ));
+        set.add_image(IconImage::new_full_content(RgbaImage::new(16, 16), 1.0));
+        set.add_image(IconImage::new_full_content(RgbaImage::new(32, 32), 1.0));
 
         assert_eq!(set.len(), 2);
         assert!(!set.is_empty());

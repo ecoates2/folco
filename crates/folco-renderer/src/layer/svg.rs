@@ -124,10 +124,8 @@ impl SvgSource {
             Self::Raw(svg) => Ok(svg.as_str()),
             #[cfg(feature = "twemoji")]
             Self::Emoji(emoji) => {
-                let asset = resolve_twemoji(emoji).ok_or_else(|| {
-                    RenderError::InvalidEmoji {
-                        emoji: emoji.clone(),
-                    }
+                let asset = resolve_twemoji(emoji).ok_or_else(|| RenderError::InvalidEmoji {
+                    emoji: emoji.clone(),
                 })?;
                 Ok(asset.as_ref())
             }
@@ -136,11 +134,8 @@ impl SvgSource {
             #[cfg(feature = "twemoji")]
             Self::EmojiName(name) => {
                 use twemoji_assets::svg::SvgTwemojiAsset;
-                let asset = SvgTwemojiAsset::from_name(name).ok_or_else(|| {
-                    RenderError::InvalidEmojiName {
-                        name: name.clone(),
-                    }
-                })?;
+                let asset = SvgTwemojiAsset::from_name(name)
+                    .ok_or_else(|| RenderError::InvalidEmojiName { name: name.clone() })?;
                 Ok(asset.as_ref())
             }
             #[cfg(not(feature = "twemoji"))]
@@ -219,7 +214,8 @@ pub fn render_svg_with_color(
     let height = (svg_size.height() * scale).ceil() as u32;
 
     // Create pixmap and render
-    let mut pixmap = Pixmap::new(width, height).ok_or(RenderError::PixmapCreation { width, height })?;
+    let mut pixmap =
+        Pixmap::new(width, height).ok_or(RenderError::PixmapCreation { width, height })?;
     let transform = Transform::from_scale(scale, scale);
     resvg::render(&tree, transform, &mut pixmap.as_mut());
 
@@ -317,7 +313,8 @@ fn pixmap_to_rgba_image(pixmap: &Pixmap) -> RgbaImage {
         for x in 0..width {
             let pixel = pixmap.pixel(x, y).unwrap();
             // tiny_skia uses premultiplied alpha, we need to unpremultiply
-            let (r, g, b, a) = unpremultiply(pixel.red(), pixel.green(), pixel.blue(), pixel.alpha());
+            let (r, g, b, a) =
+                unpremultiply(pixel.red(), pixel.green(), pixel.blue(), pixel.alpha());
             img.put_pixel(x, y, Rgba([r, g, b, a]));
         }
     }
@@ -426,7 +423,10 @@ mod tests {
         let img = render_svg_with_color(SIMPLE_SVG, 50, Some((0, 255, 0, 255))).unwrap();
         // Check that the center pixel (inside the circle) is green-ish
         let center = img.get_pixel(img.width() / 2, img.height() / 2);
-        assert!(center[1] > center[0], "Green should dominate after color replacement");
+        assert!(
+            center[1] > center[0],
+            "Green should dominate after color replacement"
+        );
     }
 
     #[test]
@@ -493,7 +493,7 @@ mod tests {
         let source = SvgSource::from_emoji("🦆").expect("Duck emoji should be supported");
         assert!(source.is_emoji());
         assert!(!source.is_raw());
-        
+
         let svg = source.resolve().expect("Should resolve to SVG");
         assert!(svg.contains("<svg"), "Should be valid SVG data");
     }
@@ -518,11 +518,12 @@ mod tests {
     #[cfg(feature = "twemoji")]
     #[test]
     fn svg_source_from_emoji_name() {
-        let source = SvgSource::from_emoji_name("duck").expect("Duck emoji should be supported by name");
+        let source =
+            SvgSource::from_emoji_name("duck").expect("Duck emoji should be supported by name");
         assert!(source.is_emoji_name());
         assert!(!source.is_raw());
         assert!(!source.is_emoji());
-        
+
         let svg = source.resolve().expect("Should resolve to SVG");
         assert!(svg.contains("<svg"), "Should be valid SVG data");
     }

@@ -125,27 +125,27 @@ impl FolderColor {
     /// Values are in the range 0–255.
     pub fn rgb(&self) -> (u8, u8, u8) {
         match self {
-            FolderColor::Red =>              (244,  67,  54),
-            FolderColor::Pink =>             (233,  30,  99),
-            FolderColor::Purple =>           (156,  39, 176),
-            FolderColor::DeepPurple =>       (103,  58, 183),
-            FolderColor::Indigo =>           ( 63,  81, 181),
-            FolderColor::Blue =>             ( 33, 150, 243),
-            FolderColor::LightBlue =>        (  3, 169, 244),
-            FolderColor::Cyan =>             (  0, 188, 212),
-            FolderColor::Teal =>             (  0, 150, 136),
-            FolderColor::Green =>            ( 76, 175,  80),
-            FolderColor::LightGreen =>       (139, 195,  74),
-            FolderColor::Lime =>             (205, 220,  57),
-            FolderColor::Yellow =>           (255, 235,  59),
-            FolderColor::Amber =>            (255, 193,   7),
-            FolderColor::Orange =>           (255, 152,   0),
-            FolderColor::DeepOrange =>       (255,  87,  34),
-            FolderColor::Brown =>            (121,  85,  72),
-            FolderColor::Grey =>             (158, 158, 158),
-            FolderColor::BlueGrey =>         ( 96, 125, 139),
-            FolderColor::White =>            (237, 237, 237),
-            FolderColor::Black =>            ( 64,  64,  64),
+            FolderColor::Red => (244, 67, 54),
+            FolderColor::Pink => (233, 30, 99),
+            FolderColor::Purple => (156, 39, 176),
+            FolderColor::DeepPurple => (103, 58, 183),
+            FolderColor::Indigo => (63, 81, 181),
+            FolderColor::Blue => (33, 150, 243),
+            FolderColor::LightBlue => (3, 169, 244),
+            FolderColor::Cyan => (0, 188, 212),
+            FolderColor::Teal => (0, 150, 136),
+            FolderColor::Green => (76, 175, 80),
+            FolderColor::LightGreen => (139, 195, 74),
+            FolderColor::Lime => (205, 220, 57),
+            FolderColor::Yellow => (255, 235, 59),
+            FolderColor::Amber => (255, 193, 7),
+            FolderColor::Orange => (255, 152, 0),
+            FolderColor::DeepOrange => (255, 87, 34),
+            FolderColor::Brown => (121, 85, 72),
+            FolderColor::Grey => (158, 158, 158),
+            FolderColor::BlueGrey => (96, 125, 139),
+            FolderColor::White => (237, 237, 237),
+            FolderColor::Black => (64, 64, 64),
         }
     }
 
@@ -239,10 +239,7 @@ impl clap::ValueEnum for FolderColor {
         };
 
         let (r, g, b) = self.rgb();
-        let help = format!(
-            "\x1b[48;2;{r};{g};{b}m  \x1b[0m {}",
-            self.display_name()
-        );
+        let help = format!("\x1b[48;2;{r};{g};{b}m  \x1b[0m {}", self.display_name());
 
         Some(clap::builder::PossibleValue::new(name).help(help))
     }
@@ -258,7 +255,13 @@ impl std::str::FromStr for FolderColor {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().replace(' ', "").replace('-', "").replace('_', "").as_str() {
+        match s
+            .to_lowercase()
+            .replace(' ', "")
+            .replace('-', "")
+            .replace('_', "")
+            .as_str()
+        {
             "red" => Ok(FolderColor::Red),
             "pink" => Ok(FolderColor::Pink),
             "purple" => Ok(FolderColor::Purple),

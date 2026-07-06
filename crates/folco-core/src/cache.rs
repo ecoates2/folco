@@ -8,8 +8,8 @@ use crate::convert::convert_icon_set;
 use crate::error::{Error, Result};
 
 use folco_renderer::IconSet as RendererIconSet;
-use icon_sys::folder_settings::{DefaultFolderIconProvider, PlatformDefaultFolderIconProvider};
 use icon_sys::IconSet as SysIconSet;
+use icon_sys::folder_settings::{DefaultFolderIconProvider, PlatformDefaultFolderIconProvider};
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -43,10 +43,10 @@ impl CacheConfig {
     /// * `organization` - The organization name (e.g., "example")
     /// * `application` - The application name (e.g., "folco")
     pub fn from_app_info(qualifier: &str, organization: &str, application: &str) -> Result<Self> {
-        let project_dirs =
-            directories::ProjectDirs::from(qualifier, organization, application).ok_or_else(
-                || Error::AppDataDir("failed to determine app data directory".to_string()),
-            )?;
+        let project_dirs = directories::ProjectDirs::from(qualifier, organization, application)
+            .ok_or_else(|| {
+                Error::AppDataDir("failed to determine app data directory".to_string())
+            })?;
 
         let cache_dir = project_dirs.data_dir().join("icon_cache");
 

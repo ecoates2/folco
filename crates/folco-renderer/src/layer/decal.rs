@@ -1,7 +1,10 @@
 //! Decal imprint layer — configuration and rendering.
 
-use super::svg::{composite_over, render_source_with_color, SvgSource};
-use super::{CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, LayerVersions, RenderContext};
+use super::svg::{SvgSource, composite_over, render_source_with_color};
+use super::{
+    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, LayerVersions,
+    RenderContext,
+};
 use crate::error::RenderError;
 use crate::icon::SurfaceColor;
 use image::RgbaImage;

@@ -5,7 +5,9 @@ use state::AppState;
 use tauri::Manager;
 
 #[tauri::command]
-fn get_folder_icon_base(state: tauri::State<AppState>) -> Result<SerializableFolderIconBase, String> {
+fn get_folder_icon_base(
+    state: tauri::State<AppState>,
+) -> Result<SerializableFolderIconBase, String> {
     state.get_folder_icon_base()
 }
 
@@ -23,7 +25,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_prevent_default::init())
         .manage(app_state)
-        .invoke_handler(tauri::generate_handler![get_folder_icon_base, get_platform_icon_sizes])
+        .invoke_handler(tauri::generate_handler![
+            get_folder_icon_base,
+            get_platform_icon_sizes
+        ])
         .setup(|app| {
             // Register the updater plugin. It stays inert until `plugins.updater`
             // (pubkey + endpoints) and `bundle.createUpdaterArtifacts` are

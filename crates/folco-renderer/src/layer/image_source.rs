@@ -7,7 +7,7 @@
 use image::RgbaImage;
 use serde::{Deserialize, Serialize};
 
-use super::svg::{render_source, SvgSource};
+use super::svg::{SvgSource, render_source};
 use crate::error::RenderError;
 
 // ============================================================================
@@ -108,8 +108,7 @@ impl ImageSource {
         match self {
             Self::Svg(source) => render_source(source, size),
             Self::Raster(png_data) => {
-                let img = image::load_from_memory(png_data)
-                    .map_err(RenderError::ImageDecode)?;
+                let img = image::load_from_memory(png_data).map_err(RenderError::ImageDecode)?;
                 let rgba = img.to_rgba8();
 
                 // If already the right size, return as-is

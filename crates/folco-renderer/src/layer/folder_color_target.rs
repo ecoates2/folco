@@ -20,7 +20,10 @@
 //! A delta of 0.0 leaves the channel unchanged, +1.0 doubles it,
 //! and -1.0 drives it to zero.
 
-use super::{CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, LayerVersions, RenderContext};
+use super::{
+    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, LayerVersions,
+    RenderContext,
+};
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor};
 use palette::{Hsl, IntoColor, Srgb};
@@ -100,7 +103,12 @@ impl Layer<FolderColorTargetConfig> {
         if let Some(CachedOutput::Image(img)) = self.get_cached(key, deps) {
             ctx.image = img.clone();
             let config = self.config().unwrap();
-            ctx.set(DominantColor::new(config.target_r, config.target_g, config.target_b, 255));
+            ctx.set(DominantColor::new(
+                config.target_r,
+                config.target_g,
+                config.target_b,
+                255,
+            ));
             return Ok(());
         }
 
@@ -110,7 +118,12 @@ impl Layer<FolderColorTargetConfig> {
             .expect("SurfaceColor must be set in RenderContext");
 
         ctx.image = apply_folder_color_target(&ctx.image, surface, config);
-        ctx.set(DominantColor::new(config.target_r, config.target_g, config.target_b, 255));
+        ctx.set(DominantColor::new(
+            config.target_r,
+            config.target_g,
+            config.target_b,
+            255,
+        ));
 
         // Cache the transformed image
         self.store(key, CachedOutput::Image(ctx.image.clone()), deps);
@@ -197,4 +210,3 @@ pub(crate) fn apply_folder_color_target(
 
     IconImage::new(result, icon.scale, icon.content_bounds)
 }
-

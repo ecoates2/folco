@@ -17,14 +17,14 @@
 //! Properties flow through the pipeline via [`RenderContext`], enabling
 //! layers to communicate without tight coupling.
 
-pub mod folder_color_target;
 pub mod decal;
+pub mod folder_color_target;
 pub mod image_source;
 pub mod overlay;
 pub mod svg;
 
-pub use folder_color_target::FolderColorTargetConfig;
 pub use decal::DecalConfig;
+pub use folder_color_target::FolderColorTargetConfig;
 pub use image_source::ImageSource;
 pub use overlay::{ImageOverlayConfig, OverlayAnchorMode, OverlayPosition};
 pub use svg::SvgSource;
@@ -129,8 +129,6 @@ pub trait LayerConfig: Clone {
     /// would produce different rendering output.
     fn differs_from(&self, other: &Self) -> bool;
 }
-
-
 
 // ============================================================================
 // Layer Dependencies

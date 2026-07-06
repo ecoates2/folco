@@ -7,9 +7,9 @@
 //! - [`FolderIconCustomizer`](crate::FolderIconCustomizer) = `IconCustomizer<FolderLayers>`
 //! - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<OverlayLayers>`
 
+use crate::error::RenderError;
 use crate::icon::{IconBase, IconImage, IconSet, SurfaceColor};
 use crate::layer::{CacheKey, CompositeLayer, DependencyVersion, RenderContext};
-use crate::error::RenderError;
 
 // ============================================================================
 // LayerSet Trait

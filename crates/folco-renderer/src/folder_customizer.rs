@@ -491,8 +491,12 @@ mod tests {
 
     #[test]
     fn overlay_config_creation() {
-        let config =
-            ImageOverlayConfig::from_svg("<svg></svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25);
+        let config = ImageOverlayConfig::from_svg(
+            "<svg></svg>",
+            OverlayPosition::BottomRight,
+            OverlayAnchorMode::Inset,
+            0.25,
+        );
         assert_eq!(config.position, OverlayPosition::BottomRight);
         assert_eq!(config.scale, 0.25);
     }
@@ -590,9 +594,7 @@ mod tests {
 
         // Apply decal - it should fall back to surface color (the golden-yellow)
         // Decal now returns a tile, not modifying ctx.image directly
-        let _tile = decal_layer
-            .render_tile(&mut ctx, key, &versions)
-            .unwrap();
+        let _tile = decal_layer.render_tile(&mut ctx, key, &versions).unwrap();
 
         // Image should still be unchanged (decal produces a tile, doesn't composite)
         assert_eq!(

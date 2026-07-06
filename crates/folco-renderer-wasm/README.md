@@ -124,7 +124,7 @@ The main class for rendering icons to HTML canvas elements.
 #### Static Methods
 
 - `fromPng(pngData: Uint8Array, scale: number): CanvasRenderer` - Create from a single PNG
-- `fromPngMultiple(pngDataArray: Uint8Array[], scales: Float32Array): CanvasRenderer` - Create from multiple PNGs
+- `fromPngMultiple(pngDataArray: Uint8Array[], scales: Float32Array): CanvasRenderer` - Create from multiple PNG images
 
 #### Instance Methods
 

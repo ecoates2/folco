@@ -32,10 +32,10 @@
 //! ```
 
 mod cache;
-pub mod folder_color;
 mod context;
 mod convert;
 mod error;
+pub mod folder_color;
 pub mod progress;
 mod sys;
 
@@ -43,17 +43,14 @@ pub use cache::{CacheConfig, IconCache};
 pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder};
 pub use convert::convert_icon_set;
 pub use error::{Error, Result};
-pub use sys::{get_platform_icon_sizes, PlatformSizeSpec};
+pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};
 
 // Re-export key types from folco-renderer for convenience
 // This allows consumers to use profiles without importing the renderer crate directly
 pub use folco_renderer::{
-    IconCustomizer, FolderIconCustomizer, CustomIconCustomizer,
-    CustomizationProfile, CustomIconProfile,
-    FolderIconBase, IconBase, IconSizeSpec,
-    SerializableFolderIconBase, SerializableIconImage,
-    SurfaceColor, FolderColor, FolderColorMetadata,
-    FolderColorTargetConfig, DecalConfig, ImageOverlayConfig, ImageSource,
-    SvgSource, OverlayAnchorMode, OverlayPosition,
-    LayerSet, FolderLayers, OverlayLayers,
+    CustomIconCustomizer, CustomIconProfile, CustomizationProfile, DecalConfig, FolderColor,
+    FolderColorMetadata, FolderColorTargetConfig, FolderIconBase, FolderIconCustomizer,
+    FolderLayers, IconBase, IconCustomizer, IconSizeSpec, ImageOverlayConfig, ImageSource,
+    LayerSet, OverlayAnchorMode, OverlayLayers, OverlayPosition, SerializableFolderIconBase,
+    SerializableIconImage, SurfaceColor, SvgSource,
 };

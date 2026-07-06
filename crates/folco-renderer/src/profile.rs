@@ -24,7 +24,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::layer::{FolderColorTargetConfig, DecalConfig, ImageOverlayConfig};
+use crate::layer::{DecalConfig, FolderColorTargetConfig, ImageOverlayConfig};
 
 // ============================================================================
 // CustomizationProfile (folder icons — all 3 layers)
@@ -234,18 +234,29 @@ mod tests {
 
     #[test]
     fn profile_apply_to_customizer() {
-        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
         use crate::FolderIconCustomizer;
+        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
         let profile = CustomizationProfile::new()
             .with_folder_color_target(FolderColorTargetConfig::new(76, 175, 80));
         // No decal in profile → decal layer should be unconfigured
 
-        let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), SurfaceColor::new(255, 217, 112)));
+        let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
+            IconSet::new(),
+            SurfaceColor::new(255, 217, 112),
+        ));
         customizer.apply_profile(&profile);
 
         assert!(customizer.layers.folder_color_target.is_active());
-        assert_eq!(customizer.layers.folder_color_target.config().unwrap().target_r, 76);
+        assert_eq!(
+            customizer
+                .layers
+                .folder_color_target
+                .config()
+                .unwrap()
+                .target_r,
+            76
+        );
 
         assert!(!customizer.layers.decal.has_config());
         assert!(!customizer.layers.decal.is_active());
@@ -253,11 +264,12 @@ mod tests {
 
     #[test]
     fn profile_export_from_customizer() {
-        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
         use crate::FolderIconCustomizer;
+        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
         let surface = SurfaceColor::new(255, 217, 112);
-        let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
+        let mut customizer =
+            FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
         customizer
             .layers
             .folder_color_target
@@ -275,8 +287,12 @@ mod tests {
 
     #[test]
     fn overlay_position_serialization() {
-        let profile = CustomizationProfile::new()
-            .with_overlay(ImageOverlayConfig::from_svg("icon", OverlayPosition::TopLeft, OverlayAnchorMode::Inset, 0.25));
+        let profile = CustomizationProfile::new().with_overlay(ImageOverlayConfig::from_svg(
+            "icon",
+            OverlayPosition::TopLeft,
+            OverlayAnchorMode::Inset,
+            0.25,
+        ));
 
         let json = profile.to_json().unwrap();
         assert!(json.contains("\"top-left\""));
@@ -294,5 +310,4 @@ mod tests {
         assert!(profile.decal.is_none());
         assert!(profile.overlay.is_none());
     }
-
 }

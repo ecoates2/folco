@@ -160,7 +160,9 @@ impl SerializableFolderIconBase {
             let rgba = image::load_from_memory(&img.png_data)?.to_rgba8();
             let width = rgba.width();
             let height = rgba.height();
-            let bounds = img.content_bounds.unwrap_or(RectPx::from_size(width, height));
+            let bounds = img
+                .content_bounds
+                .unwrap_or(RectPx::from_size(width, height));
             icon_set.add_image(IconImage::new(rgba, img.scale, bounds));
         }
 

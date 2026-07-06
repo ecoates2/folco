@@ -28,8 +28,7 @@ pub const SURFACE_COLOR: SurfaceColor = SurfaceColor::new(255, 217, 112);
 ///
 /// Panics if `dimension` is not a valid Windows icon size (16, 20, 24, 32, 40, 48, 64, or 256).
 pub fn get_folder_icon_content_bounds(dimension: u32, _height: u32) -> RectPx {
-    let size = WindowsIconSize::from_dimension(dimension)
-        .expect("Invalid Windows icon dimension");
+    let size = WindowsIconSize::from_dimension(dimension).expect("Invalid Windows icon dimension");
 
     match size {
         WindowsIconSize::Px16 => RectPx::new(0, 4, 16, 9),
@@ -43,8 +42,8 @@ pub fn get_folder_icon_content_bounds(dimension: u32, _height: u32) -> RectPx {
     }
 }
 
-use folco_renderer::IconSizeSpec;
 use super::PlatformSizeSpec;
+use folco_renderer::IconSizeSpec;
 
 impl PlatformSizeSpec {
     pub(super) fn platform_impl() -> Self {

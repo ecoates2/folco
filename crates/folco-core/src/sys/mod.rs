@@ -19,17 +19,17 @@ pub mod linux;
 
 // Re-export the platform-specific implementation under a common alias
 #[cfg(target_os = "windows")]
-pub use windows::get_folder_icon_content_bounds;
-#[cfg(target_os = "windows")]
 pub use windows::SURFACE_COLOR;
+#[cfg(target_os = "windows")]
+pub use windows::get_folder_icon_content_bounds;
 
 #[cfg(target_os = "macos")]
 pub use macos::get_folder_icon_content_bounds;
 
 #[cfg(target_os = "linux")]
-pub use linux::get_folder_icon_content_bounds;
-#[cfg(target_os = "linux")]
 pub use linux::SURFACE_COLOR;
+#[cfg(target_os = "linux")]
+pub use linux::get_folder_icon_content_bounds;
 
 // ============================================================================
 // PlatformSizeSpec

@@ -4,8 +4,10 @@
 //! via [`ImageSource`].
 
 use super::image_source::ImageSource;
-use super::svg::{composite_over, SvgSource};
-use super::{CacheKey, CachedOutput, DependencyVersion, Layer, LayerConfig, LayerVersions, RenderContext};
+use super::svg::{SvgSource, composite_over};
+use super::{
+    CacheKey, CachedOutput, DependencyVersion, Layer, LayerConfig, LayerVersions, RenderContext,
+};
 use crate::error::RenderError;
 use image::RgbaImage;
 
@@ -253,8 +255,12 @@ fn calculate_position(
         (OverlayPosition::BottomRight, OverlayAnchorMode::Inset) => (bx + bw - ow, by + bh - oh),
         (OverlayPosition::TopLeft, OverlayAnchorMode::Centered) => (bx - ow / 2, by - oh / 2),
         (OverlayPosition::TopRight, OverlayAnchorMode::Centered) => (bx + bw - ow / 2, by - oh / 2),
-        (OverlayPosition::BottomLeft, OverlayAnchorMode::Centered) => (bx - ow / 2, by + bh - oh / 2),
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Centered) => (bx + bw - ow / 2, by + bh - oh / 2),
+        (OverlayPosition::BottomLeft, OverlayAnchorMode::Centered) => {
+            (bx - ow / 2, by + bh - oh / 2)
+        }
+        (OverlayPosition::BottomRight, OverlayAnchorMode::Centered) => {
+            (bx + bw - ow / 2, by + bh - oh / 2)
+        }
         (OverlayPosition::Center, _) => (bx + (bw - ow) / 2, by + (bh - oh) / 2),
     }
 }

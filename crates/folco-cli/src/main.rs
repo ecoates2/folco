@@ -5,10 +5,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
+    CustomIconProfile, CustomizationContextBuilder, CustomizationProfile, DecalConfig,
+    ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition, SvgSource,
     folder_color::FolderColor,
-    progress::{progress_channel, Progress},
-    CustomizationContextBuilder, CustomizationProfile, CustomIconProfile, DecalConfig,
-    ImageSource, OverlayAnchorMode, OverlayPosition, ImageOverlayConfig, SvgSource,
+    progress::{Progress, progress_channel},
 };
 
 #[derive(Parser)]
@@ -71,7 +71,12 @@ enum Commands {
         decal: Option<String>,
 
         /// Decal scale factor (0.0-1.0)
-        #[arg(long, value_name = "SCALE", default_value = "0.70", requires = "folder")]
+        #[arg(
+            long,
+            value_name = "SCALE",
+            default_value = "0.70",
+            requires = "folder"
+        )]
         decal_scale: f32,
 
         // === Overlay Options (both modes) ===
@@ -165,7 +170,9 @@ const RASTER_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "bmp", "gif",
 
 /// Returns true if a file extension is a supported raster image format.
 fn is_raster_extension(ext: &std::ffi::OsStr) -> bool {
-    RASTER_EXTENSIONS.iter().any(|r| ext.eq_ignore_ascii_case(r))
+    RASTER_EXTENSIONS
+        .iter()
+        .any(|r| ext.eq_ignore_ascii_case(r))
 }
 
 /// Resolve an overlay source string to an [`ImageSource`].
@@ -195,8 +202,9 @@ fn resolve_overlay_source(input: &str) -> Result<ImageSource> {
         }
 
         if is_raster_extension(ext) && path.exists() {
-            let bytes = std::fs::read(path)
-                .with_context(|| format!("Failed to read overlay image file: {}", path.display()))?;
+            let bytes = std::fs::read(path).with_context(|| {
+                format!("Failed to read overlay image file: {}", path.display())
+            })?;
             return Ok(ImageSource::raster(bytes));
         }
     }
@@ -258,8 +266,6 @@ fn create_progress_bar(total: u64) -> ProgressBar {
     pb
 }
 
-
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -307,10 +313,7 @@ async fn main() -> Result<()> {
                     }
 
                     // Require at least one layer when not using a JSON profile
-                    if p.folder_color_target.is_none()
-                        && p.decal.is_none()
-                        && p.overlay.is_none()
-                    {
+                    if p.folder_color_target.is_none() && p.decal.is_none() && p.overlay.is_none() {
                         bail!(
                             "--folder mode requires at least one of --color, --decal, \
                              --overlay, or --folder-customization-profile"
@@ -363,7 +366,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn customize_folders(directories: Vec<PathBuf>, profile: CustomizationProfile, verbose: bool) -> Result<()> {
+async fn customize_folders(
+    directories: Vec<PathBuf>,
+    profile: CustomizationProfile,
+    verbose: bool,
+) -> Result<()> {
     println!("Initializing...");
 
     let mut ctx = CustomizationContextBuilder::new()
@@ -508,7 +515,8 @@ async fn customize_custom_icon(
     });
 
     // Run customization
-    ctx.customize_folders_custom_async(directories, &mut customizer, tx).await;
+    ctx.customize_folders_custom_async(directories, &mut customizer, tx)
+        .await;
 
     // Wait for progress handler to finish
     progress_handle.await?;

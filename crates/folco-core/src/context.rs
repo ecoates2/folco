@@ -9,8 +9,11 @@ use crate::convert::{convert_icon_set, convert_icon_set_to_sys};
 use crate::error::{Error, Result};
 use crate::progress::{Progress, ProgressSender};
 
-use folco_renderer::{CustomizationProfile, FolderIconBase, FolderIconCustomizer, CustomIconCustomizer, IconSet as RendererIconSet};
 use folco_renderer::ImageSource;
+use folco_renderer::{
+    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
+    IconSet as RendererIconSet,
+};
 use icon_sys::folder_settings::{FolderSettingsProvider, PlatformFolderSettingsProvider};
 
 use std::path::{Path, PathBuf};
@@ -225,7 +228,9 @@ impl CustomizationContext {
     pub fn folder_icon_base(&self) -> FolderIconBase {
         FolderIconBase::new(
             self.customizer.base_icons().clone(),
-            *self.customizer.surface_color()
+            *self
+                .customizer
+                .surface_color()
                 .expect("CustomizationContext always holds a folder-based customizer"),
         )
     }
@@ -408,7 +413,9 @@ impl CustomizationContext {
         }
 
         // Send completed event
-        let _ = progress.send(Progress::Completed { succeeded, failed }).await;
+        let _ = progress
+            .send(Progress::Completed { succeeded, failed })
+            .await;
     }
 
     /// Clears the icon cache and refreshes from system resources.
@@ -507,10 +514,7 @@ impl CustomizationContext {
                 Ok(()) => {
                     succeeded += 1;
                     let _ = progress
-                        .send(Progress::FolderComplete {
-                            index,
-                            path,
-                        })
+                        .send(Progress::FolderComplete { index, path })
                         .await;
                 }
                 Err(e) => {
@@ -527,7 +531,9 @@ impl CustomizationContext {
         }
 
         // Send completed event
-        let _ = progress.send(Progress::Completed { succeeded, failed }).await;
+        let _ = progress
+            .send(Progress::Completed { succeeded, failed })
+            .await;
     }
 
     // ========================================================================

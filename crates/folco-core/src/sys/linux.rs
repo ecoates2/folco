@@ -3,7 +3,7 @@
 use folco_renderer::RectPx;
 
 // Temporary stub to get stuff compiling
-pub const SURFACE_COLOR: SurfaceColor = SurfaceColor::new(127,127,127);
+pub const SURFACE_COLOR: SurfaceColor = SurfaceColor::new(127, 127, 127);
 
 /// Returns the content bounds for a Linux system folder icon.
 ///
@@ -27,9 +27,9 @@ pub fn get_folder_icon_content_bounds(width: u32, height: u32) -> RectPx {
     )
 }
 
+use super::PlatformSizeSpec;
 use folco_renderer::IconSizeSpec;
 use folco_renderer::SurfaceColor;
-use super::PlatformSizeSpec;
 
 impl PlatformSizeSpec {
     pub(super) fn platform_impl() -> Self {

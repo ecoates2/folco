@@ -35,7 +35,9 @@ use folco_renderer::FolderIconCustomizer;
 use folco_renderer::{
     DecalConfig, FolderColorTargetConfig, ImageOverlayConfig, OverlayAnchorMode, OverlayPosition,
 };
-use folco_renderer::{FolderIconBase, IconImage, IconSet, RectPx, SerializableFolderIconBase, SurfaceColor};
+use folco_renderer::{
+    FolderIconBase, IconImage, IconSet, RectPx, SerializableFolderIconBase, SurfaceColor,
+};
 
 fn parse_overlay_position(position: &str) -> OverlayPosition {
     match position {
@@ -103,7 +105,10 @@ impl CanvasRenderer {
         icon_set.add_image(icon);
 
         Ok(Self {
-            customizer: FolderIconCustomizer::from_folder(FolderIconBase::new(icon_set, surface_color)),
+            customizer: FolderIconCustomizer::from_folder(FolderIconBase::new(
+                icon_set,
+                surface_color,
+            )),
         })
     }
 
@@ -145,7 +150,10 @@ impl CanvasRenderer {
         }
 
         Ok(Self {
-            customizer: FolderIconCustomizer::from_folder(FolderIconBase::new(icon_set, surface_color)),
+            customizer: FolderIconCustomizer::from_folder(FolderIconBase::new(
+                icon_set,
+                surface_color,
+            )),
         })
     }
 
@@ -158,7 +166,9 @@ impl CanvasRenderer {
     ///
     /// * `folder_icon_base` - A serializable icon base (PNG-encoded images + surface color)
     #[wasm_bindgen(js_name = "fromFolderIconBase")]
-    pub fn from_folder_icon_base(folder_icon_base: SerializableFolderIconBase) -> Result<CanvasRenderer, JsError> {
+    pub fn from_folder_icon_base(
+        folder_icon_base: SerializableFolderIconBase,
+    ) -> Result<CanvasRenderer, JsError> {
         let base = folder_icon_base
             .into_folder_icon_base()
             .map_err(|e| JsError::new(&format!("Failed to decode icon base: {e}")))?;
@@ -181,19 +191,12 @@ impl CanvasRenderer {
     /// * `target_g` - Target green channel (0–255)
     /// * `target_b` - Target blue channel (0–255)
     #[wasm_bindgen(js_name = "setFolderColorTarget")]
-    pub fn set_folder_color_target(
-        &mut self,
-        target_r: u8,
-        target_g: u8,
-        target_b: u8,
-    ) {
+    pub fn set_folder_color_target(&mut self, target_r: u8, target_g: u8, target_b: u8) {
         self.customizer
             .layers
             .folder_color_target
             .set_config(Some(FolderColorTargetConfig::new(
-                target_r,
-                target_g,
-                target_b,
+                target_r, target_g, target_b,
             )));
         self.customizer.layers.folder_color_target.set_enabled(true);
     }
@@ -201,7 +204,10 @@ impl CanvasRenderer {
     /// Sets the color target enabled state without changing the parameters.
     #[wasm_bindgen(js_name = "setFolderColorTargetEnabled")]
     pub fn set_folder_color_target_enabled(&mut self, enabled: bool) {
-        self.customizer.layers.folder_color_target.set_enabled(enabled);
+        self.customizer
+            .layers
+            .folder_color_target
+            .set_enabled(enabled);
     }
 
     /// Sets the decal configuration.

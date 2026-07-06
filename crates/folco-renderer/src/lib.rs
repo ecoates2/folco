@@ -47,28 +47,27 @@
 //! let json = exported.to_json().unwrap();
 //! ```
 
-pub mod folder_color;
-mod customizer;
 mod custom_customizer;
+mod customizer;
 mod error;
+pub mod folder_color;
 mod folder_customizer;
 mod icon;
 pub mod layer;
 mod profile;
 
-pub use customizer::{IconCustomizer, LayerSet};
 pub use custom_customizer::{CustomIconCustomizer, OverlayLayers};
+pub use customizer::{IconCustomizer, LayerSet};
 pub use error::RenderError;
+pub use folder_color::{FolderColor, FolderColorMetadata};
 pub use folder_customizer::{FolderIconCustomizer, FolderLayers};
 pub use icon::{
-    FolderIconBase, IconBase, IconImage, IconSet, IconSizeSpec, RectPx,
-    SerializableFolderIconBase, SerializableIconImage, SizePx, SurfaceColor,
+    FolderIconBase, IconBase, IconImage, IconSet, IconSizeSpec, RectPx, SerializableFolderIconBase,
+    SerializableIconImage, SizePx, SurfaceColor,
 };
 pub use layer::{
     CacheKey, DecalConfig, DominantColor, FolderColorTargetConfig, ImageOverlayConfig, ImageSource,
-    Layer, LayerConfig, LayerVersions, OverlayAnchorMode, OverlayPosition, RenderContext, SvgSource,
+    Layer, LayerConfig, LayerVersions, OverlayAnchorMode, OverlayPosition, RenderContext,
+    SvgSource,
 };
 pub use profile::{CustomIconProfile, CustomizationProfile};
-pub use folder_color::{FolderColor, FolderColorMetadata};
-
-
