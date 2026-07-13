@@ -1,14 +1,14 @@
 mod canvas;
+mod serializable;
+
 pub use canvas::CanvasRenderer;
+pub use serializable::{SerializableFolderIconBase, SerializableIconImage};
 
 use wasm_bindgen::prelude::*;
 
-// Re-export serializable types so their tsify-generated TypeScript
+// Re-export shared model/renderer types so their tsify-generated TypeScript
 // definitions are included in the wasm-pack output `.d.ts` file.
-pub use folco_renderer::{
-    FolderColor, FolderColorMetadata, SerializableFolderIconBase, SerializableIconImage,
-    SurfaceColor,
-};
+pub use folco_renderer::{FolderColor, FolderColorMetadata, SurfaceColor};
 
 /// Returns all available folder color presets with their metadata.
 #[wasm_bindgen(js_name = "getAvailableColors")]

@@ -6,11 +6,11 @@
 //! # Usage
 //!
 //! ```
-//! use folco_core::folder_color::FolderColor;
+//! use folco_core::folder_color::{FolderColor, FolderColorExt};
 //!
 //! let color = FolderColor::Red;
 //! let config = color.to_folder_color_target_config();
 //! // config can be embedded in a CustomizationProfile
 //! ```
 
-pub use folco_renderer::folder_color::{FolderColor, FolderColorMetadata};
+pub use folco_renderer::folder_color::{FolderColor, FolderColorExt, FolderColorMetadata};

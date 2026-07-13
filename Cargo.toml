@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/folco-core",
     "crates/folco-cli",
+    "crates/folco-model",
     "crates/folco-renderer",
     "crates/folco-renderer-wasm",
     "gui/src-tauri",

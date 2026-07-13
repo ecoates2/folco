@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use folco_core::{CustomizationContext, CustomizationContextBuilder, SerializableFolderIconBase};
+use folco_core::{CustomizationContext, CustomizationContextBuilder, FolderIconBase};
 
 /// Wrapper to make `CustomizationContext` usable in Tauri managed state.
 ///
@@ -29,12 +29,9 @@ impl AppState {
         })
     }
 
-    /// Extracts a serializable icon base from the context.
-    pub fn get_folder_icon_base(&self) -> Result<SerializableFolderIconBase, String> {
+    /// Returns the current folder icon base from the context.
+    pub fn get_folder_icon_base(&self) -> Result<FolderIconBase, String> {
         let guard = self.ctx.lock().map_err(|e| e.to_string())?;
-        let folder_icon_base = guard.0.folder_icon_base();
-
-        SerializableFolderIconBase::try_from(&folder_icon_base)
-            .map_err(|e| format!("Failed to encode icon as PNG: {e}"))
+        Ok(guard.0.folder_icon_base())
     }
 }

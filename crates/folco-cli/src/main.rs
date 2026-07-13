@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use folco_core::{
     CustomIconProfile, CustomizationContextBuilder, CustomizationProfile, DecalConfig,
     ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition, SvgSource,
-    folder_color::FolderColor,
+    folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
 

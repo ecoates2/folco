@@ -49,8 +49,8 @@ pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};
 // This allows consumers to use profiles without importing the renderer crate directly
 pub use folco_renderer::{
     CustomIconCustomizer, CustomIconProfile, CustomizationProfile, DecalConfig, FolderColor,
-    FolderColorMetadata, FolderColorTargetConfig, FolderIconBase, FolderIconCustomizer,
-    FolderLayers, IconBase, IconCustomizer, IconSizeSpec, ImageOverlayConfig, ImageSource,
-    LayerSet, OverlayAnchorMode, OverlayLayers, OverlayPosition, SerializableFolderIconBase,
-    SerializableIconImage, SurfaceColor, SvgSource,
+    FolderColorExt, FolderColorMetadata, FolderColorTargetConfig, FolderIconBase,
+    FolderIconCustomizer, FolderLayers, IconBase, IconCustomizer, IconSizeSpec, ImageOverlayConfig,
+    ImageSource, LayerSet, OverlayAnchorMode, OverlayLayers, OverlayPosition, SurfaceColor,
+    SvgSource,
 };

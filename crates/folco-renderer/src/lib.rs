@@ -59,11 +59,10 @@ mod profile;
 pub use custom_customizer::{CustomIconCustomizer, OverlayLayers};
 pub use customizer::{IconCustomizer, LayerSet};
 pub use error::RenderError;
-pub use folder_color::{FolderColor, FolderColorMetadata};
+pub use folder_color::{FolderColor, FolderColorExt, FolderColorMetadata};
 pub use folder_customizer::{FolderIconCustomizer, FolderLayers};
 pub use icon::{
-    FolderIconBase, IconBase, IconImage, IconSet, IconSizeSpec, RectPx, SerializableFolderIconBase,
-    SerializableIconImage, SizePx, SurfaceColor,
+    FolderIconBase, IconBase, IconImage, IconSet, IconSizeSpec, RectPx, SizePx, SurfaceColor,
 };
 pub use layer::{
     CacheKey, DecalConfig, DominantColor, FolderColorTargetConfig, ImageOverlayConfig, ImageSource,

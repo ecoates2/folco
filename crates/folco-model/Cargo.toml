@@ -1,0 +1,23 @@
+[package]
+name = "folco-model"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Pure, shared domain value types with no logic tied to any single crate.
+# This is the lowest crate in the workspace: rendering, core, wasm and the
+# Tauri app all build on top of these types.
+[features]
+default = []
+clap = ["dep:clap"]
+jsonschema = ["dep:schemars"]
+tsify = ["dep:tsify", "dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+clap = { version = "4", optional = true }
+schemars = { version = "0.8", optional = true }
+tsify = { version = "0.5", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }

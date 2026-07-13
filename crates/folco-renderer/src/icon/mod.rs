@@ -13,12 +13,13 @@
 mod folder;
 
 use image::RgbaImage;
-use serde::{Deserialize, Serialize};
 
 use crate::error::RenderError;
 use crate::layer::ImageSource;
 
-pub use folder::{FolderIconBase, SerializableFolderIconBase, SerializableIconImage, SurfaceColor};
+pub use folco_model::{IconSizeSpec, RectPx, SizePx};
+
+pub use folder::{FolderIconBase, SurfaceColor};
 
 // ============================================================================
 // IconBase
@@ -68,138 +69,6 @@ impl IconBase {
     /// Returns `true` if this is a custom (user-provided) icon.
     pub fn is_custom(&self) -> bool {
         matches!(self, IconBase::Custom(_))
-    }
-}
-
-// ============================================================================
-// Geometry Primitives
-// ============================================================================
-
-/// A rectangle defined in pixel coordinates.
-///
-/// Used to specify regions within an image, such as content bounds
-/// that indicate where the actual icon content exists (excluding padding/margins).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "tsify", derive(tsify_next::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct RectPx {
-    /// X offset from the left edge of the image
-    pub x: u32,
-    /// Y offset from the top edge of the image
-    pub y: u32,
-    /// Width of the rectangle
-    pub width: u32,
-    /// Height of the rectangle
-    pub height: u32,
-}
-
-impl RectPx {
-    /// Creates a new rectangle with the given position and dimensions.
-    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    /// Creates a rectangle starting at origin (0, 0) with the given dimensions.
-    pub fn from_size(width: u32, height: u32) -> Self {
-        Self {
-            x: 0,
-            y: 0,
-            width,
-            height,
-        }
-    }
-
-    /// Returns the right edge coordinate (x + width).
-    pub fn right(&self) -> u32 {
-        self.x + self.width
-    }
-
-    /// Returns the bottom edge coordinate (y + height).
-    pub fn bottom(&self) -> u32 {
-        self.y + self.height
-    }
-}
-
-/// A 2D size in pixel units.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct SizePx {
-    pub width: u32,
-    pub height: u32,
-}
-
-impl SizePx {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
-
-    /// Returns true if width equals height.
-    pub fn is_square(&self) -> bool {
-        self.width == self.height
-    }
-}
-
-// ============================================================================
-// IconSizeSpec
-// ============================================================================
-
-/// Specification for a target icon size.
-///
-/// Used by platform size specifications to describe the set of sizes
-/// an icon should be rasterized to for compatibility with the host OS.
-///
-/// # Example
-///
-/// ```
-/// use folco_renderer::IconSizeSpec;
-///
-/// let spec = IconSizeSpec::new(256, 256, 1.0);
-/// assert!(spec.is_square());
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "tsify", derive(tsify_next::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct IconSizeSpec {
-    /// Target pixel width.
-    pub width: u32,
-    /// Target pixel height.
-    pub height: u32,
-    /// Display scale factor (1.0 for @1x, 2.0 for @2x, etc.).
-    pub scale: f32,
-}
-
-impl IconSizeSpec {
-    /// Creates a new icon size specification.
-    pub fn new(width: u32, height: u32, scale: f32) -> Self {
-        Self {
-            width,
-            height,
-            scale,
-        }
-    }
-
-    /// Creates a square icon size specification.
-    pub fn square(size: u32, scale: f32) -> Self {
-        Self {
-            width: size,
-            height: size,
-            scale,
-        }
-    }
-
-    /// Returns `true` if this spec is square (width == height).
-    pub fn is_square(&self) -> bool {
-        self.width == self.height
-    }
-
-    /// Returns the maximum dimension.
-    pub fn max_dimension(&self) -> u32 {
-        self.width.max(self.height)
     }
 }
 
@@ -263,6 +132,16 @@ impl IconImage {
             self.data.width() as f32 / self.scale,
             self.data.height() as f32 / self.scale,
         )
+    }
+
+    /// Encodes this image's pixels as PNG bytes.
+    ///
+    /// Shared by the boundary DTOs (Tauri IPC and wasm) that transfer icons
+    /// as PNG data rather than raw RGBA buffers.
+    pub fn to_png_bytes(&self) -> Result<Vec<u8>, image::ImageError> {
+        let mut cursor = std::io::Cursor::new(Vec::new());
+        self.data.write_to(&mut cursor, image::ImageFormat::Png)?;
+        Ok(cursor.into_inner())
     }
 }
 

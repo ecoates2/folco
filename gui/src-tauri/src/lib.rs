@@ -1,19 +1,19 @@
+mod dto;
 mod state;
 
-use folco_core::{PlatformSizeSpec, SerializableFolderIconBase};
+use dto::{FolderIconBaseDto, PlatformSizeSpecDto};
 use state::AppState;
 use tauri::Manager;
 
 #[tauri::command]
-fn get_folder_icon_base(
-    state: tauri::State<AppState>,
-) -> Result<SerializableFolderIconBase, String> {
-    state.get_folder_icon_base()
+fn get_folder_icon_base(state: tauri::State<AppState>) -> Result<FolderIconBaseDto, String> {
+    let base = state.get_folder_icon_base()?;
+    FolderIconBaseDto::try_from(&base)
 }
 
 #[tauri::command]
-fn get_platform_icon_sizes() -> PlatformSizeSpec {
-    folco_core::get_platform_icon_sizes()
+fn get_platform_icon_sizes() -> PlatformSizeSpecDto {
+    folco_core::get_platform_icon_sizes().into()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

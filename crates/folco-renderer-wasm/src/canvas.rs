@@ -35,9 +35,9 @@ use folco_renderer::FolderIconCustomizer;
 use folco_renderer::{
     DecalConfig, FolderColorTargetConfig, ImageOverlayConfig, OverlayAnchorMode, OverlayPosition,
 };
-use folco_renderer::{
-    FolderIconBase, IconImage, IconSet, RectPx, SerializableFolderIconBase, SurfaceColor,
-};
+use folco_renderer::{FolderIconBase, IconImage, IconSet, RectPx, SurfaceColor};
+
+use crate::serializable::SerializableFolderIconBase;
 
 fn parse_overlay_position(position: &str) -> OverlayPosition {
     match position {

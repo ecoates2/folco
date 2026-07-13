@@ -19,12 +19,13 @@ default = ["twemoji"]
 twemoji = ["folco-renderer/twemoji"]
 
 [dependencies]
-folco-renderer = { path = "../folco-renderer", features = ["tsify"] }
+folco-renderer = { path = "../folco-renderer" }
+folco-model = { path = "../folco-model", features = ["tsify"] }
 wasm-bindgen = "0.2"
 js-sys = "0.3"
 serde.workspace = true
 serde-wasm-bindgen = "0.6"
-tsify-next = "0.5"
+tsify = { version = "0.5", default-features = false, features = ["js"] }
 
 image.workspace = true
 
