@@ -1,8 +1,7 @@
 mod canvas;
-mod serializable;
 
 pub use canvas::CanvasRenderer;
-pub use serializable::{SerializableFolderIconBase, SerializableIconImage};
+pub use folco_transfer::{SerializableFolderIconBase, SerializableIconImage};
 
 use wasm_bindgen::prelude::*;
 

@@ -8,12 +8,12 @@ use tauri::Manager;
 #[tauri::command]
 fn get_folder_icon_base(state: tauri::State<AppState>) -> Result<FolderIconBaseDto, String> {
     let base = state.get_folder_icon_base()?;
-    FolderIconBaseDto::try_from(&base)
+    FolderIconBaseDto::try_from(&base).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_platform_icon_sizes() -> PlatformSizeSpecDto {
-    folco_core::get_platform_icon_sizes().into()
+    folco_core::get_platform_icon_sizes()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

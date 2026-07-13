@@ -6,6 +6,7 @@ members = [
     "crates/folco-model",
     "crates/folco-renderer",
     "crates/folco-renderer-wasm",
+    "crates/folco-transfer",
     "gui/src-tauri",
 ]
 

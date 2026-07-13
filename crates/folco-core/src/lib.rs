@@ -51,6 +51,6 @@ pub use folco_renderer::{
     CustomIconCustomizer, CustomIconProfile, CustomizationProfile, DecalConfig, FolderColor,
     FolderColorExt, FolderColorMetadata, FolderColorTargetConfig, FolderIconBase,
     FolderIconCustomizer, FolderLayers, IconBase, IconCustomizer, IconSizeSpec, ImageOverlayConfig,
-    ImageSource, LayerSet, OverlayAnchorMode, OverlayLayers, OverlayPosition, SurfaceColor,
+    ImageSource, LayerSet, OverlayAnchorMode, OverlayLayers, OverlayPosition, RectPx, SurfaceColor,
     SvgSource,
 };

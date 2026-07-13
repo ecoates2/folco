@@ -1,27 +1,31 @@
-//! Serializable wasm DTOs for transferring folder icon bases to JavaScript.
+//! Shared serializable transfer types for the folder-icon-base boundary.
 //!
-//! These are the WASM boundary's own transfer types (PNG-encoded), derived
-//! with `tsify` in **`js`** mode so they cross the wasm-bindgen ABI as native
-//! JS objects (via `serde-wasm-bindgen`) rather than JSON strings.
+//! These are the PNG-encoded transfer types used to move a [`FolderIconBase`]
+//! across process/language boundaries. They are defined **once** here and
+//! reused by both:
+//! - the Tauri backend, which serializes them with `serde_json` for IPC, and
+//! - the wasm renderer bindings, which deserialize them with
+//!   `serde-wasm-bindgen` (via `tsify`) and feed them into
+//!   `CanvasRenderer::from_folder_icon_base`.
 //!
-//! IMPORTANT — cross-boundary shape constraint:
-//! The Folco Tauri backend produces the *same JSON shape* for these (see the
-//! app's IPC DTOs in `gui/src-tauri/src/dto.rs`), and the frontend pipes the
-//! Tauri command result straight into
-//! [`CanvasRenderer::from_folder_icon_base`](crate::CanvasRenderer). Because
-//! Tauri serializes with `serde_json` while this crate deserializes with
-//! `serde-wasm-bindgen`, any field added here must serialize identically under
-//! both. Avoid `HashMap`, 64-bit integers, and enum representations that differ
-//! between the two serializers.
+//! Because a single definition backs both paths, the two serializers are
+//! guaranteed to agree on the wire shape — there is no longer a hand-maintained
+//! "keep these in sync" contract. When adding fields, still avoid types whose
+//! representation differs between `serde_json` and `serde-wasm-bindgen`
+//! (e.g. `HashMap`, 64-bit integers, unusual enum representations).
+//!
+//! The `tsify` feature is opt-in (mirroring `folco-model`): the wasm crate
+//! enables it to derive [`tsify::Tsify`] and the wasm-ABI conversions, while
+//! the Tauri app leaves it off and gets plain serde.
 
 use folco_model::{RectPx, SurfaceColor};
 use folco_renderer::{FolderIconBase, IconImage, IconSet};
 use serde::{Deserialize, Serialize};
-use tsify::Tsify;
 
-/// PNG-encoded representation of an icon image for wasm transfer.
-#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+/// PNG-encoded representation of an icon image for boundary transfer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SerializableIconImage {
     /// PNG-encoded image bytes.
     pub png_data: Vec<u8>,
@@ -36,9 +40,10 @@ pub struct SerializableIconImage {
     pub content_bounds: Option<RectPx>,
 }
 
-/// Serializable representation of a [`FolderIconBase`] for wasm transfer.
-#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+/// Serializable representation of a [`FolderIconBase`] for boundary transfer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SerializableFolderIconBase {
     /// PNG-encoded icon images at various sizes/scales.
     pub images: Vec<SerializableIconImage>,

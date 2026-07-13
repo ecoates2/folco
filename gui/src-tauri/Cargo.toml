@@ -26,5 +26,6 @@ tauri-plugin-prevent-default = "4"
 serde.workspace = true
 serde_json.workspace = true
 folco-core = { path = "../../crates/folco-core" }
+folco-transfer = { path = "../../crates/folco-transfer" }
 tauri-plugin-updater = "2"
 

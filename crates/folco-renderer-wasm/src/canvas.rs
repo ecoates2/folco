@@ -37,7 +37,7 @@ use folco_renderer::{
 };
 use folco_renderer::{FolderIconBase, IconImage, IconSet, RectPx, SurfaceColor};
 
-use crate::serializable::SerializableFolderIconBase;
+use folco_transfer::SerializableFolderIconBase;
 
 fn parse_overlay_position(position: &str) -> OverlayPosition {
     match position {

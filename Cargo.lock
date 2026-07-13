@@ -1444,6 +1444,7 @@ name = "folco-gui"
 version = "0.1.0"
 dependencies = [
  "folco-core",
+ "folco-transfer",
  "serde",
  "serde_json",
  "tauri",
@@ -1488,6 +1489,7 @@ version = "0.1.0"
 dependencies = [
  "folco-model",
  "folco-renderer",
+ "folco-transfer",
  "image",
  "js-sys",
  "serde",
@@ -1495,6 +1497,19 @@ dependencies = [
  "tsify",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "folco-transfer"
+version = "0.1.0"
+dependencies = [
+ "folco-model",
+ "folco-renderer",
+ "image",
+ "serde",
+ "serde-wasm-bindgen",
+ "tsify",
+ "wasm-bindgen",
 ]
 
 [[package]]

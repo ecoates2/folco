@@ -1,0 +1,28 @@
+[package]
+name = "folco-transfer"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Shared serializable transfer types for the folder-icon-base boundary.
+#
+# These are defined exactly once so that the two consumers that must agree on
+# the wire shape are guaranteed to stay in sync:
+# - the Tauri IPC layer (serializes with `serde_json`), and
+# - the wasm bindings (deserialize with `serde-wasm-bindgen` via `tsify`).
+#
+# The `tsify` feature mirrors `folco-model`: enable it for the wasm build to
+# emit TypeScript + wasm-ABI conversions; leave it off for the Tauri build,
+# which only needs plain serde.
+[features]
+default = []
+tsify = ["dep:tsify", "dep:wasm-bindgen", "dep:serde-wasm-bindgen", "folco-model/tsify"]
+
+[dependencies]
+folco-model = { path = "../folco-model" }
+folco-renderer = { path = "../folco-renderer" }
+image.workspace = true
+serde.workspace = true
+tsify = { version = "0.5", default-features = false, features = ["js"], optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }

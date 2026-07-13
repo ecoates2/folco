@@ -5,7 +5,11 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:app": "bun run build:wasm && vite dev",
 		"build": "vite build",
+		"build:app": "bun run build:wasm:release && vite build",
+		"build:wasm": "wasm-pack build ../crates/folco-renderer-wasm --target web --dev && bun install",
+		"build:wasm:release": "wasm-pack build ../crates/folco-renderer-wasm --target web --release && bun install",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -17,9 +21,9 @@
 		"@tauri-apps/api": "^2.11.0",
 		"@tauri-apps/plugin-dialog": "^2.7.1",
 		"@tauri-apps/plugin-opener": "^2.5.4",
+		"folco-renderer-wasm": "file:../crates/folco-renderer-wasm/pkg",
 		"iconify-picker": "^0.7.2",
-		"tailwindcss": "^4.3.1",
-		"folco-renderer-wasm": "file:../crates/folco-renderer-wasm/pkg"
+		"tailwindcss": "^4.3.1"
 	},
 	"devDependencies": {
 		"@emoji-mart/data": "^1.2.1",
