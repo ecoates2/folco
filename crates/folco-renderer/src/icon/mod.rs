@@ -11,6 +11,7 @@
 //!   Defined in the [`folder`] submodule.
 
 mod folder;
+mod svg_folder;
 
 use image::RgbaImage;
 
@@ -20,6 +21,7 @@ use crate::layer::ImageSource;
 pub use folco_model::{IconSizeSpec, RectPx, SizePx};
 
 pub use folder::{FolderIconBase, SurfaceColor};
+pub use svg_folder::SvgFolderIconBase;
 
 // ============================================================================
 // IconBase

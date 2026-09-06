@@ -1,7 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { CanvasRenderer, FolderColorMetadata, SerializableFolderIconBase } from 'folco-renderer-wasm';
+import type {
+	CanvasRenderer,
+	FolderColorMetadata,
+	SerializableFolderIconBase,
+	SerializableSvgFolderIconBase
+} from 'folco-renderer-wasm';
 
 export type RendererStatus = 'uninitialized' | 'loading' | 'ready' | 'error';
+
+// SVG icons are resolution-independent, so the preview ladder is ours to pick.
+const SVG_PREVIEW_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
 // Shared WASM module singleton — loaded once, reused everywhere.
 let wasmModule: typeof import('folco-renderer-wasm') | null = null;
@@ -28,8 +36,14 @@ class RendererStore {
 	error = $state<string | null>(null);
 	renderer = $state<CanvasRenderer | null>(null);
 
-	/** Available logical icon sizes (pixels), derived from the base icon set. */
+	/** Available logical icon sizes (pixels) offered by the preview. */
 	availableSizes = $state<number[]>([]);
+
+	/** Whether the active folder icon is vector (SVG) rather than raster. */
+	isSvg = $state(false);
+
+	/** Whether the active medium supports the decal layer. */
+	supportsDecal = $state(true);
 
 	/** All available folder color presets, populated once WASM is ready. */
 	availableColors = $state<FolderColorMetadata[]>([]);
@@ -45,10 +59,8 @@ class RendererStore {
 	 * Initializes the WASM module and creates a `CanvasRenderer` from the
 	 * backend's `CustomizationContext` icon base.
 	 *
-	 * This performs two steps:
-	 * 1. Loads the folco-renderer-wasm module
-	 * 2. Fetches the icon base from the Tauri backend via IPC
-	 * 3. Creates a `CanvasRenderer` from the received data
+	 * Vector platforms (e.g. GNOME) return SVG markup; everything else returns
+	 * a PNG icon set. Either way the result is one `CanvasRenderer`.
 	 */
 	async init() {
 		if (this.status === 'loading' || this.status === 'ready') return;
@@ -57,23 +69,29 @@ class RendererStore {
 		this.error = null;
 
 		try {
-			// Load WASM module and fetch icon base in parallel
-			const [wasm, folderIconBase] = await Promise.all([
+			const [wasm, svgBase] = await Promise.all([
 				ensureWasm(),
-				invoke<SerializableFolderIconBase>('get_folder_icon_base')
+				invoke<SerializableSvgFolderIconBase | null>('get_folder_icon_svg')
 			]);
 
-			// Populate available colors from WASM
 			this.availableColors = wasm.getAvailableColors();
 
-			// Compute available logical sizes from the icon images
-			this.availableSizes = folderIconBase.images
-				.map((img) => Math.round(img.width / img.scale))
-				.filter((size, i, arr) => arr.indexOf(size) === i)
-				.sort((a, b) => a - b);
-
 			const { CanvasRenderer } = wasm;
-			this.renderer = CanvasRenderer.fromFolderIconBase(folderIconBase);
+
+			if (svgBase) {
+				this.renderer = CanvasRenderer.fromSvgFolderIconBase(svgBase);
+				this.availableSizes = SVG_PREVIEW_SIZES;
+			} else {
+				const base = await invoke<SerializableFolderIconBase>('get_folder_icon_base');
+				this.renderer = CanvasRenderer.fromFolderIconBase(base);
+				this.availableSizes = base.images
+					.map((img) => Math.round(img.width / img.scale))
+					.filter((size, i, arr) => arr.indexOf(size) === i)
+					.sort((a, b) => a - b);
+			}
+
+			this.isSvg = this.renderer.isSvg();
+			this.supportsDecal = this.renderer.supportsDecal();
 
 			this.status = 'ready';
 		} catch (e) {
@@ -84,7 +102,7 @@ class RendererStore {
 	}
 
 	/**
-	 * Renders the current icon to an HTML canvas element.
+	 * Renders a preview of the current icon to an HTML canvas element.
 	 */
 	renderToCanvas(canvas: HTMLCanvasElement, size: number) {
 		this.#assertRenderer();
@@ -92,19 +110,13 @@ class RendererStore {
 	}
 
 	/**
-	 * Renders the current icon and returns raw RGBA pixel data.
+	 * Renders the scalable SVG artifact that would be written to the system.
+	 *
+	 * Returns `null` on raster platforms, where the saved artifact is a PNG set.
 	 */
-	renderToPixels(size: number): Uint8Array {
+	renderOutputSvg(): string | null {
 		this.#assertRenderer();
-		return this.renderer!.renderToPixels(size);
-	}
-
-	/**
-	 * Returns the dimensions of the rendered icon at the given logical size.
-	 */
-	getRenderedDimensions(size: number): [number, number] {
-		this.#assertRenderer();
-		return this.renderer!.getRenderedDimensions(size) as [number, number];
+		return this.renderer!.renderOutputSvg() ?? null;
 	}
 
 	/**
@@ -123,7 +135,7 @@ class RendererStore {
 	}
 
 	/**
-	 * Sets the decal configuration.
+	 * Sets the decal configuration. Ignored when `supportsDecal` is false.
 	 */
 	setDecal(svgData: string | null | undefined, scale: number) {
 		this.#assertRenderer();
@@ -200,8 +212,7 @@ class RendererStore {
 	 * Clears the render cache to free memory.
 	 */
 	clearCache() {
-		this.#assertRenderer();
-		this.renderer!.clearCache();
+		this.renderer?.clearCache();
 	}
 
 	/**
@@ -212,12 +223,6 @@ class RendererStore {
 		this.renderer = null;
 		this.status = 'uninitialized';
 		this.error = null;
-	}
-
-	#assertReady() {
-		if (this.status !== 'ready') {
-			throw new Error('Renderer not initialized. Call init() first.');
-		}
 	}
 
 	#assertRenderer() {

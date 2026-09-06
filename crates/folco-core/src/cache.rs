@@ -106,6 +106,11 @@ impl IconCache {
             .join(format!("folder_icon_{}_{}.png", size, index))
     }
 
+    /// Returns the path where the scalable SVG variant would be cached.
+    fn svg_path(&self) -> PathBuf {
+        self.config.cache_dir.join("folder_icon.svg")
+    }
+
     /// Returns the path to the cache manifest file.
     fn manifest_path(&self) -> PathBuf {
         self.config.cache_dir.join("manifest.json")
@@ -154,6 +159,7 @@ impl IconCache {
             version: 1,
             icon_count: icon_set.images.len(),
             icons: Vec::new(),
+            svg: None,
         };
 
         for (index, image) in icon_set.images.iter().enumerate() {
@@ -168,6 +174,13 @@ impl IconCache {
                 index,
                 path: path.to_string_lossy().to_string(),
             });
+        }
+
+        // Cache the scalable SVG variant, if the platform provided one.
+        if let Some(svg) = &icon_set.svg {
+            let svg_path = self.svg_path();
+            fs::write(&svg_path, svg)?;
+            manifest.svg = Some(svg_path.to_string_lossy().to_string());
         }
 
         // Write manifest
@@ -197,8 +210,20 @@ impl IconCache {
             images.push(icon_sys::IconImage { data: img });
         }
 
-        // TODO: Support SVG for linux
-        Ok(SysIconSet { images, svg: None })
+        // Reload the scalable SVG variant if one was cached.
+        let svg = match &manifest.svg {
+            Some(path) => {
+                let path = PathBuf::from(path);
+                if path.exists() {
+                    Some(fs::read_to_string(&path)?)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
+
+        Ok(SysIconSet { images, svg })
     }
 
     /// Clears the cache, forcing a refresh on next access.
@@ -222,6 +247,9 @@ struct CacheManifest {
     version: u32,
     icon_count: usize,
     icons: Vec<CachedIconInfo>,
+    /// Path to the cached scalable SVG variant, if any.
+    #[serde(default)]
+    svg: Option<String>,
 }
 
 /// Information about a cached icon.

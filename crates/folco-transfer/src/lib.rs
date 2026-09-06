@@ -51,6 +51,21 @@ pub struct SerializableFolderIconBase {
     pub surface_color: SurfaceColor,
 }
 
+/// Serializable scalable folder icon: markup plus its surface color.
+///
+/// The vector counterpart to [`SerializableFolderIconBase`]. No rasterization
+/// happens at this boundary — consumers rasterize on demand at whatever size
+/// they need.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct SerializableSvgFolderIconBase {
+    /// Raw SVG markup for the base folder icon.
+    pub svg: String,
+    /// The surface color of the base icon.
+    pub surface_color: SurfaceColor,
+}
+
 impl TryFrom<&IconImage> for SerializableIconImage {
     type Error = image::ImageError;
 

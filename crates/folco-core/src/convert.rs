@@ -81,7 +81,18 @@ pub fn convert_icon_set_to_sys(renderer_icon_set: &RendererIconSet) -> SysIconSe
     // TODO: Support SVG for linux
     SysIconSet { images, svg: None }
 }
-
+/// Builds an `icon-sys` [`SysIconSet`] carrying only a scalable SVG variant.
+///
+/// Used by the SVG folder strategy: on platforms that provide vector folder
+/// icons the customized result is a single SVG string. The Linux folder
+/// settings provider writes the `.svg` directly, falling back to raster only
+/// when no SVG is present, so an SVG-only set is sufficient.
+pub fn convert_svg_to_sys(svg: &str) -> SysIconSet {
+    SysIconSet {
+        images: Vec::new(),
+        svg: Some(svg.to_string()),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,5 +157,14 @@ mod tests {
             original_sys_set.images[0].data.height(),
             roundtrip_sys_set.images[0].data.height()
         );
+    }
+
+    #[test]
+    fn test_convert_svg_to_sys() {
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg"></svg>"#;
+        let sys_set = convert_svg_to_sys(svg);
+
+        assert!(sys_set.images.is_empty());
+        assert_eq!(sys_set.svg.as_deref(), Some(svg));
     }
 }

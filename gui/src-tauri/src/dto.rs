@@ -16,5 +16,8 @@
 /// A folder icon base (images + surface color) delivered to the frontend.
 pub use folco_transfer::SerializableFolderIconBase as FolderIconBaseDto;
 
+/// A scalable folder icon (markup + surface color) delivered to the frontend.
+pub use folco_transfer::SerializableSvgFolderIconBase as SvgFolderIconBaseDto;
+
 /// The set of icon sizes required by the host platform.
 pub use folco_core::PlatformSizeSpec as PlatformSizeSpecDto;

@@ -25,6 +25,11 @@
   /** Whether the selected icon SVG is applied as a decal or overlay. */
   let iconMode = $state<'decal' | 'overlay'>('decal');
 
+  // Vector folder icons have no decal layer; keep the UI on a mode that works.
+  $effect(() => {
+    if (!renderer.supportsDecal && iconMode === 'decal') iconMode = 'overlay';
+  });
+
   /** How overlays attach to their chosen anchor point. */
   let overlayAnchorMode = $state<'inset' | 'centered'>('inset');
 
@@ -227,8 +232,13 @@
         class="mb-3 flex flex-row gap-4"
       >
         <div class="flex items-center gap-2">
-          <RadioGroup.Item value="decal" id="icon-mode-decal" />
-          <label for="icon-mode-decal" class="cursor-pointer text-sm font-medium text-foreground">Decal</label>
+          <RadioGroup.Item value="decal" id="icon-mode-decal" disabled={!renderer.supportsDecal} />
+          <label
+            for="icon-mode-decal"
+            class="cursor-pointer text-sm font-medium text-foreground {renderer.supportsDecal
+              ? ''
+              : 'cursor-not-allowed opacity-50'}"
+          >Decal</label>
         </div>
         <div class="flex items-center gap-2">
           <RadioGroup.Item value="overlay" id="icon-mode-overlay" />

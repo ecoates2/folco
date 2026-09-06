@@ -12,6 +12,7 @@ clap = ["folco-model/clap"]
 
 [dependencies]
 folco-model = { path = "../folco-model" }
+base64 = "0.22"
 image.workspace = true
 palette = "0.7"
 resvg = "0.44"

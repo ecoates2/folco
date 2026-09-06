@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.ecoates2.folco-gui",
   "build": {
-    "beforeDevCommand": "bun run dev:app",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build:app",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../build"
   },
   "app": {

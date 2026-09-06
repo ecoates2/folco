@@ -1,14 +1,27 @@
 mod dto;
 mod state;
 
-use dto::{FolderIconBaseDto, PlatformSizeSpecDto};
+use dto::{FolderIconBaseDto, PlatformSizeSpecDto, SvgFolderIconBaseDto};
 use state::AppState;
 use tauri::Manager;
 
 #[tauri::command]
-fn get_folder_icon_base(state: tauri::State<AppState>) -> Result<FolderIconBaseDto, String> {
-    let base = state.get_folder_icon_base()?;
-    FolderIconBaseDto::try_from(&base).map_err(|e| e.to_string())
+fn get_folder_icon_base(state: tauri::State<AppState>) -> Result<Option<FolderIconBaseDto>, String> {
+    let Some(base) = state.get_folder_icon_base()? else {
+        return Ok(None);
+    };
+    FolderIconBaseDto::try_from(&base)
+        .map(Some)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_folder_icon_svg(
+    state: tauri::State<AppState>,
+) -> Result<Option<SvgFolderIconBaseDto>, String> {
+    Ok(state
+        .get_folder_icon_svg()?
+        .map(|(svg, surface_color)| SvgFolderIconBaseDto { svg, surface_color }))
 }
 
 #[tauri::command]
@@ -27,6 +40,7 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             get_folder_icon_base,
+            get_folder_icon_svg,
             get_platform_icon_sizes
         ])
         .setup(|app| {
@@ -37,11 +51,11 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            #[cfg(debug_assertions)]
-            {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
-            }
+            // #[cfg(debug_assertions)]
+            // {
+            //     let window = app.get_webview_window("main").unwrap();
+            //     window.open_devtools();
+            // }
             Ok(())
         })
         .run(tauri::generate_context!())

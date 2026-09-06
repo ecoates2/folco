@@ -5,15 +5,16 @@
 //! icon cache.
 
 use crate::cache::{CacheConfig, IconCache};
-use crate::convert::{convert_icon_set, convert_icon_set_to_sys};
+use crate::convert::{convert_icon_set, convert_icon_set_to_sys, convert_svg_to_sys};
 use crate::error::{Error, Result};
 use crate::progress::{Progress, ProgressSender};
 
 use folco_renderer::ImageSource;
 use folco_renderer::{
-    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
-    IconSet as RendererIconSet,
+    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer, SurfaceColor,
+    SvgFolderIconBase, SvgFolderIconCustomizer,
 };
+use icon_sys::IconSet as SysIconSet;
 use icon_sys::folder_settings::{FolderSettingsProvider, PlatformFolderSettingsProvider};
 
 use std::path::{Path, PathBuf};
@@ -138,18 +139,17 @@ impl CustomizationContextBuilder {
 
         // Create cache and load icons
         let cache = IconCache::new(cache_config);
-        let renderer_icons = cache.get_renderer_icon_set()?;
+        let sys_set = cache.get_sys_icon_set()?;
 
-        // Create the customizer with the platform-specific surface color
-        let folder_icon_base = FolderIconBase::new(renderer_icons, crate::sys::SURFACE_COLOR);
-        let customizer = FolderIconCustomizer::from_folder(folder_icon_base);
+        // Choose the customization strategy based on the icon medium.
+        let strategy = FolderStrategy::from_sys_icon_set(&sys_set);
 
         // Create the folder settings provider
         let folder_provider = PlatformFolderSettingsProvider::new();
 
         Ok(CustomizationContext {
             cache,
-            customizer,
+            strategy,
             folder_provider,
         })
     }
@@ -158,6 +158,100 @@ impl CustomizationContextBuilder {
 impl Default for CustomizationContextBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// The active folder customization strategy.
+///
+/// Chosen once at build/refresh time based on what `icon-sys` hands us: if the
+/// platform provides a scalable SVG folder icon we use the vector pipeline and
+/// disregard raster PNGs; otherwise we use the raster pipeline. This enum is
+/// the single place that inspects the icon medium — the renderer stays
+/// platform-agnostic.
+enum FolderStrategy {
+    /// Pixel-based pipeline over system PNG icons.
+    Raster(Box<FolderIconCustomizer>),
+    /// Vector pipeline over a scalable system SVG icon.
+    Svg(SvgFolderIconCustomizer),
+}
+
+impl FolderStrategy {
+    /// Builds the appropriate strategy from a system icon set.
+    ///
+    /// When the set carries an SVG variant, the vector pipeline is used and the
+    /// raster images are disregarded; otherwise the raster pipeline is used.
+    fn from_sys_icon_set(sys_set: &SysIconSet) -> Self {
+        match &sys_set.svg {
+            Some(svg) => {
+                let base = SvgFolderIconBase::new(svg.clone(), crate::sys::SURFACE_COLOR);
+                FolderStrategy::Svg(SvgFolderIconCustomizer::from_folder(base))
+            }
+            None => {
+                let renderer_icons = convert_icon_set(sys_set);
+                let base = FolderIconBase::new(renderer_icons, crate::sys::SURFACE_COLOR);
+                FolderStrategy::Raster(Box::new(FolderIconCustomizer::from_folder(base)))
+            }
+        }
+    }
+
+    /// Applies a customization profile to the underlying customizer.
+    fn apply_profile(&mut self, profile: &CustomizationProfile) {
+        match self {
+            FolderStrategy::Raster(c) => c.apply_profile(profile),
+            FolderStrategy::Svg(c) => c.apply_profile(profile),
+        }
+    }
+
+    /// Exports the current settings as a profile.
+    fn export_profile(&self) -> CustomizationProfile {
+        match self {
+            FolderStrategy::Raster(c) => c.export_profile(),
+            FolderStrategy::Svg(c) => c.export_profile(),
+        }
+    }
+
+    /// Renders the artifact written to the system, in `icon-sys` format.
+    fn render_output(&mut self) -> Result<SysIconSet> {
+        match self {
+            FolderStrategy::Raster(c) => {
+                let rendered = c.render_all()?;
+                Ok(convert_icon_set_to_sys(&rendered))
+            }
+            FolderStrategy::Svg(c) => {
+                let svg = c.render_output()?;
+                Ok(convert_svg_to_sys(&svg))
+            }
+        }
+    }
+
+    /// Returns the raster base, or `None` when the active strategy is SVG-based.
+    fn folder_icon_base(&self) -> Option<FolderIconBase> {
+        match self {
+            FolderStrategy::Raster(c) => Some(FolderIconBase::new(
+                c.base_icons().clone(),
+                *c.surface_color()
+                    .expect("raster folder customizer always has a surface color"),
+            )),
+            FolderStrategy::Svg(_) => None,
+        }
+    }
+
+    /// Returns the surface color of the base folder icon.
+    fn surface_color(&self) -> SurfaceColor {
+        match self {
+            FolderStrategy::Raster(c) => *c
+                .surface_color()
+                .expect("raster folder customizer always has a surface color"),
+            FolderStrategy::Svg(c) => *c.surface_color(),
+        }
+    }
+
+    /// Returns the base SVG markup when the active strategy is SVG-based.
+    fn base_svg(&self) -> Option<String> {
+        match self {
+            FolderStrategy::Raster(_) => None,
+            FolderStrategy::Svg(c) => Some(c.base().svg.clone()),
+        }
     }
 }
 
@@ -192,23 +286,33 @@ impl Default for CustomizationContextBuilder {
 /// ```
 pub struct CustomizationContext {
     cache: IconCache,
-    customizer: FolderIconCustomizer,
+    strategy: FolderStrategy,
     folder_provider: PlatformFolderSettingsProvider,
 }
 
 impl CustomizationContext {
-    /// Returns a reference to the icon customizer.
+    /// Returns a reference to the raster icon customizer, if the active
+    /// strategy is raster-based.
     ///
-    /// Use this for live preview rendering without applying to folders.
-    pub fn customizer(&self) -> &FolderIconCustomizer {
-        &self.customizer
+    /// Returns `None` when the platform provided a scalable SVG icon (the SVG
+    /// pipeline exposes no raster customizer). Use for live preview rendering
+    /// without applying to folders.
+    pub fn customizer(&self) -> Option<&FolderIconCustomizer> {
+        match &self.strategy {
+            FolderStrategy::Raster(c) => Some(c.as_ref()),
+            FolderStrategy::Svg(_) => None,
+        }
     }
 
-    /// Returns a mutable reference to the icon customizer.
+    /// Returns a mutable reference to the raster icon customizer, if the active
+    /// strategy is raster-based.
     ///
-    /// Use this to configure layers and render previews.
-    pub fn customizer_mut(&mut self) -> &mut FolderIconCustomizer {
-        &mut self.customizer
+    /// Returns `None` when the active strategy is SVG-based.
+    pub fn customizer_mut(&mut self) -> Option<&mut FolderIconCustomizer> {
+        match &mut self.strategy {
+            FolderStrategy::Raster(c) => Some(c.as_mut()),
+            FolderStrategy::Svg(_) => None,
+        }
     }
 
     /// Returns a reference to the icon cache.
@@ -225,34 +329,38 @@ impl CustomizationContext {
     ///
     /// This is useful for folco-gui to pass icon images and the surface
     /// color to the WASM renderer.
-    pub fn folder_icon_base(&self) -> FolderIconBase {
-        FolderIconBase::new(
-            self.customizer.base_icons().clone(),
-            *self
-                .customizer
-                .surface_color()
-                .expect("CustomizationContext always holds a folder-based customizer"),
-        )
+    ///
+    /// Returns `None` when the platform provided a vector folder icon — use
+    /// [`folder_icon_svg`](Self::folder_icon_svg) in that case.
+    pub fn folder_icon_base(&self) -> Option<FolderIconBase> {
+        self.strategy.folder_icon_base()
+    }
+
+    /// Returns the base folder icon as scalable SVG markup, if available.
+    ///
+    /// Returns `Some` only when the platform provided a vector folder icon
+    /// (the active strategy is SVG-based). Frontends should prefer rendering
+    /// this markup directly for crisp scaling, falling back to
+    /// [`folder_icon_base`](Self::folder_icon_base) when it returns `None`.
+    pub fn folder_icon_svg(&self) -> Option<String> {
+        self.strategy.base_svg()
+    }
+
+    /// Returns the surface color of the base folder icon, whatever the medium.
+    pub fn folder_surface_color(&self) -> SurfaceColor {
+        self.strategy.surface_color()
     }
 
     /// Applies a customization profile to the customizer.
     ///
     /// This configures all layers according to the profile settings.
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
-        self.customizer.apply_profile(profile);
+        self.strategy.apply_profile(profile);
     }
 
     /// Exports the current customizer settings as a profile.
     pub fn export_profile(&self) -> CustomizationProfile {
-        self.customizer.export_profile()
-    }
-
-    /// Renders and returns the customized icon set.
-    ///
-    /// This applies all active customizations and returns the result.
-    /// The returned icon set is in `folco-renderer` format.
-    pub fn render(&mut self) -> Result<RendererIconSet> {
-        Ok(self.customizer.render_all()?)
+        self.strategy.export_profile()
     }
 
     /// Customizes the icons for the specified folders.
@@ -280,14 +388,11 @@ impl CustomizationContext {
         // Apply the profile
         self.apply_profile(profile);
 
-        // Render the customized icons
-        let rendered = match self.render() {
+        // Render the customized icons and convert to system format
+        let sys_icons = match self.strategy.render_output() {
             Ok(icons) => icons,
             Err(e) => return vec![Err(e)],
         };
-
-        // Convert to system format
-        let sys_icons = convert_icon_set_to_sys(&rendered);
 
         // Apply to each folder
         folders
@@ -421,9 +526,7 @@ impl CustomizationContext {
     /// Clears the icon cache and refreshes from system resources.
     pub fn refresh_cache(&mut self) -> Result<()> {
         let sys_icons = self.cache.refresh()?;
-        let renderer_icons = convert_icon_set(&sys_icons);
-        let folder_icon_base = FolderIconBase::new(renderer_icons, crate::sys::SURFACE_COLOR);
-        self.customizer = FolderIconCustomizer::from_folder(folder_icon_base);
+        self.strategy = FolderStrategy::from_sys_icon_set(&sys_icons);
         Ok(())
     }
 
@@ -472,7 +575,7 @@ impl CustomizationContext {
         // Apply the profile and render
         let _ = progress.send(Progress::Rendering).await;
         self.apply_profile(profile);
-        let rendered = match self.render() {
+        let sys_icons = match self.strategy.render_output() {
             Ok(icons) => icons,
             Err(e) => {
                 let _ = progress
@@ -489,7 +592,6 @@ impl CustomizationContext {
                 return;
             }
         };
-        let sys_icons = convert_icon_set_to_sys(&rendered);
 
         let mut succeeded = 0usize;
         let mut failed = 0usize;

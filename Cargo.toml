@@ -13,7 +13,8 @@ members = [
 # Shared dependencies. Members opt in with `<crate>.workspace = true`
 # and may add crate-specific features on top.
 [workspace.dependencies]
-icon-sys = { git = "https://github.com/ecoates2/icon-sys.git", branch = "main" }
+# icon-sys = { git = "https://github.com/ecoates2/icon-sys.git", branch = "main" }
+icon-sys = { path = "../icon-sys" }
 image = "0.25"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

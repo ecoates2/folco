@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use folco_core::{CustomizationContext, CustomizationContextBuilder, FolderIconBase};
+use folco_core::{CustomizationContext, CustomizationContextBuilder, FolderIconBase, SurfaceColor};
 
 /// Wrapper to make `CustomizationContext` usable in Tauri managed state.
 ///
@@ -29,9 +29,16 @@ impl AppState {
         })
     }
 
-    /// Returns the current folder icon base from the context.
-    pub fn get_folder_icon_base(&self) -> Result<FolderIconBase, String> {
+    /// Returns the current folder icon base, or `None` for vector folder icons.
+    pub fn get_folder_icon_base(&self) -> Result<Option<FolderIconBase>, String> {
         let guard = self.ctx.lock().map_err(|e| e.to_string())?;
         Ok(guard.0.folder_icon_base())
+    }
+
+    /// Returns the scalable folder icon markup and surface color, if vector.
+    pub fn get_folder_icon_svg(&self) -> Result<Option<(String, SurfaceColor)>, String> {
+        let guard = self.ctx.lock().map_err(|e| e.to_string())?;
+        let surface_color = guard.0.folder_surface_color();
+        Ok(guard.0.folder_icon_svg().map(|svg| (svg, surface_color)))
     }
 }

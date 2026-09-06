@@ -54,7 +54,10 @@ pub mod folder_color;
 mod folder_customizer;
 mod icon;
 pub mod layer;
+pub mod medium;
 mod profile;
+mod svg_folder_customizer;
+pub mod svg_layer;
 
 pub use custom_customizer::{CustomIconCustomizer, OverlayLayers};
 pub use customizer::{IconCustomizer, LayerSet};
@@ -63,10 +66,14 @@ pub use folder_color::{FolderColor, FolderColorExt, FolderColorMetadata};
 pub use folder_customizer::{FolderIconCustomizer, FolderLayers};
 pub use icon::{
     FolderIconBase, IconBase, IconImage, IconSet, IconSizeSpec, RectPx, SizePx, SurfaceColor,
+    SvgFolderIconBase,
 };
 pub use layer::{
     CacheKey, DecalConfig, DominantColor, FolderColorTargetConfig, ImageOverlayConfig, ImageSource,
     Layer, LayerConfig, LayerVersions, OverlayAnchorMode, OverlayPosition, RenderContext,
     SvgSource,
 };
+pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
 pub use profile::{CustomIconProfile, CustomizationProfile};
+pub use svg_folder_customizer::{SvgFolderIconCustomizer, SvgFolderLayers, SvgLayerSet};
+pub use svg_layer::{ColorDotConfig, SvgLayer};

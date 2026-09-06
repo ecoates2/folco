@@ -18,10 +18,6 @@
 		if (!canvas || renderer.status !== 'ready') return;
 
 		try {
-			const [width, height] = renderer.getRenderedDimensions(selectedSize);
-			canvas.width = width;
-			canvas.height = height;
-
 			renderer.renderToCanvas(canvas, selectedSize);
 		} catch (e) {
 			console.error('Render failed:', e);
