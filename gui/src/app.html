@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tauri + SvelteKit + Typescript App</title>
+    <title>Folco</title>
     <script>
       // Prevent flash of wrong theme before Svelte hydrates
       (function () {
@@ -14,9 +14,49 @@
         }
       })();
     </script>
+    <style>
+      /* Boot loader. Lives in the shell HTML so it paints on the first frame,
+         before the SvelteKit bundle is fetched or parsed. Removed on mount. */
+      html, body { background: #ffffff; }
+      html.dark, html.dark body { background: #020617; }
+
+      #boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: inherit;
+        transition: opacity 150ms ease-out;
+      }
+      #boot-loader[data-done] { opacity: 0; pointer-events: none; }
+
+      #boot-loader::after {
+        content: '';
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid rgb(15 23 42 / 0.15);
+        border-top-color: rgb(15 23 42 / 0.55);
+        animation: boot-spin 700ms linear infinite;
+      }
+      html.dark #boot-loader::after {
+        border-color: rgb(248 250 252 / 0.15);
+        border-top-color: rgb(248 250 252 / 0.6);
+      }
+
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+
+      @media (prefers-reduced-motion: reduce) {
+        #boot-loader { transition: none; }
+        #boot-loader::after { animation-duration: 2s; }
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
+    <div id="boot-loader"></div>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

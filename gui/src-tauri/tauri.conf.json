@@ -12,10 +12,11 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Folco",
         "width": 800,
         "height": 600,
-        "backgroundColor": "#FFFFFF"
+        "create": false
       }
     ],
     "security": {

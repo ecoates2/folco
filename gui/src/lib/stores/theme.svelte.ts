@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -60,6 +61,12 @@ class ThemeStore {
 		const theme = this.preference === 'system' ? this.#systemTheme : this.preference;
 		this.resolved = theme;
 		document.documentElement.classList.toggle('dark', theme === 'dark');
+
+		// Cache for the next launch so the window can be created with a matching
+		// background colour instead of flashing the wrong one.
+		invoke('set_startup_theme', { theme }).catch(() => {
+			// Not running under Tauri; nothing to cache.
+		});
 	}
 
 	destroy() {
