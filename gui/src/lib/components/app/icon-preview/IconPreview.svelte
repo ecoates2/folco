@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { renderer } from '$lib/stores/renderer.svelte';
 	import { cn } from '$lib/utils';
+	import * as Select from '$lib/components/ui/select';
 
 	interface Props {
 		/** Fixed display size of the preview area in pixels. */
@@ -75,13 +76,19 @@
 	</div>
 
 	{#if renderer.availableSizes.length > 1}
-		<select
-			bind:value={selectedSize}
-			class="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+		<Select.Root
+			type="single"
+			value={String(selectedSize)}
+			onValueChange={(v) => (selectedSize = Number(v))}
 		>
-			{#each [...renderer.availableSizes].reverse() as size}
-				<option value={size}>{size} × {size}</option>
-			{/each}
-		</select>
+			<Select.Trigger size="sm" aria-label="Preview resolution">
+				{selectedSize} × {selectedSize}
+			</Select.Trigger>
+			<Select.Content>
+				{#each [...renderer.availableSizes].reverse() as size (size)}
+					<Select.Item value={String(size)} label="{size} × {size}" />
+				{/each}
+			</Select.Content>
+		</Select.Root>
 	{/if}
 </div>

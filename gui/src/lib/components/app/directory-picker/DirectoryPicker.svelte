@@ -31,23 +31,28 @@
 	let isDragging = $state(false);
 
 	onMount(() => {
-		const appWindow = getCurrentWebviewWindow();
-		const unlisten = appWindow.onDragDropEvent((event) => {
-			if (event.payload.type === 'over') {
-				isDragging = true;
-			} else if (event.payload.type === 'leave') {
-				isDragging = false;
-			} else if (event.payload.type === 'drop') {
-				isDragging = false;
-				const paths = event.payload.paths;
-				if (paths.length > 0 && onDropPaths) {
-					onDropPaths(paths);
+		// Native drag-and-drop only exists under Tauri; the browser dev server has no backend.
+		let unlisten: Promise<() => void> | null = null;
+		try {
+			unlisten = getCurrentWebviewWindow().onDragDropEvent((event) => {
+				if (event.payload.type === 'over') {
+					isDragging = true;
+				} else if (event.payload.type === 'leave') {
+					isDragging = false;
+				} else if (event.payload.type === 'drop') {
+					isDragging = false;
+					const paths = event.payload.paths;
+					if (paths.length > 0 && onDropPaths) {
+						onDropPaths(paths);
+					}
 				}
-			}
-		});
+			});
+		} catch {
+			unlisten = null;
+		}
 
 		return () => {
-			unlisten.then((fn) => fn());
+			unlisten?.then((fn) => fn()).catch(() => {});
 		};
 	});
 

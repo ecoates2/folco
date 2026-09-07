@@ -5,11 +5,11 @@
   import { ColorPicker } from '$lib/components/app/color-picker';
   import { CustomizationOption } from '$lib/components/app/customization-option';
   import { DirectoryPicker } from '$lib/components/app/directory-picker';
+  import { IconPicker } from '$lib/components/app/icon-picker';
   import { IconPreview } from '$lib/components/app/icon-preview';
+  import { ThemeSelector } from '$lib/components/app/theme-selector';
 
   import * as RadioGroup from '$lib/components/ui/radio-group';
-
-  import 'iconify-picker';
 
   import { open } from '@tauri-apps/plugin-dialog';
 
@@ -178,7 +178,10 @@
 </script>
 
 <main class="container mx-auto max-w-2xl p-6">
-  <h1 class="mb-6 text-2xl font-bold text-foreground">Folder Customization</h1>
+  <div class="mb-6 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-foreground">Folder Customization</h1>
+    <ThemeSelector />
+  </div>
 
   <div class="mb-6 flex flex-col gap-3">
     <CustomizationOption
@@ -262,12 +265,12 @@
         </RadioGroup.Root>
       {/if}
       <!-- Search function currently broken... -->
-      <iconify-picker
+      <IconPicker
         collection="mdi"
-        hide-search
-        page-size="30"
-        onicon-selected={handleIconSelect}>
-      </iconify-picker>
+        hideSearch
+        pageSize={30}
+        oniconselected={handleIconSelect}>
+      </IconPicker>
     </CustomizationOption>
   </div>
 

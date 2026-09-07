@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import type {
 	CanvasRenderer,
 	FolderColorMetadata,
@@ -67,6 +67,14 @@ class RendererStore {
 
 		this.status = 'loading';
 		this.error = null;
+
+		// The icon base comes from the native side. Tests can stand one up with
+		// mockIPC() from @tauri-apps/api/mocks, which satisfies isTauri().
+		if (!isTauri()) {
+			this.status = 'error';
+			this.error = 'Tauri backend unavailable; cannot load the folder icon base.';
+			return;
+		}
 
 		try {
 			const [wasm, svgBase] = await Promise.all([

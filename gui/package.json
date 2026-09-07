@@ -28,7 +28,7 @@
 	"devDependencies": {
 		"@emoji-mart/data": "^1.2.1",
 		"@internationalized/date": "^3.12.4",
-		"@lucide/svelte": "^0.561.0",
+		"@lucide/svelte": "^1.42.0",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^5.1.1",
