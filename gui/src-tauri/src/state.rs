@@ -46,6 +46,13 @@ impl AppState {
         }
     }
 
+    /// Builds the context ahead of the first command that needs it.
+    ///
+    /// Callers that arrive mid-build block on the `Mutex` rather than duplicating work.
+    pub fn warm(&self) -> Result<(), String> {
+        self.with_ctx(|_| ())
+    }
+
     /// Returns the current folder icon base, or `None` for vector folder icons.
     pub fn get_folder_icon_base(&self) -> Result<Option<FolderIconBase>, String> {
         self.with_ctx(|ctx| ctx.folder_icon_base())

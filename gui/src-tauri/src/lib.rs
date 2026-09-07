@@ -4,6 +4,7 @@ mod theme;
 
 use dto::{FolderIconBaseDto, PlatformSizeSpecDto, SvgFolderIconBaseDto};
 use state::AppState;
+use tauri::Manager;
 use theme::StartupTheme;
 
 /// Caches the frontend's resolved theme so the next launch can create the window
@@ -66,6 +67,16 @@ pub fn run() {
 
             window_config.background_color = Some(theme::read(app.handle()).background_color());
             tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?.build()?;
+
+            // Build the customization context off the critical path: the window is
+            // already up, and the frontend's first icon request usually lands after
+            // this finishes rather than paying for it.
+            let warm_handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(e) = warm_handle.state::<AppState>().warm() {
+                    eprintln!("Failed to warm customization context: {e}");
+                }
+            });
 
             // Register the updater plugin. It stays inert until `plugins.updater`
             // (pubkey + endpoints) and `bundle.createUpdaterArtifacts` are

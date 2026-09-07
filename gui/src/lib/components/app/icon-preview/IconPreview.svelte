@@ -2,6 +2,7 @@
 	import { renderer } from '$lib/stores/renderer.svelte';
 	import { cn } from '$lib/utils';
 	import * as Select from '$lib/components/ui/select';
+	import { Spinner } from '$lib/components/ui/spinner';
 
 	interface Props {
 		/** Fixed display size of the preview area in pixels. */
@@ -15,11 +16,16 @@
 	let container = $state<HTMLDivElement | null>(null);
 	let selectedSize = $state<number>(0);
 
+	// `renderer.status === 'ready'` only means the data arrived; pixels land a few
+	// effect flushes later, once `selectedSize` is set and the canvas is bound.
+	let hasPainted = $state(false);
+
 	function render() {
 		if (!canvas || renderer.status !== 'ready') return;
 
 		try {
 			renderer.renderToCanvas(canvas, selectedSize);
+			hasPainted = true;
 		} catch (e) {
 			console.error('Render failed:', e);
 		}
@@ -66,13 +72,26 @@
 	class={cn('inline-flex flex-col items-center gap-3 rounded-lg border border-border bg-background p-4', className)}
 >
 	<div
-		class="flex items-center justify-center"
+		class="relative flex items-center justify-center"
 		style="width: {displaySize}px; height: {displaySize}px;"
 	>
+		<!-- Kept mounted so `bind:this` resolves before the render effect runs. -->
 		<canvas
 			bind:this={canvas}
+			class:invisible={!hasPainted}
 			style="max-width: {displaySize}px; max-height: {displaySize}px; width: auto; height: auto;"
 		></canvas>
+
+		{#if !hasPainted}
+			<div class="absolute inset-0 flex items-center justify-center">
+				{#if renderer.status === 'error'}
+					<p class="text-muted-foreground px-4 text-center text-sm">Preview unavailable</p>
+				{:else}
+				<!-- TODO: Revisit broken spinner rendering: renders in DOM but is invisible -->
+					<Spinner class="text-muted-foreground size-8" />
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	{#if renderer.availableSizes.length > 1}
