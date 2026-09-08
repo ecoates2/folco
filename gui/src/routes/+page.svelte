@@ -39,108 +39,77 @@
   /** Last selected icon SVG markup. */
   let lastIconSvg = $state<string | null>(null);
 
-  // ── Emoji handlers ───────────────────────────────────────────────
+  const OVERLAY_POSITION = 'bottom-right';
+  const OVERLAY_SCALE = 0.5;
+  const DECAL_SCALE = 0.7;
 
-  function enableEmoji(on: boolean) {
-    if (on && iconEnabled) {
-      // Disable icon — they are mutually exclusive
-      iconEnabled = false;
-      clearIcon();
+  /**
+   * Pushes the complete decal + overlay state to the renderer.
+   *
+   * Emoji and icon overlays share a single overlay layer, so the state is always
+   * rewritten in full: only toggling the layer that gained focus would leave the
+   * previous source configured, and it would keep rendering.
+   */
+  function syncImageLayers() {
+    const emoji = emojiEnabled ? lastEmoji : null;
+    const icon = iconEnabled ? lastIconSvg : null;
+
+    renderer.setDecal(iconMode === 'decal' ? icon : null, DECAL_SCALE);
+
+    if (emoji) {
+      renderer.setOverlayEmoji(emoji.emoji, OVERLAY_POSITION, overlayAnchorMode, OVERLAY_SCALE);
+    } else {
+      const overlay = iconMode === 'overlay' ? icon : null;
+      renderer.setOverlay(overlay, OVERLAY_POSITION, overlayAnchorMode, OVERLAY_SCALE);
     }
-    renderer.setOverlayEnabled(on);
-  }
-
-  function handleEmojiSelect(emoji: SelectedEmoji) {
-    lastEmoji = emoji;
-    renderer.setOverlayEmoji(emoji.emoji, 'bottom-right', overlayAnchorMode, 0.5);
-  }
-
-  function handleSkinChange(skin: EmojiPickerSkin) {
-    if (!lastEmoji || lastEmoji.data.skins.length <= 1) return;
-    const native = lastEmoji.data.skins[skin].native;
-    lastEmoji = { ...lastEmoji, emoji: native, skin };
-    renderer.setOverlayEmoji(native, 'bottom-right', overlayAnchorMode, 0.5);
   }
 
   function setOverlayAnchorMode(mode: 'inset' | 'centered') {
     overlayAnchorMode = mode;
+    syncImageLayers();
+  }
 
-    if (emojiEnabled && lastEmoji) {
-      renderer.setOverlayEmoji(lastEmoji.emoji, 'bottom-right', overlayAnchorMode, 0.5);
-    }
+  // ── Emoji handlers ───────────────────────────────────────────────
 
-    if (iconEnabled && iconMode === 'overlay' && lastIconSvg) {
-      renderer.setOverlay(lastIconSvg, 'bottom-right', overlayAnchorMode, 0.5);
-    }
+  function enableEmoji(on: boolean) {
+    // Emoji and icon are mutually exclusive
+    if (on && iconEnabled) iconEnabled = false;
+    emojiEnabled = on;
+    syncImageLayers();
+  }
+
+  function handleEmojiSelect(emoji: SelectedEmoji) {
+    lastEmoji = emoji;
+    syncImageLayers();
+  }
+
+  function handleSkinChange(skin: EmojiPickerSkin) {
+    if (!lastEmoji || lastEmoji.data.skins.length <= 1) return;
+    lastEmoji = { ...lastEmoji, emoji: lastEmoji.data.skins[skin].native, skin };
+    syncImageLayers();
   }
 
   // ── Icon handlers ────────────────────────────────────────────────
 
   function enableIcon(on: boolean) {
-    if (on && emojiEnabled) {
-      // Disable emoji — they are mutually exclusive
-      emojiEnabled = false;
-      clearEmoji();
-    }
-    // Enable whichever layer the icon is targeting
-    if (iconMode === 'decal') {
-      renderer.setDecalEnabled(on);
-    } else {
-      renderer.setOverlayEnabled(on);
-    }
+    // Emoji and icon are mutually exclusive
+    if (on && emojiEnabled) emojiEnabled = false;
+    iconEnabled = on;
+    syncImageLayers();
   }
 
   function handleIconSelect(e: Event) {
     const detail = (e as CustomEvent).detail;
     if (!detail?.svg) return;
     lastIconSvg = detail.svg;
-    applyIconSvg(detail.svg);
-  }
-
-  /** Applies the current icon SVG to the layer indicated by `iconMode`. */
-  function applyIconSvg(svg: string) {
-    if (iconMode === 'decal') {
-      renderer.setDecal(svg, 0.7);
-    } else {
-      renderer.setOverlay(svg, 'bottom-right', overlayAnchorMode, 0.5);
-    }
+    syncImageLayers();
   }
 
   /** Switches the icon between decal and overlay mode, moving the SVG data. */
   function setIconMode(mode: 'decal' | 'overlay') {
     if (mode === iconMode) return;
-
-    // Disable the old layer
-    if (iconMode === 'decal') {
-      renderer.setDecalEnabled(false);
-    } else {
-      renderer.setOverlayEnabled(false);
-    }
-
     iconMode = mode;
-
-    // Re-apply SVG to the new layer and enable it
-    if (lastIconSvg) {
-      applyIconSvg(lastIconSvg);
-    }
-    if (iconMode === 'decal') {
-      renderer.setDecalEnabled(true);
-    } else {
-      renderer.setOverlayEnabled(true);
-    }
-  }
-
-  // ── Cleanup helpers ──────────────────────────────────────────────
-
-  function clearEmoji() {
-    renderer.setOverlayEnabled(false);
-    lastEmoji = null;
-  }
-
-  function clearIcon() {
-    renderer.setDecalEnabled(false);
-    renderer.setOverlayEnabled(false);
-    lastIconSvg = null;
+    syncImageLayers();
   }
 
   // ── Directory handlers ───────────────────────────────────────────
