@@ -9,24 +9,27 @@
 //! Each layer config implements [`LayerConfig`] (pure data with change
 //! detection). Rendering logic lives on the concrete `Layer<Config>` types.
 //!
-//! - **Base layers** (e.g., color target) transform the icon image directly
+//! - **Base layers** (e.g., solid color) transform the icon image directly
 //!   and cache the full result.
-//! - **Stackable layers** (e.g., decal, overlay) render to a transparent tile
-//!   of the same dimensions, which the pipeline composites on top.
+//! - **Stackable layers** (e.g., color dot, decal, overlay) render to a
+//!   transparent tile of the same dimensions, which the pipeline composites
+//!   on top.
 //!
 //! Properties flow through the pipeline via [`RenderContext`], enabling
 //! layers to communicate without tight coupling.
 
+pub mod color_dot;
 pub mod decal;
-pub mod folder_color_target;
 pub mod image_source;
 pub mod overlay;
+pub mod solid_color;
 pub mod svg;
 
+pub use color_dot::ColorDotConfig;
 pub use decal::DecalConfig;
-pub use folder_color_target::FolderColorTargetConfig;
 pub use image_source::ImageSource;
 pub use overlay::{ImageOverlayConfig, OverlayAnchorMode, OverlayPosition};
+pub use solid_color::SolidColorConfig;
 pub use svg::SvgSource;
 
 use crate::icon::IconImage;
@@ -95,7 +98,7 @@ impl RenderContext {
 
 /// The dominant color sampled from the image.
 ///
-/// Emitted by layers that modify the image appearance (like color target).
+/// Emitted by layers that modify the image appearance (like solid color).
 /// Consumed by layers that need to derive colors from the image (like decal).
 #[derive(Debug, Clone, Copy)]
 pub struct DominantColor {
@@ -171,8 +174,10 @@ impl DependencyVersion {
 /// which upstream layers it depends on for cache invalidation.
 #[derive(Debug, Clone, Copy)]
 pub struct LayerVersions {
-    /// Version of the color target layer.
-    pub folder_color_target: u64,
+    /// Version of the solid color layer.
+    pub solid_color: u64,
+    /// Version of the color dot layer.
+    pub color_dot: u64,
     /// Version of the decal layer.
     pub decal: u64,
     /// Version of the overlay layer.
@@ -220,12 +225,12 @@ impl CacheKey {
 /// Cached result from a layer's rendering.
 ///
 /// Layers produce different types of output:
-/// - **Image-transforming layers** (e.g., color_target) modify `ctx.image`
+/// - **Image-transforming layers** (e.g., solid_color) modify `ctx.image`
 ///   directly and cache the full transformed result.
-/// - **Tile layers** (e.g., decal, overlay) render to a transparent canvas
-///   of the same dimensions, which the pipeline composites on top.
+/// - **Tile layers** (e.g., color_dot, decal, overlay) render to a transparent
+///   canvas of the same dimensions, which the pipeline composites on top.
 enum CachedOutput {
-    /// Full transformed image (e.g., color_target mutates the base icon).
+    /// Full transformed image (e.g., solid_color mutates the base icon).
     Image(IconImage),
     /// Transparent tile for compositing (e.g., decal, overlay).
     Tile(RgbaImage),
@@ -357,7 +362,7 @@ impl<C: LayerConfig> Layer<C> {
 }
 
 // NOTE: Rendering methods (apply, render_tile) are implemented on `Layer<SpecificConfig>`
-// in each layer module (color_target.rs, decal.rs, overlay.rs).
+// in each layer module (solid_color.rs, color_dot.rs, decal.rs, overlay.rs).
 
 // ============================================================================
 // Composite Layer

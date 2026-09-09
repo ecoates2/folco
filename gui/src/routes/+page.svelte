@@ -18,7 +18,8 @@
 
   onMount(() => renderer.init());
 
-  let colorEnabled = $state(false);
+  let solidColorEnabled = $state(false);
+  let colorDotEnabled = $state(false);
   let emojiEnabled = $state(false);
   let iconEnabled = $state(false);
 
@@ -154,12 +155,24 @@
 
   <div class="mb-6 flex flex-col gap-3">
     <CustomizationOption
-      label="Color"
-      bind:enabled={colorEnabled}
-      onToggle={(on) => renderer.setFolderColorTargetEnabled(on)}
+      label="Solid Color"
+      bind:enabled={solidColorEnabled}
+      disabled={!renderer.supportsSolidColor}
+      disabledReason="This system's folder icon is a scalable SVG, which can't be recolored. Use a color dot instead."
+      onToggle={(on) => renderer.setSolidColorEnabled(on)}
     >
       <ColorPicker
-        onchange={(color) => renderer.setFolderColorTarget(color.r, color.g, color.b)}
+        onchange={(color) => renderer.setSolidColor(color.r, color.g, color.b)}
+      />
+    </CustomizationOption>
+
+    <CustomizationOption
+      label="Color Dot"
+      bind:enabled={colorDotEnabled}
+      onToggle={(on) => renderer.setColorDotEnabled(on)}
+    >
+      <ColorPicker
+        onchange={(color) => renderer.setColorDot(color.r, color.g, color.b)}
       />
     </CustomizationOption>
 

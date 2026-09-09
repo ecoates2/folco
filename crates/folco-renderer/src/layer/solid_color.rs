@@ -1,4 +1,8 @@
-//! Color target layer configuration and application.
+//! Solid color layer configuration and application.
+//!
+//! Recolors the entire icon to a target RGB color. Because the transform is a
+//! shift relative to the base icon's [`SurfaceColor`], this layer only applies
+//! to media that expose one — raster system folder icons.
 //!
 //! Implements GIMP-style Hue/Saturation adjustment internally: hue is shifted by a
 //! delta in degrees, while saturation and lightness are scaled by a
@@ -29,13 +33,13 @@ use crate::icon::{IconImage, SurfaceColor};
 use palette::{Hsl, IntoColor, Srgb};
 
 // ============================================================================
-// FolderColorTargetConfig
+// SolidColorConfig
 // ============================================================================
 
-/// Configuration for color targeting — pure data.
+/// Configuration for solid recoloring — pure data.
 ///
 /// Stores only the target RGB color. HSL delta computation and pixel
-/// transformation are handled by [`Layer<FolderColorTargetConfig>::apply()`].
+/// transformation are handled by [`Layer<SolidColorConfig>::apply()`].
 ///
 /// # Emitted Properties
 ///
@@ -53,7 +57,7 @@ pub struct SolidColorConfig {
 }
 
 impl SolidColorConfig {
-    /// Creates a new color target config from target RGB values.
+    /// Creates a new solid color config from target RGB values.
     pub fn new(target_r: u8, target_g: u8, target_b: u8) -> Self {
         Self {
             target_r,
@@ -76,7 +80,7 @@ impl LayerConfig for SolidColorConfig {
 // ============================================================================
 
 impl Layer<SolidColorConfig> {
-    /// Apply the color target layer to the render context, using cache if valid.
+    /// Apply the solid color layer to the render context, using cache if valid.
     ///
     /// Transforms `ctx.image` using GIMP-style HSL adjustment and emits
     /// [`DominantColor`] for downstream layers. If inactive, the context
@@ -135,7 +139,7 @@ impl Layer<SolidColorConfig> {
 // Helper Functions
 // ============================================================================
 
-/// Applies GIMP-style HSL color targeting to an icon image.
+/// Applies GIMP-style HSL recoloring to an icon image.
 ///
 /// Computes hue/saturation/lightness deltas from `surface_color` and
 /// `config.target_r/g/b`, then for each opaque pixel:

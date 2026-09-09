@@ -72,7 +72,7 @@ impl Layer<DecalConfig> {
             return Ok(None);
         }
 
-        let deps = DependencyVersion::from_version(versions.folder_color_target);
+        let deps = DependencyVersion::from_version(versions.solid_color);
 
         if let Some(CachedOutput::Tile(tile)) = self.get_cached(key, deps) {
             return Ok(Some(tile.clone()));

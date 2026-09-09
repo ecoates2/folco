@@ -6,14 +6,12 @@
 //! [`SvgCanvas`](crate::medium::SvgCanvas), which is resolution-independent, so
 //! there is nothing size-keyed to cache.
 //!
-//! Layer configs reuse the raster [`LayerConfig`](crate::layer::LayerConfig)
-//! trait for change detection; rendering logic lives on the concrete
-//! `SvgLayer<Config>` types (e.g. [`SvgLayer<ColorDotConfig>`]).
+//! Layer configs are shared with the raster medium (see
+//! [`crate::layer`]); only the rendering logic differs, and it lives on the
+//! concrete `SvgLayer<Config>` types.
 
 mod color_dot;
 mod overlay;
-
-pub use color_dot::ColorDotConfig;
 
 use crate::layer::LayerConfig;
 

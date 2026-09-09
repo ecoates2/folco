@@ -1,8 +1,8 @@
-//! Folder icon customizer — color target + decal + overlay layers.
+//! Folder icon customizer — solid color + color dot + decal + overlay layers.
 //!
 //! [`FolderIconCustomizer`] is a type alias for `IconCustomizer<FolderLayers>`,
-//! providing color targeting, decal imprints, and image overlays on top of
-//! system folder icons.
+//! providing recoloring, color-dot badges, decal imprints, and image overlays
+//! on top of system folder icons.
 //!
 //! # Layer Pipeline
 //!
@@ -10,16 +10,21 @@
 //! Base Image
 //!     │
 //!     ▼
-//! ┌──────────────┐
-//! │ Color Target │ ◄── No dependencies (root layer)
-//! └──────┬───────┘
+//! ┌─────────────┐
+//! │ Solid Color │ ◄── No dependencies (root layer)
+//! └──────┬──────┘
 //!        │
 //!        ▼
 //! ┌─────────┐
-//! │  Decal  │ ◄── Depends on: Color Target
+//! │  Decal  │ ◄── Depends on: Solid Color
 //! └────┬────┘
 //!      │
 //!      ▼
+//! ┌───────────┐
+//! │ Color Dot │ ◄── No direct dependencies (drawn on top)
+//! └─────┬─────┘
+//!       │
+//!       ▼
 //! ┌─────────┐
 //! │ Overlay │ ◄── No direct dependencies (applied last)
 //! └─────────┘
@@ -30,8 +35,8 @@ use crate::error::RenderError;
 use crate::icon::{FolderIconBase, IconBase};
 use crate::layer::svg::composite_over;
 use crate::layer::{
-    CacheKey, DecalConfig, DependencyVersion, FolderColorTargetConfig, ImageOverlayConfig, Layer,
-    LayerVersions, RenderContext,
+    CacheKey, ColorDotConfig, DecalConfig, DependencyVersion, ImageOverlayConfig, Layer,
+    LayerVersions, RenderContext, SolidColorConfig,
 };
 use crate::profile::CustomizationProfile;
 
@@ -41,17 +46,21 @@ use crate::profile::CustomizationProfile;
 
 /// Layer set for folder icon customization.
 ///
-/// Contains all three layers in pipeline order:
-/// 1. **Color target** – Recolors to a target RGB color (mutates image)
+/// Contains all four layers in pipeline order:
+/// 1. **Solid color** – Recolors the icon to a target RGB color (mutates image)
 /// 2. **Decal** – Renders an SVG at the center (tile composited on top)
-/// 3. **Overlay** – Renders an image at a corner position (tile composited on top)
+/// 3. **Color dot** – Renders a colored badge in the bottom-right (tile)
+/// 4. **Overlay** – Renders an image at a corner position (tile composited on top)
 #[derive(Default)]
 pub struct FolderLayers {
-    /// Color target layer (root — no dependencies).
-    pub folder_color_target: Layer<FolderColorTargetConfig>,
+    /// Solid color layer (root — no dependencies).
+    pub solid_color: Layer<SolidColorConfig>,
 
-    /// Decal imprint layer (depends on color target).
+    /// Decal imprint layer (depends on solid color).
     pub decal: Layer<DecalConfig>,
+
+    /// Color dot badge layer (no dependencies).
+    pub color_dot: Layer<ColorDotConfig>,
 
     /// Image overlay layer (no dependencies, applied last).
     pub overlay: Layer<ImageOverlayConfig>,
@@ -61,7 +70,8 @@ impl FolderLayers {
     /// Returns a snapshot of all layer versions.
     fn layer_versions(&self) -> LayerVersions {
         LayerVersions {
-            folder_color_target: self.folder_color_target.version(),
+            solid_color: self.solid_color.version(),
+            color_dot: self.color_dot.version(),
             decal: self.decal.version(),
             overlay: self.overlay.version(),
         }
@@ -72,15 +82,20 @@ impl LayerSet for FolderLayers {
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
         let versions = self.layer_versions();
 
-        // 1. Color target transforms ctx.image directly
-        self.folder_color_target.apply(ctx, key, &versions)?;
+        // 1. Solid color transforms ctx.image directly
+        self.solid_color.apply(ctx, key, &versions)?;
 
         // 2. Decal tile layer
         if let Some(tile) = self.decal.render_tile(ctx, key, &versions)? {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
 
-        // 3. Overlay tile layer
+        // 3. Color dot tile layer
+        if let Some(tile) = self.color_dot.render_tile(ctx, key, &versions)? {
+            composite_over(&mut ctx.image.data, &tile, 0, 0);
+        }
+
+        // 4. Overlay tile layer
         if let Some(tile) = self.overlay.render_tile(ctx, key, &versions)? {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
@@ -90,14 +105,16 @@ impl LayerSet for FolderLayers {
 
     fn combined_version(&self) -> DependencyVersion {
         DependencyVersion::combine(&[
-            self.folder_color_target.version(),
+            self.solid_color.version(),
+            self.color_dot.version(),
             self.decal.version(),
             self.overlay.version(),
         ])
     }
 
     fn invalidate_all(&mut self) {
-        self.folder_color_target.invalidate();
+        self.solid_color.invalidate();
+        self.color_dot.invalidate();
         self.decal.invalidate();
         self.overlay.invalidate();
     }
@@ -107,20 +124,20 @@ impl LayerSet for FolderLayers {
 // FolderIconCustomizer
 // ============================================================================
 
-/// Folder icon customizer — all three layers (color target, decal, overlay).
+/// Folder icon customizer — solid color, color dot, decal, and overlay layers.
 ///
 /// Construct via [`FolderIconCustomizer::from_folder()`].
 ///
 /// # Example
 ///
 /// ```
-/// use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, FolderColorTargetConfig, DecalConfig, SurfaceColor};
+/// use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor};
 ///
 /// let surface = SurfaceColor::new(255, 217, 112);
 /// let base = FolderIconBase::new(IconSet::new(), surface);
 /// let mut customizer = FolderIconCustomizer::from_folder(base);
 ///
-/// customizer.layers.folder_color_target.set_config(Some(FolderColorTargetConfig::new(33, 150, 243)));
+/// customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
 /// customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 ///
 /// let output = customizer.render_all();
@@ -130,7 +147,7 @@ pub type FolderIconCustomizer = IconCustomizer<FolderLayers>;
 impl FolderIconCustomizer {
     /// Creates a customizer for system folder icons.
     ///
-    /// All layers (color target, decal, overlay) are available.
+    /// All layers are available.
     pub fn from_folder(base: FolderIconBase) -> Self {
         IconCustomizer::new(IconBase::Folder(base), FolderLayers::default())
     }
@@ -138,8 +155,9 @@ impl FolderIconCustomizer {
     /// Applies a [`CustomizationProfile`]'s settings to all layers.
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         self.layers
-            .folder_color_target
-            .set_config(profile.folder_color_target.clone());
+            .solid_color
+            .set_config(profile.solid_color.clone());
+        self.layers.color_dot.set_config(profile.color_dot);
         self.layers.decal.set_config(profile.decal.clone());
         self.layers.overlay.set_config(profile.overlay.clone());
     }
@@ -147,7 +165,8 @@ impl FolderIconCustomizer {
     /// Exports the current settings as a [`CustomizationProfile`].
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
-            folder_color_target: self.layers.folder_color_target.config().cloned(),
+            solid_color: self.layers.solid_color.config().cloned(),
+            color_dot: self.layers.color_dot.config().copied(),
             decal: self.layers.decal.config().cloned(),
             overlay: self.layers.overlay.config().cloned(),
         }
@@ -196,7 +215,7 @@ mod tests {
         let base = create_test_icon_base();
         let customizer = FolderIconCustomizer::from_folder(base);
 
-        assert!(customizer.layers.folder_color_target.config().is_none());
+        assert!(customizer.layers.solid_color.config().is_none());
         assert!(customizer.layers.decal.config().is_none());
         assert!(customizer.layers.overlay.config().is_none());
     }
@@ -208,38 +227,20 @@ mod tests {
 
         customizer
             .layers
-            .folder_color_target
-            .set_config(Some(FolderColorTargetConfig::new(33, 150, 243)));
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(33, 150, 243)));
+        assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 33);
         assert_eq!(
-            customizer
-                .layers
-                .folder_color_target
-                .config()
-                .unwrap()
-                .target_r,
-            33
-        );
-        assert_eq!(
-            customizer
-                .layers
-                .folder_color_target
-                .config()
-                .unwrap()
-                .target_g,
+            customizer.layers.solid_color.config().unwrap().target_g,
             150
         );
         assert_eq!(
-            customizer
-                .layers
-                .folder_color_target
-                .config()
-                .unwrap()
-                .target_b,
+            customizer.layers.solid_color.config().unwrap().target_b,
             243
         );
 
-        customizer.layers.folder_color_target.set_config(None);
-        assert!(customizer.layers.folder_color_target.config().is_none());
+        customizer.layers.solid_color.set_config(None);
+        assert!(customizer.layers.solid_color.config().is_none());
     }
 
     #[test]
@@ -265,6 +266,27 @@ mod tests {
     }
 
     #[test]
+    fn color_dot_draws_into_bottom_right_without_recoloring() {
+        let base = create_test_icon_base();
+        let mut customizer = FolderIconCustomizer::from_folder(base);
+        customizer
+            .layers
+            .color_dot
+            .set_config(Some(ColorDotConfig::new(0, 0, 255)));
+
+        // The 32px base is solid green; only the dot area should turn blue.
+        let rendered = customizer.render(32).unwrap();
+        assert_eq!(rendered.data.get_pixel(0, 0).0, [0, 255, 0, 255]);
+
+        // Dot center: 32 - margin(1) - size(12)/2 ≈ 25.
+        let dot = rendered.data.get_pixel(25, 25).0;
+        assert!(
+            dot[2] > dot[1],
+            "expected a blue dot in the bottom-right, got {dot:?}"
+        );
+    }
+
+    #[test]
     fn hsl_mutation_applied() {
         let base = create_test_icon_base();
         let mut customizer = FolderIconCustomizer::from_folder(base);
@@ -272,8 +294,8 @@ mod tests {
         // Apply a green-ish target color
         customizer
             .layers
-            .folder_color_target
-            .set_config(Some(FolderColorTargetConfig::new(0, 188, 212)));
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(0, 188, 212)));
 
         let rendered = customizer.render(16).unwrap();
         let pixel = rendered.data.get_pixel(0, 0);
@@ -297,15 +319,15 @@ mod tests {
         // First render
         customizer
             .layers
-            .folder_color_target
-            .set_config(Some(FolderColorTargetConfig::new(76, 175, 80)));
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(76, 175, 80)));
         let first = customizer.render(16).unwrap();
 
         // Change color and render again
         customizer
             .layers
-            .folder_color_target
-            .set_config(Some(FolderColorTargetConfig::new(33, 150, 243)));
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(33, 150, 243)));
         let second = customizer.render(16).unwrap();
 
         // Results should be different
@@ -324,8 +346,8 @@ mod tests {
 
         customizer
             .layers
-            .folder_color_target
-            .set_config(Some(FolderColorTargetConfig::new(76, 175, 80)));
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(76, 175, 80)));
 
         // Render twice with same config
         let first = customizer.render(16).unwrap();
@@ -430,21 +452,21 @@ mod tests {
         // Set color target
         customizer
             .layers
-            .folder_color_target
-            .set_config(Some(FolderColorTargetConfig::new(0, 188, 212)));
-        assert!(customizer.layers.folder_color_target.is_active());
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(0, 188, 212)));
+        assert!(customizer.layers.solid_color.is_active());
         let rotated = customizer.render(16).unwrap();
         let rotated_pixel = rotated.data.get_pixel(0, 0).0;
 
         // Disable via toggle (config and cache preserved)
-        customizer.layers.folder_color_target.set_enabled(false);
-        assert!(!customizer.layers.folder_color_target.is_active());
-        assert!(customizer.layers.folder_color_target.has_config()); // Config still present
+        customizer.layers.solid_color.set_enabled(false);
+        assert!(!customizer.layers.solid_color.is_active());
+        assert!(customizer.layers.solid_color.has_config()); // Config still present
         let disabled = customizer.render(16).unwrap();
         assert_eq!(disabled.data.get_pixel(0, 0).0, [255, 0, 0, 255]); // Original red
 
         // Re-enable
-        customizer.layers.folder_color_target.set_enabled(true);
+        customizer.layers.solid_color.set_enabled(true);
         let re_enabled = customizer.render(16).unwrap();
         assert_eq!(re_enabled.data.get_pixel(0, 0).0, rotated_pixel);
     }
@@ -495,7 +517,7 @@ mod tests {
     #[test]
     fn decal_uses_hsl_mutated_dominant_color() {
         use crate::layer::decal::render_decal;
-        use crate::layer::folder_color_target::apply_folder_color_target;
+        use crate::layer::solid_color::apply_solid_color;
         use crate::layer::{DominantColor, RenderContext};
 
         // Create a solid red image
@@ -506,10 +528,10 @@ mod tests {
         let red_icon = IconImage::new_full_content(red_img, 1.0);
 
         // Apply color target (cyan-ish)
-        let config = FolderColorTargetConfig::new(0, 188, 212);
+        let config = SolidColorConfig::new(0, 188, 212);
         let mut ctx = RenderContext::new(red_icon.clone());
         ctx.set(TEST_SURFACE);
-        ctx.image = apply_folder_color_target(&ctx.image, &TEST_SURFACE, &config);
+        ctx.image = apply_solid_color(&ctx.image, &TEST_SURFACE, &config);
         ctx.set(DominantColor::new(
             config.target_r,
             config.target_g,
@@ -551,7 +573,7 @@ mod tests {
         let blue_icon = IconImage::new_full_content(blue_img, 1.0);
 
         // Set up layers: color target NOT configured (disabled)
-        let mut ct_layer: Layer<FolderColorTargetConfig> = Layer::default();
+        let mut ct_layer: Layer<SolidColorConfig> = Layer::default();
         // No config set — layer is inactive
 
         let mut decal_layer: Layer<DecalConfig> = Layer::default();
@@ -562,7 +584,8 @@ mod tests {
         ctx.set(TEST_SURFACE);
         let key = CacheKey::from_icon(&blue_icon);
         let versions = LayerVersions {
-            folder_color_target: ct_layer.version(),
+            solid_color: ct_layer.version(),
+            color_dot: 0,
             decal: decal_layer.version(),
             overlay: 0,
         };
@@ -608,14 +631,15 @@ mod tests {
         let key = CacheKey::from_icon(&red_icon);
 
         // Set up layers
-        let mut ct_layer: Layer<FolderColorTargetConfig> = Layer::default();
-        ct_layer.set_config(Some(FolderColorTargetConfig::new(0, 188, 212)));
+        let mut ct_layer: Layer<SolidColorConfig> = Layer::default();
+        ct_layer.set_config(Some(SolidColorConfig::new(0, 188, 212)));
         let mut decal_layer: Layer<DecalConfig> = Layer::default();
         decal_layer.set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
         // First render: color target enabled
         let versions_v1 = LayerVersions {
-            folder_color_target: ct_layer.version(),
+            solid_color: ct_layer.version(),
+            color_dot: 0,
             decal: decal_layer.version(),
             overlay: 0,
         };
@@ -644,7 +668,8 @@ mod tests {
 
         // Second render: color target not configured
         let versions_v2 = LayerVersions {
-            folder_color_target: ct_layer.version(), // New version!
+            solid_color: ct_layer.version(), // New version!
+            color_dot: 0,
             decal: decal_layer.version(),
             overlay: 0,
         };
@@ -683,10 +708,10 @@ mod tests {
             FolderIconCustomizer::from_folder(FolderIconBase::new(icons, TEST_SURFACE));
 
         // Enable both color target and decal
-        let ct_config = FolderColorTargetConfig::new(0, 188, 212);
+        let ct_config = SolidColorConfig::new(0, 188, 212);
         customizer
             .layers
-            .folder_color_target
+            .solid_color
             .set_config(Some(ct_config.clone()));
         customizer
             .layers
@@ -698,7 +723,7 @@ mod tests {
         let ct_pixel = with_ct.data.get_pixel(0, 0).0;
 
         // Disable color target via toggle, keep decal
-        customizer.layers.folder_color_target.set_enabled(false);
+        customizer.layers.solid_color.set_enabled(false);
         let without_ct = customizer.render(16).unwrap();
         let no_ct_pixel = without_ct.data.get_pixel(0, 0).0;
 
@@ -716,7 +741,7 @@ mod tests {
         );
 
         // Re-enable color target - should go back to shifted
-        customizer.layers.folder_color_target.set_enabled(true);
+        customizer.layers.solid_color.set_enabled(true);
         let re_enabled = customizer.render(16).unwrap();
         assert_eq!(
             re_enabled.data.get_pixel(0, 0).0,

@@ -1,23 +1,23 @@
 //! folco-renderer: Cross-platform icon customization library
 //!
 //! This crate provides utilities for loading system icons and applying
-//! customizations such as color targeting and SVG overlays.
+//! customizations such as recoloring, color-dot badges, and SVG overlays.
 //!
 //! # Example
 //!
 //! ```
-//! use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, FolderColorTargetConfig, DecalConfig, SurfaceColor};
+//! use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor};
 //!
 //! let surface = SurfaceColor::new(255, 217, 112);
 //! let base = FolderIconBase::new(IconSet::new(), surface);
 //! let mut customizer = FolderIconCustomizer::from_folder(base);
 //!
 //! // Configure layers directly through the layers field
-//! customizer.layers.folder_color_target.set_config(Some(FolderColorTargetConfig::new(33, 150, 243)));
+//! customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
 //! customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 //!
 //! // Toggle layers without losing config
-//! customizer.layers.folder_color_target.set_enabled(false);
+//! customizer.layers.solid_color.set_enabled(false);
 //!
 //! let output = customizer.render_all();
 //! ```
@@ -31,7 +31,7 @@
 //! ```
 //! use folco_renderer::{
 //!     FolderIconCustomizer, FolderIconBase, IconSet, SurfaceColor,
-//!     CustomizationProfile, FolderColorTargetConfig,
+//!     CustomizationProfile, SolidColorConfig,
 //! };
 //!
 //! let surface = SurfaceColor::new(255, 217, 112);
@@ -39,7 +39,7 @@
 //!
 //! // Apply a profile
 //! let profile = CustomizationProfile::new()
-//!     .with_folder_color_target(FolderColorTargetConfig::new(33, 150, 243));
+//!     .with_solid_color(SolidColorConfig::new(33, 150, 243));
 //! customizer.apply_profile(&profile);
 //!
 //! // Export current settings
@@ -59,7 +59,7 @@ mod profile;
 mod svg_folder_customizer;
 pub mod svg_layer;
 
-pub use custom_customizer::{CustomIconCustomizer, OverlayLayers};
+pub use custom_customizer::{CustomIconCustomizer, CustomLayers};
 pub use customizer::{IconCustomizer, LayerSet};
 pub use error::RenderError;
 pub use folder_color::{FolderColor, FolderColorExt, FolderColorMetadata};
@@ -69,11 +69,11 @@ pub use icon::{
     SvgFolderIconBase,
 };
 pub use layer::{
-    CacheKey, DecalConfig, DominantColor, FolderColorTargetConfig, ImageOverlayConfig, ImageSource,
-    Layer, LayerConfig, LayerVersions, OverlayAnchorMode, OverlayPosition, RenderContext,
-    SvgSource,
+    CacheKey, ColorDotConfig, DecalConfig, DominantColor, ImageOverlayConfig, ImageSource, Layer,
+    LayerConfig, LayerVersions, OverlayAnchorMode, OverlayPosition, RenderContext,
+    SolidColorConfig, SvgSource,
 };
 pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
 pub use profile::{CustomIconProfile, CustomizationProfile};
 pub use svg_folder_customizer::{SvgFolderIconCustomizer, SvgFolderLayers, SvgLayerSet};
-pub use svg_layer::{ColorDotConfig, SvgLayer};
+pub use svg_layer::SvgLayer;

@@ -5,7 +5,7 @@
 //!
 //! Concrete customizer types are constructed as type aliases:
 //! - [`FolderIconCustomizer`](crate::FolderIconCustomizer) = `IconCustomizer<FolderLayers>`
-//! - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<OverlayLayers>`
+//! - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<CustomLayers>`
 
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconImage, IconSet, SurfaceColor};
@@ -49,18 +49,18 @@ pub trait LayerSet {
 ///
 /// Specialized customizer types are constructed as type aliases:
 /// - [`FolderIconCustomizer`](crate::FolderIconCustomizer) = `IconCustomizer<FolderLayers>`
-/// - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<OverlayLayers>`
+/// - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<CustomLayers>`
 ///
 /// # Example (folder icons)
 ///
 /// ```
-/// use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, FolderColorTargetConfig, DecalConfig, SurfaceColor};
+/// use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor};
 ///
 /// let surface = SurfaceColor::new(255, 217, 112);
 /// let base = FolderIconBase::new(IconSet::new(), surface);
 /// let mut customizer = FolderIconCustomizer::from_folder(base);
 ///
-/// customizer.layers.folder_color_target.set_config(Some(FolderColorTargetConfig::new(33, 150, 243)));
+/// customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
 /// customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 ///
 /// let output = customizer.render_all();

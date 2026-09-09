@@ -10,18 +10,20 @@
 //!
 //! [`SvgFolderLayers`] holds SVG-compatible layers that realize medium-neutral
 //! profile intents in vector form. Currently:
-//! - **Color dot** — the vector analogue of raster color targeting. Because an
-//!   arbitrary SVG can't be HSL-shifted, the folder-color intent is expressed
-//!   as a small colored dot overlaid on the icon.
+//! - **Color dot** — a colored badge in the bottom-right, drawn as a nested
+//!   `<svg>` rather than a rasterized tile.
 //! - **Overlay** — the vector analogue of the raster image overlay. The source
 //!   (SVG, emoji, or raster) is embedded as an SVG `<image>` element.
+//!
+//! The solid-color intent has no vector analogue: an arbitrary SVG can't be
+//! HSL-shifted, so profiles carrying one are applied without it.
 
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor, SvgFolderIconBase};
-use crate::layer::{DependencyVersion, FolderColorTargetConfig, ImageOverlayConfig, ImageSource};
+use crate::layer::{ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource};
 use crate::medium::SvgCanvas;
 use crate::profile::CustomizationProfile;
-use crate::svg_layer::{ColorDotConfig, SvgLayer};
+use crate::svg_layer::SvgLayer;
 
 // ============================================================================
 // SvgLayerSet
@@ -52,7 +54,7 @@ pub trait SvgLayerSet {
 /// Holds SVG-compatible layers, in composition order.
 #[derive(Debug, Default)]
 pub struct SvgFolderLayers {
-    /// Color-dot overlay — the vector analogue of raster color targeting.
+    /// Color dot badge, drawn as a nested `<svg>`.
     pub color_dot: SvgLayer<ColorDotConfig>,
 
     /// Image overlay — an embedded SVG `<image>` (SVG/emoji/raster source).
@@ -161,30 +163,22 @@ impl SvgFolderIconCustomizer {
 
     /// Applies a [`CustomizationProfile`]'s settings to the SVG layers.
     ///
-    /// Medium-neutral intents are realized in vector form: the folder-color
-    /// intent (`folder_color_target`) becomes a color-dot overlay rather than
-    /// an HSL shift, and the `overlay` intent becomes an embedded `<image>`.
+    /// The profile's `solid_color` intent is skipped: recoloring an arbitrary
+    /// SVG by HSL shift isn't possible, so the vector medium offers only the
+    /// color dot.
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
-        let color_dot = profile
-            .folder_color_target
-            .as_ref()
-            .map(|c| ColorDotConfig::new(c.target_r, c.target_g, c.target_b));
-        self.layers.color_dot.set_config(color_dot);
+        self.layers.color_dot.set_config(profile.color_dot);
         self.layers.overlay.set_config(profile.overlay.clone());
     }
 
     /// Exports the current SVG layer settings as a [`CustomizationProfile`].
-    ///
-    /// The color dot maps back to the medium-neutral `folder_color_target`
-    /// intent so profiles round-trip across strategies.
     pub fn export_profile(&self) -> CustomizationProfile {
-        let mut profile = CustomizationProfile::new();
-        if let Some(dot) = self.layers.color_dot.config() {
-            profile.folder_color_target =
-                Some(FolderColorTargetConfig::new(dot.r, dot.g, dot.b));
+        CustomizationProfile {
+            solid_color: None,
+            color_dot: self.layers.color_dot.config().copied(),
+            decal: None,
+            overlay: self.layers.overlay.config().cloned(),
         }
-        profile.overlay = self.layers.overlay.config().cloned();
-        profile
     }
 
     /// Clears all layer caches.
@@ -200,11 +194,12 @@ impl SvgFolderIconCustomizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layer::{ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition};
+    use crate::layer::{
+        ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition, SolidColorConfig,
+    };
     use image::{Rgba, RgbaImage};
 
-    const BASE_SVG: &str =
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd970"/></svg>"##;
+    const BASE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd970"/></svg>"##;
 
     fn test_base() -> SvgFolderIconBase {
         SvgFolderIconBase::new(BASE_SVG, SurfaceColor::new(255, 217, 112))
@@ -219,7 +214,10 @@ mod tests {
     #[test]
     fn exposes_surface_color() {
         let customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        assert_eq!(*customizer.surface_color(), SurfaceColor::new(255, 217, 112));
+        assert_eq!(
+            *customizer.surface_color(),
+            SurfaceColor::new(255, 217, 112)
+        );
     }
 
     #[test]
@@ -232,8 +230,7 @@ mod tests {
     #[test]
     fn apply_profile_adds_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let profile = CustomizationProfile::new()
-            .with_folder_color_target(FolderColorTargetConfig::new(33, 150, 243));
+        let profile = CustomizationProfile::new().with_color_dot(ColorDotConfig::new(33, 150, 243));
         customizer.apply_profile(&profile);
 
         let svg = customizer.render_output().unwrap();
@@ -244,27 +241,35 @@ mod tests {
     }
 
     #[test]
+    fn solid_color_intent_is_ignored_by_the_vector_medium() {
+        let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
+        customizer.apply_profile(
+            &CustomizationProfile::new().with_solid_color(SolidColorConfig::new(33, 150, 243)),
+        );
+
+        assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
+        assert!(customizer.export_profile().solid_color.is_none());
+    }
+
+    #[test]
     fn profile_round_trips_through_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let profile = CustomizationProfile::new()
-            .with_folder_color_target(FolderColorTargetConfig::new(10, 20, 30));
+        let profile = CustomizationProfile::new().with_color_dot(ColorDotConfig::new(10, 20, 30));
         customizer.apply_profile(&profile);
 
         let exported = customizer.export_profile();
-        let target = exported.folder_color_target.unwrap();
-        assert_eq!((target.target_r, target.target_g, target.target_b), (10, 20, 30));
+        assert_eq!(exported.color_dot.unwrap(), ColorDotConfig::new(10, 20, 30));
     }
 
     #[test]
     fn empty_profile_clears_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         customizer.apply_profile(
-            &CustomizationProfile::new()
-                .with_folder_color_target(FolderColorTargetConfig::new(1, 2, 3)),
+            &CustomizationProfile::new().with_color_dot(ColorDotConfig::new(1, 2, 3)),
         );
         customizer.apply_profile(&CustomizationProfile::new());
 
-        assert!(customizer.export_profile().folder_color_target.is_none());
+        assert!(customizer.export_profile().color_dot.is_none());
         assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
     }
 
@@ -278,8 +283,7 @@ mod tests {
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
         customizer.apply_profile(
-            &CustomizationProfile::new()
-                .with_folder_color_target(FolderColorTargetConfig::new(255, 0, 0)),
+            &CustomizationProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
         );
         let svg = customizer.render_output().unwrap();
 
@@ -287,7 +291,10 @@ mod tests {
         // Center of the dot sits at ~(48, 48) for a 64px render.
         let px = img.get_pixel(48, 48).0;
         assert!(px[0] > 150, "expected red-dominant dot, got {px:?}");
-        assert!(px[1] < 100 && px[2] < 100, "expected low green/blue, got {px:?}");
+        assert!(
+            px[1] < 100 && px[2] < 100,
+            "expected low green/blue, got {px:?}"
+        );
         assert!(px[3] > 0, "expected an opaque dot, got {px:?}");
     }
 
@@ -337,7 +344,12 @@ mod tests {
         let blue = RgbaImage::from_pixel(8, 8, Rgba([0, 0, 255, 255]));
         let source = ImageSource::from_rgba_image(&blue).unwrap();
         customizer.apply_profile(&CustomizationProfile::new().with_overlay(
-            ImageOverlayConfig::new(source, OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
+            ImageOverlayConfig::new(
+                source,
+                OverlayPosition::BottomRight,
+                OverlayAnchorMode::Inset,
+                0.25,
+            ),
         ));
         let svg = customizer.render_output().unwrap();
 
@@ -345,7 +357,10 @@ mod tests {
         // The overlay occupies the bottom-right 25%; sample its center ~(56, 56).
         let px = img.get_pixel(56, 56).0;
         assert!(px[2] > 150, "expected blue-dominant overlay, got {px:?}");
-        assert!(px[0] < 100 && px[1] < 100, "expected low red/green, got {px:?}");
+        assert!(
+            px[0] < 100 && px[1] < 100,
+            "expected low red/green, got {px:?}"
+        );
     }
 
     #[test]
@@ -364,12 +379,14 @@ mod tests {
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
         customizer.apply_profile(
-            &CustomizationProfile::new()
-                .with_folder_color_target(FolderColorTargetConfig::new(255, 0, 0)),
+            &CustomizationProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
         );
 
         let preview = customizer.render_preview(64).unwrap();
         let px = preview.data.get_pixel(48, 48).0;
-        assert!(px[0] > 150, "expected the color dot in the preview, got {px:?}");
+        assert!(
+            px[0] > 150,
+            "expected the color dot in the preview, got {px:?}"
+        );
     }
 }

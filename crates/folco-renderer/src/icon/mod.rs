@@ -30,19 +30,20 @@ pub use svg_folder::SvgFolderIconBase;
 /// The base icon data for an [`IconCustomizer`](crate::IconCustomizer).
 ///
 /// This enum distinguishes between folder icons (which carry surface color
-/// metadata for color targeting and decal layers) and user-provided custom
+/// metadata for the solid color and decal layers) and user-provided custom
 /// images (which have no color metadata).
 #[derive(Debug, Clone)]
 pub enum IconBase {
     /// System folder icons with surface color metadata.
     ///
-    /// Enables all layers: color target, decal, and overlay.
+    /// Enables all layers: solid color, color dot, decal, and overlay.
     Folder(FolderIconBase),
 
     /// User-provided image rasterized to platform sizes.
     ///
-    /// Only the overlay layer is applicable; color target and decal
-    /// are skipped because there is no surface color reference.
+    /// Only the layers that draw on top (color dot, overlay) apply; solid
+    /// color and decal are skipped because there is no surface color
+    /// reference.
     Custom(IconSet),
 }
 

@@ -23,8 +23,8 @@
 //! // Surface color is the folder icon's base RGB color (e.g. Windows: 255, 217, 112)
 //! const renderer = CanvasRenderer.fromPng(baseIconPng, 1.0, 255, 217, 112);
 //!
-//! // Update color target and render
-//! renderer.setFolderColorTarget(33, 150, 243);
+//! // Update the folder color and render
+//! renderer.setSolidColor(33, 150, 243);
 //! renderer.renderToCanvas(canvas, 256);
 //!
 //! // Export profile when done
@@ -36,9 +36,9 @@ use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use folco_renderer::{
-    ColorDotConfig, CustomizationProfile, DecalConfig, FolderColorTargetConfig, FolderIconBase,
-    FolderIconCustomizer, IconImage, IconSet, ImageOverlayConfig, OverlayAnchorMode,
-    OverlayPosition, RectPx, SurfaceColor, SvgFolderIconBase, SvgFolderIconCustomizer,
+    ColorDotConfig, CustomizationProfile, DecalConfig, FolderIconBase, FolderIconCustomizer,
+    IconImage, IconSet, ImageOverlayConfig, OverlayAnchorMode, OverlayPosition, RectPx,
+    SolidColorConfig, SurfaceColor, SvgFolderIconBase, SvgFolderIconCustomizer,
 };
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
@@ -61,10 +61,7 @@ pub(crate) fn parse_overlay_anchor_mode(anchor_mode: &str) -> OverlayAnchorMode 
 }
 
 /// Resizes `canvas` to the image and blits its pixels into the 2d context.
-fn draw_rgba_to_canvas(
-    canvas: &HtmlCanvasElement,
-    image: image::RgbaImage,
-) -> Result<(), JsError> {
+fn draw_rgba_to_canvas(canvas: &HtmlCanvasElement, image: image::RgbaImage) -> Result<(), JsError> {
     let width = image.width();
     let height = image.height();
 
@@ -120,15 +117,11 @@ impl CanvasRenderer {
         let enabled = config.is_some();
         match &mut self.medium {
             Medium::Raster(c) => {
-                if enabled {
-                    c.layers.overlay.set_config(config);
-                }
+                c.layers.overlay.set_config(config);
                 c.layers.overlay.set_enabled(enabled);
             }
             Medium::Svg(c) => {
-                if enabled {
-                    c.layers.overlay.set_config(config);
-                }
+                c.layers.overlay.set_config(config);
                 c.layers.overlay.set_enabled(enabled);
             }
         }
@@ -267,6 +260,17 @@ impl CanvasRenderer {
         matches!(self.medium, Medium::Raster(_))
     }
 
+    /// Returns `true` if the active medium supports the solid color layer.
+    ///
+    /// Recoloring works by HSL-shifting pixels against a known surface color,
+    /// which an arbitrary SVG can't be put through. Vector icons offer the
+    /// color dot instead, so UIs should disable the control rather than let it
+    /// silently do nothing.
+    #[wasm_bindgen(js_name = "supportsSolidColor")]
+    pub fn supports_solid_color(&self) -> bool {
+        matches!(self.medium, Medium::Raster(_))
+    }
+
     /// Returns `true` if the active medium is vector (SVG).
     #[wasm_bindgen(js_name = "isSvg")]
     pub fn is_svg(&self) -> bool {
@@ -275,40 +279,62 @@ impl CanvasRenderer {
 
     // ---- Layer Configuration ----
 
-    /// Sets the color target from a target RGB color.
+    /// Recolors the whole icon to a target RGB color.
     ///
-    /// Raster icons recolor via an HSL shift; vector icons get a color dot.
+    /// Ignored for vector icons — see [`supports_solid_color`](Self::supports_solid_color).
     ///
     /// # Arguments
     ///
-    /// * `target_r` - Target red channel (0–255), or `null` to disable
+    /// * `target_r` - Target red channel (0–255)
     /// * `target_g` - Target green channel (0–255)
     /// * `target_b` - Target blue channel (0–255)
-    #[wasm_bindgen(js_name = "setFolderColorTarget")]
-    pub fn set_folder_color_target(&mut self, target_r: u8, target_g: u8, target_b: u8) {
+    #[wasm_bindgen(js_name = "setSolidColor")]
+    pub fn set_solid_color(&mut self, target_r: u8, target_g: u8, target_b: u8) {
+        if let Medium::Raster(c) = &mut self.medium {
+            c.layers
+                .solid_color
+                .set_config(Some(SolidColorConfig::new(target_r, target_g, target_b)));
+            c.layers.solid_color.set_enabled(true);
+        }
+    }
+
+    /// Sets the solid color enabled state without changing the parameters.
+    #[wasm_bindgen(js_name = "setSolidColorEnabled")]
+    pub fn set_solid_color_enabled(&mut self, enabled: bool) {
+        if let Medium::Raster(c) = &mut self.medium {
+            c.layers.solid_color.set_enabled(enabled);
+        }
+    }
+
+    /// Sets the color-dot badge drawn in the icon's bottom-right corner.
+    ///
+    /// Supported by every medium.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - Red channel (0–255)
+    /// * `g` - Green channel (0–255)
+    /// * `b` - Blue channel (0–255)
+    #[wasm_bindgen(js_name = "setColorDot")]
+    pub fn set_color_dot(&mut self, r: u8, g: u8, b: u8) {
+        let config = ColorDotConfig::new(r, g, b);
         match &mut self.medium {
             Medium::Raster(c) => {
-                c.layers
-                    .folder_color_target
-                    .set_config(Some(FolderColorTargetConfig::new(
-                        target_r, target_g, target_b,
-                    )));
-                c.layers.folder_color_target.set_enabled(true);
+                c.layers.color_dot.set_config(Some(config));
+                c.layers.color_dot.set_enabled(true);
             }
             Medium::Svg(c) => {
-                c.layers
-                    .color_dot
-                    .set_config(Some(ColorDotConfig::new(target_r, target_g, target_b)));
+                c.layers.color_dot.set_config(Some(config));
                 c.layers.color_dot.set_enabled(true);
             }
         }
     }
 
-    /// Sets the color target enabled state without changing the parameters.
-    #[wasm_bindgen(js_name = "setFolderColorTargetEnabled")]
-    pub fn set_folder_color_target_enabled(&mut self, enabled: bool) {
+    /// Sets the color dot enabled state without changing the parameters.
+    #[wasm_bindgen(js_name = "setColorDotEnabled")]
+    pub fn set_color_dot_enabled(&mut self, enabled: bool) {
         match &mut self.medium {
-            Medium::Raster(c) => c.layers.folder_color_target.set_enabled(enabled),
+            Medium::Raster(c) => c.layers.color_dot.set_enabled(enabled),
             Medium::Svg(c) => c.layers.color_dot.set_enabled(enabled),
         };
     }
@@ -319,7 +345,7 @@ impl CanvasRenderer {
     ///
     /// # Arguments
     ///
-    /// * `svg_data` - The SVG string for the decal, or `null` to disable
+    /// * `svg_data` - The SVG string for the decal, or `null` to clear it
     /// * `scale` - Scale factor relative to icon bounds (0.0-1.0)
     #[wasm_bindgen(js_name = "setDecal")]
     pub fn set_decal(&mut self, svg_data: Option<String>, scale: f32) {
@@ -328,10 +354,13 @@ impl CanvasRenderer {
         };
         match svg_data {
             Some(svg) if !svg.is_empty() => {
-                c.layers.decal.set_config(Some(DecalConfig::new(svg, scale)));
+                c.layers
+                    .decal
+                    .set_config(Some(DecalConfig::new(svg, scale)));
                 c.layers.decal.set_enabled(true);
             }
             _ => {
+                c.layers.decal.set_config(None);
                 c.layers.decal.set_enabled(false);
             }
         }
@@ -347,9 +376,12 @@ impl CanvasRenderer {
 
     /// Sets the overlay configuration.
     ///
+    /// Passing `null` clears the stored source, so a later `setOverlayEnabled(true)`
+    /// cannot bring back a previously selected icon or emoji.
+    ///
     /// # Arguments
     ///
-    /// * `svg_data` - The SVG string for the overlay, or `null` to disable
+    /// * `svg_data` - The SVG string for the overlay, or `null` to clear it
     /// * `position` - Position string: "top-left", "top-right", "bottom-left", "bottom-right", "center"
     /// * `anchor_mode` - Anchor mode string: "inset" or "centered"
     /// * `scale` - Scale factor relative to icon bounds (0.0-1.0)
@@ -507,7 +539,8 @@ impl CanvasRenderer {
     pub fn reset(&mut self) {
         match &mut self.medium {
             Medium::Raster(c) => {
-                c.layers.folder_color_target.set_config(None);
+                c.layers.solid_color.set_config(None);
+                c.layers.color_dot.set_config(None);
                 c.layers.decal.set_config(None);
                 c.layers.overlay.set_config(None);
             }

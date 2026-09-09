@@ -45,6 +45,9 @@ class RendererStore {
 	/** Whether the active medium supports the decal layer. */
 	supportsDecal = $state(true);
 
+	/** Whether the active medium supports recoloring the whole icon. */
+	supportsSolidColor = $state(true);
+
 	/** All available folder color presets, populated once WASM is ready. */
 	availableColors = $state<FolderColorMetadata[]>([]);
 
@@ -100,6 +103,7 @@ class RendererStore {
 
 			this.isSvg = this.renderer.isSvg();
 			this.supportsDecal = this.renderer.supportsDecal();
+			this.supportsSolidColor = this.renderer.supportsSolidColor();
 
 			this.status = 'ready';
 		} catch (e) {
@@ -128,17 +132,33 @@ class RendererStore {
 	}
 
 	/**
-	 * Sets the color target from a target RGB color.
+	 * Recolors the whole icon to a target RGB color.
+	 * Ignored when `supportsSolidColor` is false.
 	 */
-	setFolderColorTarget(targetR: number, targetG: number, targetB: number) {
+	setSolidColor(targetR: number, targetG: number, targetB: number) {
 		this.#assertRenderer();
-		this.renderer!.setFolderColorTarget(targetR, targetG, targetB);
+		this.renderer!.setSolidColor(targetR, targetG, targetB);
 		this.version++;
 	}
 
-	setFolderColorTargetEnabled(enabled: boolean) {
+	setSolidColorEnabled(enabled: boolean) {
 		this.#assertRenderer();
-		this.renderer!.setFolderColorTargetEnabled(enabled);
+		this.renderer!.setSolidColorEnabled(enabled);
+		this.version++;
+	}
+
+	/**
+	 * Sets the color-dot badge in the icon's bottom-right corner.
+	 */
+	setColorDot(r: number, g: number, b: number) {
+		this.#assertRenderer();
+		this.renderer!.setColorDot(r, g, b);
+		this.version++;
+	}
+
+	setColorDotEnabled(enabled: boolean) {
+		this.#assertRenderer();
+		this.renderer!.setColorDotEnabled(enabled);
 		this.version++;
 	}
 

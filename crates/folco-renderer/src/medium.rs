@@ -133,8 +133,7 @@ impl SvgCanvas {
 mod tests {
     use super::*;
 
-    const BASE: &str =
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>"##;
+    const BASE: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>"##;
 
     #[test]
     fn passthrough_returns_base_unchanged() {

@@ -55,9 +55,7 @@ fn source_data_uri(source: &ImageSource) -> Result<String, RenderError> {
                 STANDARD.encode(markup.as_bytes())
             ))
         }
-        ImageSource::Raster(png) => {
-            Ok(format!("data:image/png;base64,{}", STANDARD.encode(png)))
-        }
+        ImageSource::Raster(png) => Ok(format!("data:image/png;base64,{}", STANDARD.encode(png))),
     }
 }
 
@@ -80,16 +78,12 @@ fn placement(
         (OverlayPosition::TopLeft, OverlayAnchorMode::Inset) => (0.0, 0.0),
         (OverlayPosition::TopRight, OverlayAnchorMode::Inset) => (100.0 - size, 0.0),
         (OverlayPosition::BottomLeft, OverlayAnchorMode::Inset) => (0.0, 100.0 - size),
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Inset) => {
-            (100.0 - size, 100.0 - size)
-        }
+        (OverlayPosition::BottomRight, OverlayAnchorMode::Inset) => (100.0 - size, 100.0 - size),
 
         (OverlayPosition::TopLeft, OverlayAnchorMode::Centered) => (-half, -half),
         (OverlayPosition::TopRight, OverlayAnchorMode::Centered) => (100.0 - half, -half),
         (OverlayPosition::BottomLeft, OverlayAnchorMode::Centered) => (-half, 100.0 - half),
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Centered) => {
-            (100.0 - half, 100.0 - half)
-        }
+        (OverlayPosition::BottomRight, OverlayAnchorMode::Centered) => (100.0 - half, 100.0 - half),
     };
 
     (x, y, size)
@@ -143,11 +137,7 @@ mod tests {
 
     #[test]
     fn inset_bottom_right_stays_in_bounds() {
-        let (x, y, size) = placement(
-            OverlayPosition::BottomRight,
-            OverlayAnchorMode::Inset,
-            0.25,
-        );
+        let (x, y, size) = placement(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25);
         assert_eq!(size, 25.0);
         assert_eq!((x, y), (75.0, 75.0));
     }
@@ -166,11 +156,7 @@ mod tests {
 
     #[test]
     fn centered_top_left_uses_negative_offsets() {
-        let (x, y, _) = placement(
-            OverlayPosition::TopLeft,
-            OverlayAnchorMode::Centered,
-            0.4,
-        );
+        let (x, y, _) = placement(OverlayPosition::TopLeft, OverlayAnchorMode::Centered, 0.4);
         assert_eq!((x, y), (-20.0, -20.0));
     }
 }

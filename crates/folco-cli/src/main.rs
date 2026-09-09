@@ -59,10 +59,15 @@ enum Commands {
         #[arg(long, value_name = "JSON", requires = "custom_icon")]
         custom_icon_profile: Option<String>,
 
-        // === Color Target Options (folder-mode only) ===
-        /// Folder color
+        // === Solid Color Options (folder-mode only) ===
+        /// Recolor the whole folder icon to this color
         #[arg(long, value_enum, value_name = "COLOR", requires = "folder")]
         color: Option<FolderColor>,
+
+        // === Color Dot Options (both modes) ===
+        /// Add a colored dot badge in the icon's bottom-right corner
+        #[arg(long, value_enum, value_name = "COLOR")]
+        color_dot: Option<FolderColor>,
 
         // === Decal Options (folder-mode only) ===
         /// Decal source: an SVG file path or raw SVG markup.
@@ -278,6 +283,7 @@ async fn main() -> Result<()> {
             folder_customization_profile,
             custom_icon_profile,
             color,
+            color_dot,
             decal,
             decal_scale,
             overlay,
@@ -294,7 +300,11 @@ async fn main() -> Result<()> {
                     let mut p = CustomizationProfile::new();
 
                     if let Some(color) = color {
-                        p = p.with_folder_color_target(color.to_folder_color_target_config());
+                        p = p.with_solid_color(color.to_solid_color_config());
+                    }
+
+                    if let Some(color) = color_dot {
+                        p = p.with_color_dot(color.to_color_dot_config());
                     }
 
                     if let Some(ref source) = decal {
@@ -313,10 +323,14 @@ async fn main() -> Result<()> {
                     }
 
                     // Require at least one layer when not using a JSON profile
-                    if p.folder_color_target.is_none() && p.decal.is_none() && p.overlay.is_none() {
+                    if p.solid_color.is_none()
+                        && p.color_dot.is_none()
+                        && p.decal.is_none()
+                        && p.overlay.is_none()
+                    {
                         bail!(
-                            "--folder mode requires at least one of --color, --decal, \
-                             --overlay, or --folder-customization-profile"
+                            "--folder mode requires at least one of --color, --color-dot, \
+                             --decal, --overlay, or --folder-customization-profile"
                         );
                     }
 
@@ -334,6 +348,10 @@ async fn main() -> Result<()> {
                         .context("Failed to parse CustomIconProfile JSON")?
                 } else {
                     let mut p = CustomIconProfile::new();
+
+                    if let Some(color) = color_dot {
+                        p = p.with_color_dot(color.to_color_dot_config());
+                    }
 
                     if let Some(ref source) = overlay {
                         let source = resolve_overlay_source(source)?;
