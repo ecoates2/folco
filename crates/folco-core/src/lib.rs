@@ -40,7 +40,7 @@ pub mod progress;
 mod sys;
 
 pub use cache::{CacheConfig, IconCache};
-pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder};
+pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder, UnsupportedLayer};
 pub use convert::convert_icon_set;
 pub use error::{Error, Result};
 pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};

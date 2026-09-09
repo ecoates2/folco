@@ -161,6 +161,47 @@ impl Default for CustomizationContextBuilder {
     }
 }
 
+/// A profile layer the active folder icon medium cannot realize.
+///
+/// The platform picks the medium, so a profile that works on one system may
+/// carry entries another can't honour. Applying such a profile drops them
+/// silently, which is indistinguishable from success — callers that need to
+/// surface it should pre-flight with
+/// [`CustomizationContext::unsupported_layers`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnsupportedLayer {
+    /// Recoloring the whole icon.
+    SolidColor,
+    /// The centered, tinted glyph imprint.
+    Decal,
+}
+
+impl UnsupportedLayer {
+    /// Why the active medium can't realize this layer.
+    ///
+    /// The vector pipeline is currently the only one that drops layers, so
+    /// these are phrased for it.
+    pub fn reason(self) -> &'static str {
+        match self {
+            Self::SolidColor => {
+                "this system's folder icon is a scalable SVG, which has no pixels to recolor"
+            }
+            Self::Decal => {
+                "this system's folder icon is a scalable SVG, and decals are imprinted per-pixel"
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for UnsupportedLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::SolidColor => "solid color",
+            Self::Decal => "decal",
+        })
+    }
+}
+
 /// The active folder customization strategy.
 ///
 /// Chosen once at build/refresh time based on what `icon-sys` hands us: if the
@@ -199,6 +240,24 @@ impl FolderStrategy {
         match self {
             FolderStrategy::Raster(c) => c.apply_profile(profile),
             FolderStrategy::Svg(c) => c.apply_profile(profile),
+        }
+    }
+
+    /// Returns the profile entries [`apply_profile`](Self::apply_profile) would
+    /// silently drop.
+    fn unsupported_layers(&self, profile: &CustomizationProfile) -> Vec<UnsupportedLayer> {
+        match self {
+            FolderStrategy::Raster(_) => Vec::new(),
+            FolderStrategy::Svg(_) => [
+                profile
+                    .solid_color
+                    .is_some()
+                    .then_some(UnsupportedLayer::SolidColor),
+                profile.decal.is_some().then_some(UnsupportedLayer::Decal),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
         }
     }
 
@@ -353,9 +412,22 @@ impl CustomizationContext {
 
     /// Applies a customization profile to the customizer.
     ///
-    /// This configures all layers according to the profile settings.
+    /// This configures all layers according to the profile settings. Entries
+    /// the active medium can't realize are dropped; check
+    /// [`unsupported_layers`](Self::unsupported_layers) first if that should be
+    /// reported rather than ignored.
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         self.strategy.apply_profile(profile);
+    }
+
+    /// Returns the profile entries this platform's folder icon medium can't
+    /// realize, in the order they appear in the pipeline.
+    ///
+    /// Empty means the profile applies in full. Non-interactive callers should
+    /// treat a non-empty result as an error: applying anyway produces a
+    /// stock-looking icon and reports success.
+    pub fn unsupported_layers(&self, profile: &CustomizationProfile) -> Vec<UnsupportedLayer> {
+        self.strategy.unsupported_layers(profile)
     }
 
     /// Exports the current customizer settings as a profile.

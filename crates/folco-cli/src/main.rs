@@ -7,6 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use folco_core::{
     CustomIconProfile, CustomizationContextBuilder, CustomizationProfile, DecalConfig,
     ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition, SvgSource,
+    UnsupportedLayer,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -113,6 +114,14 @@ enum Commands {
 
     /// Print the JSON Schema for CustomizationProfile
     Schema,
+}
+
+/// The flag that gets closest to `layer` on every icon medium.
+fn alternative_flag(layer: UnsupportedLayer) -> &'static str {
+    match layer {
+        UnsupportedLayer::SolidColor => "--color-dot",
+        UnsupportedLayer::Decal => "--overlay",
+    }
 }
 
 /// Resolve an SVG source string (for decals — only SVG file paths and raw markup).
@@ -394,6 +403,23 @@ async fn customize_folders(
     let mut ctx = CustomizationContextBuilder::new()
         .build()
         .context("Failed to initialize customization context")?;
+
+    // Applying anyway would write a stock-looking icon and report success.
+    let unsupported = ctx.unsupported_layers(&profile);
+    if !unsupported.is_empty() {
+        bail!(
+            "This system can't apply every layer in the profile:\n{}",
+            unsupported
+                .iter()
+                .map(|layer| format!(
+                    "  - {layer} ({}) — use {} instead",
+                    layer.reason(),
+                    alternative_flag(*layer)
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
 
     let (tx, mut rx) = progress_channel(32);
 
