@@ -109,6 +109,16 @@ impl CustomizationProfile {
         self
     }
 
+    /// Whether this profile carries an intent for `layer`.
+    pub fn carries(&self, layer: crate::LayerKind) -> bool {
+        match layer {
+            crate::LayerKind::SolidColor => self.solid_color.is_some(),
+            crate::LayerKind::ColorDot => self.color_dot.is_some(),
+            crate::LayerKind::Decal => self.decal.is_some(),
+            crate::LayerKind::Overlay => self.overlay.is_some(),
+        }
+    }
+
     /// Serializes the profile to a JSON string.
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)

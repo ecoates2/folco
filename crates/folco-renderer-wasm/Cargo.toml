@@ -19,7 +19,7 @@ default = ["twemoji"]
 twemoji = ["folco-renderer/twemoji"]
 
 [dependencies]
-folco-renderer = { path = "../folco-renderer" }
+folco-renderer = { path = "../folco-renderer", features = ["tsify"] }
 folco-model = { path = "../folco-model", features = ["tsify"] }
 folco-transfer = { path = "../folco-transfer", features = ["tsify"] }
 wasm-bindgen = "0.2"

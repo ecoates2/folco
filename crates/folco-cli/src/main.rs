@@ -6,7 +6,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
     CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageOverlayConfig,
-    ImageSource, OverlayAnchorMode, OverlayPosition, SvgSource, UnsupportedLayer,
+    ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -117,10 +117,11 @@ enum Commands {
 }
 
 /// The flag that gets closest to `layer` on every icon medium.
-fn alternative_flag(layer: UnsupportedLayer) -> &'static str {
+fn alternative_flag(layer: LayerKind) -> &'static str {
     match layer {
-        UnsupportedLayer::SolidColor => "--color-dot",
-        UnsupportedLayer::Decal => "--overlay",
+        LayerKind::SolidColor => "--color-dot",
+        LayerKind::Decal => "--overlay",
+        LayerKind::ColorDot | LayerKind::Overlay => "--color-dot",
     }
 }
 
@@ -411,10 +412,11 @@ async fn customize_folders(
             "This system can't apply every layer in the profile:\n{}",
             unsupported
                 .iter()
-                .map(|layer| format!(
-                    "  - {layer} ({}) — use {} instead",
-                    layer.reason(),
-                    alternative_flag(*layer)
+                .map(|entry| format!(
+                    "  - {} ({}) — use {} instead",
+                    entry.layer,
+                    entry.reason,
+                    alternative_flag(entry.layer)
                 ))
                 .collect::<Vec<_>>()
                 .join("\n")

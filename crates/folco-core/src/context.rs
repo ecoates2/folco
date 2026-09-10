@@ -11,8 +11,8 @@ use crate::progress::{Progress, ProgressSender};
 
 use folco_renderer::ImageSource;
 use folco_renderer::{
-    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer, SurfaceColor,
-    SvgFolderIconBase, SvgFolderIconCustomizer,
+    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer, IconBaseKind,
+    LayerKind, SurfaceColor, SvgFolderIconBase, SvgFolderIconCustomizer,
 };
 use icon_sys::IconSet as SysIconSet;
 use icon_sys::folder_settings::{FolderSettingsProvider, PlatformFolderSettingsProvider};
@@ -161,7 +161,7 @@ impl Default for CustomizationContextBuilder {
     }
 }
 
-/// A profile layer the active folder icon medium cannot realize.
+/// A profile layer the active folder icon base cannot realize.
 ///
 /// The platform picks the medium, so a profile that works on one system may
 /// carry entries another can't honour. Applying such a profile drops them
@@ -169,36 +169,16 @@ impl Default for CustomizationContextBuilder {
 /// surface it should pre-flight with
 /// [`CustomizationContext::unsupported_layers`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnsupportedLayer {
-    /// Recoloring the whole icon.
-    SolidColor,
-    /// The centered, tinted glyph imprint.
-    Decal,
-}
-
-impl UnsupportedLayer {
-    /// Why the active medium can't realize this layer.
-    ///
-    /// The vector pipeline is currently the only one that drops layers, so
-    /// these are phrased for it.
-    pub fn reason(self) -> &'static str {
-        match self {
-            Self::SolidColor => {
-                "this system's folder icon is a scalable SVG, which has no pixels to recolor"
-            }
-            Self::Decal => {
-                "this system's folder icon is a scalable SVG, and decals are imprinted per-pixel"
-            }
-        }
-    }
+pub struct UnsupportedLayer {
+    /// The layer that can't be realized.
+    pub layer: LayerKind,
+    /// Why the active base can't realize it, phrased for end users.
+    pub reason: &'static str,
 }
 
 impl std::fmt::Display for UnsupportedLayer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::SolidColor => "solid color",
-            Self::Decal => "decal",
-        })
+        self.layer.fmt(f)
     }
 }
 
@@ -246,18 +226,24 @@ impl FolderStrategy {
     /// Returns the profile entries [`apply_profile`](Self::apply_profile) would
     /// silently drop.
     fn unsupported_layers(&self, profile: &CustomizationProfile) -> Vec<UnsupportedLayer> {
-        match self {
-            FolderStrategy::Raster(_) => Vec::new(),
-            FolderStrategy::Svg(_) => [
-                profile
-                    .solid_color
-                    .is_some()
-                    .then_some(UnsupportedLayer::SolidColor),
-                profile.decal.is_some().then_some(UnsupportedLayer::Decal),
-            ]
+        let kind = self.base_kind();
+        kind.capabilities()
+            .unsupported_in(profile)
             .into_iter()
-            .flatten()
-            .collect(),
+            .map(|layer| UnsupportedLayer {
+                layer,
+                reason: kind
+                    .rejection(layer)
+                    .expect("unsupported_in only yields layers the base rejects"),
+            })
+            .collect()
+    }
+
+    /// What the active strategy resolved to operate on.
+    fn base_kind(&self) -> IconBaseKind {
+        match self {
+            FolderStrategy::Raster(_) => FolderIconCustomizer::base_kind(),
+            FolderStrategy::Svg(_) => SvgFolderIconCustomizer::base_kind(),
         }
     }
 

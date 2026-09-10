@@ -37,9 +37,16 @@ pub use linux::get_folder_icon_content_bounds;
 
 /// Platform-specific icon size specifications.
 ///
-/// Describes the set of sizes an icon should be rasterized to for
-/// compatibility with the host operating system. Each platform has
-/// its own required set of sizes and scale factors.
+/// The icon sizes required to emit a **raster** icon set for the host OS.
+///
+/// This describes an output requirement, not what the system's own folder icon
+/// looks like. It applies whenever folco must produce pixels — most visibly
+/// when turning a user-supplied image into an icon, where there is no inherent
+/// size ladder to inherit.
+///
+/// A platform whose folder icon is vector still has a meaningful ladder here:
+/// the vector *folder* pipeline emits a single scalable file and never consults
+/// it, but a custom image on that same platform still has to be rasterized.
 ///
 /// # Example
 ///
@@ -47,7 +54,7 @@ pub use linux::get_folder_icon_content_bounds;
 /// use folco_core::PlatformSizeSpec;
 ///
 /// let spec = PlatformSizeSpec::current_platform();
-/// println!("Platform requires {} icon sizes", spec.sizes().len());
+/// println!("Raster output needs {} icon sizes", spec.sizes().len());
 ///
 /// // Pass to folco-renderer for generating an icon set
 /// // let icon_set = IconSet::from_image_source(&source, spec.sizes())?;

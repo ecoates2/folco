@@ -38,9 +38,9 @@ use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomizationProfile, DecalConfig, FolderIconBase,
-    FolderIconCustomizer, IconImage, IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource,
-    OverlayAnchorMode, OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgFolderIconBase,
-    SvgFolderIconCustomizer,
+    FolderIconCustomizer, IconBaseKind, IconCapabilities, IconImage, IconSet, IconSizeSpec,
+    ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode, OverlayPosition, RectPx,
+    SolidColorConfig, SurfaceColor, SvgFolderIconBase, SvgFolderIconCustomizer,
 };
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
@@ -179,6 +179,14 @@ impl CanvasRenderer {
             .find_by_logical_size(size)
             .ok_or_else(|| JsError::new("No icon available at requested size"))?;
         Ok((icon.data.width(), icon.data.height()))
+    }
+
+    fn base_kind(&self) -> IconBaseKind {
+        match &self.active {
+            ActiveCustomizer::Folder(_) => FolderIconCustomizer::base_kind(),
+            ActiveCustomizer::SvgFolder(_) => SvgFolderIconCustomizer::base_kind(),
+            ActiveCustomizer::Custom(_) => CustomIconCustomizer::base_kind(),
+        }
     }
 }
 
@@ -340,7 +348,7 @@ impl CanvasRenderer {
     /// control rather than let it silently do nothing.
     #[wasm_bindgen(js_name = "supportsDecal")]
     pub fn supports_decal(&self) -> bool {
-        matches!(self.active, ActiveCustomizer::Folder(_))
+        self.capabilities().decal
     }
 
     /// Returns `true` if the active customizer supports the solid color layer.
@@ -351,19 +359,35 @@ impl CanvasRenderer {
     /// Every other case offers the color dot instead.
     #[wasm_bindgen(js_name = "supportsSolidColor")]
     pub fn supports_solid_color(&self) -> bool {
-        matches!(self.active, ActiveCustomizer::Folder(_))
+        self.capabilities().solid_color
+    }
+
+    /// Which layers the resolved base can realize.
+    ///
+    /// Prefer this over the individual `supports*` flags when driving UI: it is
+    /// one value, and it comes straight from the renderer's own rules rather
+    /// than being reassembled on the JS side.
+    #[wasm_bindgen(js_name = "capabilities")]
+    pub fn capabilities(&self) -> IconCapabilities {
+        self.base_kind().capabilities()
+    }
+
+    /// Why each unrealizable layer is unavailable, for explaining disabled controls.
+    #[wasm_bindgen(js_name = "layerRejections")]
+    pub fn layer_rejections(&self) -> LayerRejections {
+        self.base_kind().rejections()
     }
 
     /// Returns `true` if the active customizer uses the vector pipeline.
     #[wasm_bindgen(js_name = "isSvg")]
     pub fn is_svg(&self) -> bool {
-        matches!(self.active, ActiveCustomizer::SvgFolder(_))
+        self.base_kind() == IconBaseKind::VectorFolder
     }
 
     /// Returns `true` if the base icon came from the user rather than the system.
     #[wasm_bindgen(js_name = "isCustom")]
     pub fn is_custom(&self) -> bool {
-        matches!(self.active, ActiveCustomizer::Custom(_))
+        self.base_kind() == IconBaseKind::CustomImage
     }
 
     // ---- Layer Configuration ----

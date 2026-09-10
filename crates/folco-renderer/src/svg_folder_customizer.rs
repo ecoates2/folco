@@ -18,6 +18,7 @@
 //! The solid-color intent has no vector analogue: an arbitrary SVG can't be
 //! HSL-shifted, so profiles carrying one are applied without it.
 
+use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor, SvgFolderIconBase};
 use crate::layer::{ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource};
@@ -163,12 +164,22 @@ impl SvgFolderIconCustomizer {
 
     /// Applies a [`CustomizationProfile`]'s settings to the SVG layers.
     ///
-    /// The profile's `solid_color` intent is skipped: recoloring an arbitrary
-    /// SVG by HSL shift isn't possible, so the vector medium offers only the
-    /// color dot.
+    /// Intents this base can't realize are dropped — see
+    /// [`capabilities`](Self::capabilities).
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
+        let profile = Self::capabilities().filter(profile);
         self.layers.color_dot.set_config(profile.color_dot);
-        self.layers.overlay.set_config(profile.overlay.clone());
+        self.layers.overlay.set_config(profile.overlay);
+    }
+
+    /// What this customizer operates on.
+    pub const fn base_kind() -> IconBaseKind {
+        IconBaseKind::VectorFolder
+    }
+
+    /// The layers a scalable folder icon can realize.
+    pub fn capabilities() -> IconCapabilities {
+        Self::base_kind().capabilities()
     }
 
     /// Exports the current SVG layer settings as a [`CustomizationProfile`].

@@ -47,6 +47,7 @@
 //! let json = exported.to_json().unwrap();
 //! ```
 
+mod capabilities;
 mod custom_customizer;
 mod customizer;
 mod error;
@@ -59,6 +60,7 @@ mod profile;
 mod svg_folder_customizer;
 pub mod svg_layer;
 
+pub use capabilities::{IconBaseKind, IconCapabilities, LayerKind, LayerRejections};
 pub use custom_customizer::{CustomIconCustomizer, CustomLayers};
 pub use customizer::{IconCustomizer, LayerSet};
 pub use error::RenderError;

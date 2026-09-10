@@ -50,7 +50,7 @@ pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};
 pub use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomLayers, CustomizationProfile, DecalConfig,
     FolderColor, FolderColorExt, FolderColorMetadata, FolderIconBase, FolderIconCustomizer,
-    FolderLayers, IconBase, IconCustomizer, IconSizeSpec, ImageOverlayConfig, ImageSource,
-    LayerSet, OverlayAnchorMode, OverlayPosition, RectPx, SolidColorConfig, SurfaceColor,
-    SvgSource,
+    FolderLayers, IconBase, IconBaseKind, IconCapabilities, IconCustomizer, IconSizeSpec,
+    ImageOverlayConfig, ImageSource, LayerKind, LayerSet, OverlayAnchorMode, OverlayPosition,
+    RectPx, SolidColorConfig, SurfaceColor, SvgSource,
 };

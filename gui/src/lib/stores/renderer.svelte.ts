@@ -1,5 +1,11 @@
 import { isTauri } from '@tauri-apps/api/core';
-import type { CanvasRenderer, FolderColorMetadata, IconSizeSpec } from 'folco-renderer-wasm';
+import type {
+	CanvasRenderer,
+	FolderColorMetadata,
+	IconCapabilities,
+	IconSizeSpec,
+	LayerRejections
+} from 'folco-renderer-wasm';
 import {
 	getFolderIconBase,
 	getFolderIconSvg,
@@ -9,6 +15,21 @@ import {
 export type RendererStatus = 'uninitialized' | 'loading' | 'ready' | 'error';
 
 type WasmModule = typeof import('folco-renderer-wasm');
+
+// Optimistic default: before a base is resolved there is nothing to disable.
+const ALL_CAPABILITIES: IconCapabilities = {
+	solidColor: true,
+	colorDot: true,
+	decal: true,
+	overlay: true
+};
+
+const NO_REJECTIONS: LayerRejections = {
+	solidColor: undefined,
+	colorDot: undefined,
+	decal: undefined,
+	overlay: undefined
+};
 
 // SVG icons are resolution-independent, so the preview ladder is ours to pick.
 const SVG_PREVIEW_SIZES = [16, 24, 32, 48, 64, 128, 256];
@@ -53,11 +74,14 @@ class RendererStore {
 	/** Whether the base icon came from the user rather than the system. */
 	isCustom = $state(false);
 
-	/** Whether the active medium supports the decal layer. */
-	supportsDecal = $state(true);
+	/** Which layers the resolved base can realize. */
+	capabilities = $state<IconCapabilities>(ALL_CAPABILITIES);
 
-	/** Whether the active medium supports recoloring the whole icon. */
-	supportsSolidColor = $state(true);
+	/** Why each unrealizable layer is unavailable. */
+	rejections = $state<LayerRejections>(NO_REJECTIONS);
+
+	readonly supportsDecal = $derived(this.capabilities.decal);
+	readonly supportsSolidColor = $derived(this.capabilities.solidColor);
 
 	/** All available folder color presets, populated once WASM is ready. */
 	availableColors = $state<FolderColorMetadata[]>([]);
@@ -73,15 +97,13 @@ class RendererStore {
 	version = $state(0);
 
 	/**
-	 * Initializes the WASM module and creates a `CanvasRenderer` from the
-	 * backend's `CustomizationContext` icon base.
+	 * Loads the system folder icon — the folder workflow's acquisition step.
 	 *
 	 * Vector platforms (e.g. GNOME) return SVG markup; everything else returns
-	 * a PNG icon set. Either way the result is one `CanvasRenderer`.
+	 * a PNG icon set. Either way the result is one `CanvasRenderer`. Callable
+	 * repeatedly, so switching back from a custom image re-reads the base.
 	 */
-	async init() {
-		if (this.status === 'loading' || this.status === 'ready') return;
-
+	async loadFolderIcon() {
 		this.status = 'loading';
 		this.error = null;
 
@@ -106,7 +128,7 @@ class RendererStore {
 				this.#adopt(CanvasRenderer.fromFolderIconBase(base), logicalSizes(base.images));
 			}
 		} catch (e) {
-			this.#fail(e, 'Failed to initialize renderer');
+			this.#fail(e, 'Failed to load the system folder icon');
 		}
 	}
 
@@ -127,8 +149,8 @@ class RendererStore {
 	/**
 	 * Builds a custom-icon renderer against the platform's size ladder.
 	 *
-	 * Unlike {@linkcode init}, this is callable at any time — picking a new
-	 * image after one is already loaded is the normal path.
+	 * Unlike {@linkcode loadFolderIcon}, this needs a source from the user —
+	 * picking a new image after one is already loaded is the normal path.
 	 */
 	async #loadCustom(build: (wasm: WasmModule, specs: IconSizeSpec[]) => CanvasRenderer) {
 		this.status = 'loading';
@@ -169,8 +191,8 @@ class RendererStore {
 		this.availableSizes = availableSizes;
 		this.isSvg = renderer.isSvg();
 		this.isCustom = renderer.isCustom();
-		this.supportsDecal = renderer.supportsDecal();
-		this.supportsSolidColor = renderer.supportsSolidColor();
+		this.capabilities = renderer.capabilities();
+		this.rejections = renderer.layerRejections();
 		this.status = 'ready';
 		this.version++;
 	}
@@ -320,6 +342,8 @@ class RendererStore {
 		this.status = 'uninitialized';
 		this.error = null;
 		this.isCustom = false;
+		this.capabilities = ALL_CAPABILITIES;
+		this.rejections = NO_REJECTIONS;
 	}
 
 	#assertRenderer() {

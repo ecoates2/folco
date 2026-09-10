@@ -30,6 +30,7 @@
 //! └─────────┘
 //! ```
 
+use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::customizer::{IconCustomizer, LayerSet};
 use crate::error::RenderError;
 use crate::icon::{FolderIconBase, IconBase};
@@ -170,6 +171,16 @@ impl FolderIconCustomizer {
             decal: self.layers.decal.config().cloned(),
             overlay: self.layers.overlay.config().cloned(),
         }
+    }
+
+    /// What this customizer operates on.
+    pub const fn base_kind() -> IconBaseKind {
+        IconBaseKind::RasterFolder
+    }
+
+    /// The layers a raster folder icon can realize — all of them.
+    pub fn capabilities() -> IconCapabilities {
+        Self::base_kind().capabilities()
     }
 }
 

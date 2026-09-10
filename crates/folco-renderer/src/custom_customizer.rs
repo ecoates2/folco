@@ -6,6 +6,7 @@
 //! The solid-color and decal layers are unavailable because custom images have
 //! no surface color reference to recolor against.
 
+use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::customizer::{IconCustomizer, LayerSet};
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconSet, IconSizeSpec};
@@ -113,11 +114,22 @@ impl CustomIconCustomizer {
 
     /// Applies a [`CustomizationProfile`]'s settings to the layers.
     ///
-    /// The `solid_color` and `decal` intents are skipped: both shift pixels
-    /// against a surface color, and user-supplied images carry none.
+    /// Intents this base can't realize are dropped — see
+    /// [`capabilities`](Self::capabilities).
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
+        let profile = Self::capabilities().filter(profile);
         self.layers.color_dot.set_config(profile.color_dot);
-        self.layers.overlay.set_config(profile.overlay.clone());
+        self.layers.overlay.set_config(profile.overlay);
+    }
+
+    /// What this customizer operates on.
+    pub const fn base_kind() -> IconBaseKind {
+        IconBaseKind::CustomImage
+    }
+
+    /// The layers a user-supplied image can realize.
+    pub fn capabilities() -> IconCapabilities {
+        Self::base_kind().capabilities()
     }
 
     /// Exports the current settings as a [`CustomizationProfile`].
