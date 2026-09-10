@@ -1,25 +1,33 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
-import type {
-	CanvasRenderer,
-	FolderColorMetadata,
-	SerializableFolderIconBase,
-	SerializableSvgFolderIconBase
-} from 'folco-renderer-wasm';
+import { isTauri } from '@tauri-apps/api/core';
+import type { CanvasRenderer, FolderColorMetadata, IconSizeSpec } from 'folco-renderer-wasm';
+import {
+	getFolderIconBase,
+	getFolderIconSvg,
+	getPlatformIconSizes
+} from '$lib/services/tauri-commands';
 
 export type RendererStatus = 'uninitialized' | 'loading' | 'ready' | 'error';
+
+type WasmModule = typeof import('folco-renderer-wasm');
 
 // SVG icons are resolution-independent, so the preview ladder is ours to pick.
 const SVG_PREVIEW_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
+/** Logical (unscaled) sizes offered by the preview, deduped and ascending. */
+function logicalSizes(items: { width: number; scale: number }[]): number[] {
+	const sizes = items.map((item) => Math.round(item.width / item.scale));
+	return [...new Set(sizes)].sort((a, b) => a - b);
+}
+
 // Shared WASM module singleton — loaded once, reused everywhere.
-let wasmModule: typeof import('folco-renderer-wasm') | null = null;
-let wasmInitPromise: Promise<typeof import('folco-renderer-wasm')> | null = null;
+let wasmModule: WasmModule | null = null;
+let wasmInitPromise: Promise<WasmModule> | null = null;
 
 /**
  * Ensures the WASM module is loaded and initialized exactly once.
  * Safe to call from anywhere; concurrent calls share the same promise.
  */
-export async function ensureWasm(): Promise<typeof import('folco-renderer-wasm')> {
+export async function ensureWasm(): Promise<WasmModule> {
 	if (wasmModule) return wasmModule;
 	if (!wasmInitPromise) {
 		wasmInitPromise = import('folco-renderer-wasm').then(async (mod) => {
@@ -42,6 +50,9 @@ class RendererStore {
 	/** Whether the active folder icon is vector (SVG) rather than raster. */
 	isSvg = $state(false);
 
+	/** Whether the base icon came from the user rather than the system. */
+	isCustom = $state(false);
+
 	/** Whether the active medium supports the decal layer. */
 	supportsDecal = $state(true);
 
@@ -50,6 +61,9 @@ class RendererStore {
 
 	/** All available folder color presets, populated once WASM is ready. */
 	availableColors = $state<FolderColorMetadata[]>([]);
+
+	/** Platform size ladder, fetched once — it can't change while we're running. */
+	#platformSizes: IconSizeSpec[] | null = null;
 
 	/**
 	 * Monotonically increasing version counter, bumped on every customization
@@ -73,44 +87,98 @@ class RendererStore {
 
 		// The icon base comes from the native side. Tests can stand one up with
 		// mockIPC() from @tauri-apps/api/mocks, which satisfies isTauri().
-		if (!isTauri()) {
-			this.status = 'error';
-			this.error = 'Tauri backend unavailable; cannot load the folder icon base.';
-			return;
-		}
+		if (!this.#hasBackend()) return;
 
 		try {
-			const [wasm, svgBase] = await Promise.all([
-				ensureWasm(),
-				invoke<SerializableSvgFolderIconBase | null>('get_folder_icon_svg')
-			]);
+			const [wasm, svgBase] = await Promise.all([ensureWasm(), getFolderIconSvg()]);
 
 			this.availableColors = wasm.getAvailableColors();
 
 			const { CanvasRenderer } = wasm;
 
 			if (svgBase) {
-				this.renderer = CanvasRenderer.fromSvgFolderIconBase(svgBase);
-				this.availableSizes = SVG_PREVIEW_SIZES;
+				this.#adopt(CanvasRenderer.fromSvgFolderIconBase(svgBase), SVG_PREVIEW_SIZES);
 			} else {
-				const base = await invoke<SerializableFolderIconBase>('get_folder_icon_base');
-				this.renderer = CanvasRenderer.fromFolderIconBase(base);
-				this.availableSizes = base.images
-					.map((img) => Math.round(img.width / img.scale))
-					.filter((size, i, arr) => arr.indexOf(size) === i)
-					.sort((a, b) => a - b);
+				const base = await getFolderIconBase();
+				if (!base) {
+					throw new Error('The backend reported no folder icon in either medium.');
+				}
+				this.#adopt(CanvasRenderer.fromFolderIconBase(base), logicalSizes(base.images));
+			}
+		} catch (e) {
+			this.#fail(e, 'Failed to initialize renderer');
+		}
+	}
+
+	/**
+	 * Replaces the base with a user-supplied raster image.
+	 *
+	 * Accepts any encoded format the backend can decode (PNG, JPEG, WebP, ...).
+	 */
+	async loadCustomImage(imageData: Uint8Array) {
+		await this.#loadCustom((wasm, specs) => wasm.CanvasRenderer.fromCustomImage(imageData, specs));
+	}
+
+	/** Replaces the base with user-supplied SVG markup, rasterized to platform sizes. */
+	async loadCustomSvg(svg: string) {
+		await this.#loadCustom((wasm, specs) => wasm.CanvasRenderer.fromCustomSvg(svg, specs));
+	}
+
+	/**
+	 * Builds a custom-icon renderer against the platform's size ladder.
+	 *
+	 * Unlike {@linkcode init}, this is callable at any time — picking a new
+	 * image after one is already loaded is the normal path.
+	 */
+	async #loadCustom(build: (wasm: WasmModule, specs: IconSizeSpec[]) => CanvasRenderer) {
+		this.status = 'loading';
+		this.error = null;
+
+		if (!this.#hasBackend()) return;
+
+		try {
+			const [wasm, specs] = await Promise.all([ensureWasm(), this.#platformIconSizes()]);
+
+			if (this.availableColors.length === 0) {
+				this.availableColors = wasm.getAvailableColors();
 			}
 
-			this.isSvg = this.renderer.isSvg();
-			this.supportsDecal = this.renderer.supportsDecal();
-			this.supportsSolidColor = this.renderer.supportsSolidColor();
-
-			this.status = 'ready';
+			this.#adopt(build(wasm, specs), logicalSizes(specs));
 		} catch (e) {
-			this.status = 'error';
-			this.error = e instanceof Error ? e.message : String(e);
-			console.error('Failed to initialize renderer:', e);
+			this.#fail(e, 'Failed to load custom image');
 		}
+	}
+
+	async #platformIconSizes(): Promise<IconSizeSpec[]> {
+		this.#platformSizes ??= await getPlatformIconSizes();
+		return this.#platformSizes;
+	}
+
+	/** Records a missing backend as an error; returns false when unavailable. */
+	#hasBackend() {
+		if (isTauri()) return true;
+		this.status = 'error';
+		this.error = 'Tauri backend unavailable; the icon pipeline lives on the native side.';
+		return false;
+	}
+
+	/** Installs a renderer and refreshes the capability flags it reports. */
+	#adopt(renderer: CanvasRenderer, availableSizes: number[]) {
+		this.renderer?.free();
+		this.renderer = renderer;
+		this.availableSizes = availableSizes;
+		this.isSvg = renderer.isSvg();
+		this.isCustom = renderer.isCustom();
+		this.supportsDecal = renderer.supportsDecal();
+		this.supportsSolidColor = renderer.supportsSolidColor();
+		this.status = 'ready';
+		this.version++;
+	}
+
+	#fail(e: unknown, context: string) {
+		this.status = 'error';
+		this.error = e instanceof Error ? e.message : String(e);
+		console.error(`${context}:`, e);
 	}
 
 	/**
@@ -251,6 +319,7 @@ class RendererStore {
 		this.renderer = null;
 		this.status = 'uninitialized';
 		this.error = null;
+		this.isCustom = false;
 	}
 
 	#assertRenderer() {

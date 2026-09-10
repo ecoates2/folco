@@ -105,4 +105,12 @@ mod platform_size_spec_tests {
             assert!(size.scale > 0.0);
         }
     }
+
+    // The GUI mirrors this shape as a hand-written TypeScript interface.
+    #[test]
+    fn serializes_as_a_sizes_array() {
+        let spec = PlatformSizeSpec::new(vec![IconSizeSpec::square(16, 1.0)]);
+        let json = serde_json::to_string(&spec).unwrap();
+        assert_eq!(json, r#"{"sizes":[{"width":16,"height":16,"scale":1.0}]}"#);
+    }
 }
