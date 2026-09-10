@@ -33,12 +33,14 @@ use crate::layer::{ColorDotConfig, DecalConfig, ImageOverlayConfig, SolidColorCo
 /// A serializable profile containing all customization configurations.
 ///
 /// This is the primary type for communicating settings between WASM frontend
-/// and native backend. Each field stores an optional config struct directly.
-/// `Some(config)` means the layer is configured; `None` means it's absent.
+/// and native backend, and the single profile shape every customizer accepts.
+/// Each field stores an optional config struct directly. `Some(config)` means
+/// the layer is configured; `None` means it's absent.
 ///
-/// Not every medium supports every layer: `solid_color` recolors pixels and so
-/// applies only to raster folder icons, while `color_dot` draws on top and
-/// applies everywhere. Unsupported entries are ignored on apply.
+/// Fields are *intents*, not commitments: `solid_color` and `decal` shift pixels
+/// against a surface color, so they apply only to raster folder icons, while
+/// `color_dot` and `overlay` draw on top and apply everywhere. Entries the
+/// active customizer can't realize are ignored on apply.
 ///
 /// # JSON Format
 ///
@@ -126,86 +128,6 @@ impl CustomizationProfile {
     #[cfg(feature = "jsonschema")]
     pub fn json_schema() -> schemars::schema::RootSchema {
         schemars::schema_for!(CustomizationProfile)
-    }
-
-    /// Returns the JSON Schema as a pretty-printed JSON string.
-    #[cfg(feature = "jsonschema")]
-    pub fn json_schema_string() -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(&Self::json_schema())
-    }
-}
-
-// ============================================================================
-// CustomIconProfile (custom images — color dot + overlay)
-// ============================================================================
-
-/// A serializable profile for custom icon customization.
-///
-/// Custom images have no surface color, so only the layers that draw on top
-/// (color dot, overlay) are applicable.
-///
-/// # JSON Format
-///
-/// ```json
-/// {
-///   "colorDot": { "r": 33, "g": 150, "b": 243 },
-///   "overlay": {
-///     "source": { "svg": { "raw": "<svg>...</svg>" } },
-///     "position": "bottom-right",
-///     "scale": 0.25
-///   }
-/// }
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "camelCase")]
-pub struct CustomIconProfile {
-    /// Color dot layer config. `None` means not configured.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub color_dot: Option<ColorDotConfig>,
-
-    /// Image overlay layer config. `None` means not configured.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub overlay: Option<ImageOverlayConfig>,
-}
-
-impl CustomIconProfile {
-    /// Creates an empty profile with no layers configured.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the color dot configuration.
-    pub fn with_color_dot(mut self, config: ColorDotConfig) -> Self {
-        self.color_dot = Some(config);
-        self
-    }
-
-    /// Sets the overlay configuration.
-    pub fn with_overlay(mut self, config: ImageOverlayConfig) -> Self {
-        self.overlay = Some(config);
-        self
-    }
-
-    /// Serializes the profile to a JSON string.
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
-    }
-
-    /// Serializes the profile to a pretty-printed JSON string.
-    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(self)
-    }
-
-    /// Deserializes a profile from a JSON string.
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-
-    /// Returns the JSON Schema for `CustomIconProfile`.
-    #[cfg(feature = "jsonschema")]
-    pub fn json_schema() -> schemars::schema::RootSchema {
-        schemars::schema_for!(CustomIconProfile)
     }
 
     /// Returns the JSON Schema as a pretty-printed JSON string.

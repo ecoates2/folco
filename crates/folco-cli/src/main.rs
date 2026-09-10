@@ -5,9 +5,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
-    CustomIconProfile, CustomizationContextBuilder, CustomizationProfile, DecalConfig,
-    ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition, SvgSource,
-    UnsupportedLayer,
+    CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageOverlayConfig,
+    ImageSource, OverlayAnchorMode, OverlayPosition, SvgSource, UnsupportedLayer,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -55,8 +54,9 @@ enum Commands {
         folder_customization_profile: Option<String>,
 
         // === Custom-icon JSON profile ===
-        /// JSON-serialized CustomIconProfile for custom-icon mode
-        /// (alternative to individual --overlay options)
+        /// JSON-serialized CustomizationProfile for custom-icon mode
+        /// (alternative to individual --overlay options). The solidColor and
+        /// decal entries are ignored: custom images have no surface color.
         #[arg(long, value_name = "JSON", requires = "custom_icon")]
         custom_icon_profile: Option<String>,
 
@@ -353,10 +353,10 @@ async fn main() -> Result<()> {
                     .context("Failed to resolve --custom-icon source")?;
 
                 let profile = if let Some(json) = custom_icon_profile {
-                    CustomIconProfile::from_json(&json)
-                        .context("Failed to parse CustomIconProfile JSON")?
+                    CustomizationProfile::from_json(&json)
+                        .context("Failed to parse CustomizationProfile JSON")?
                 } else {
-                    let mut p = CustomIconProfile::new();
+                    let mut p = CustomizationProfile::new();
 
                     if let Some(color) = color_dot {
                         p = p.with_color_dot(color.to_color_dot_config());
@@ -488,7 +488,7 @@ async fn customize_folders(
 async fn customize_custom_icon(
     directories: Vec<PathBuf>,
     image_source: ImageSource,
-    profile: CustomIconProfile,
+    profile: CustomizationProfile,
     verbose: bool,
 ) -> Result<()> {
     println!("Initializing...");

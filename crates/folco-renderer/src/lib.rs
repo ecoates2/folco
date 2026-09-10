@@ -74,6 +74,6 @@ pub use layer::{
     SolidColorConfig, SvgSource,
 };
 pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
-pub use profile::{CustomIconProfile, CustomizationProfile};
+pub use profile::CustomizationProfile;
 pub use svg_folder_customizer::{SvgFolderIconCustomizer, SvgFolderLayers, SvgLayerSet};
 pub use svg_layer::SvgLayer;

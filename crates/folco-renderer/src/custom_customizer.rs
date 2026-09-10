@@ -14,7 +14,7 @@ use crate::layer::{
     CacheKey, ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource, Layer,
     LayerVersions, RenderContext,
 };
-use crate::profile::CustomIconProfile;
+use crate::profile::CustomizationProfile;
 
 // ============================================================================
 // CustomLayers
@@ -111,17 +111,108 @@ impl CustomIconCustomizer {
         IconCustomizer::new(IconBase::Custom(icons), CustomLayers::default())
     }
 
-    /// Applies a [`CustomIconProfile`]'s settings to the layers.
-    pub fn apply_profile(&mut self, profile: &CustomIconProfile) {
+    /// Applies a [`CustomizationProfile`]'s settings to the layers.
+    ///
+    /// The `solid_color` and `decal` intents are skipped: both shift pixels
+    /// against a surface color, and user-supplied images carry none.
+    pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         self.layers.color_dot.set_config(profile.color_dot);
         self.layers.overlay.set_config(profile.overlay.clone());
     }
 
-    /// Exports the current settings as a [`CustomIconProfile`].
-    pub fn export_profile(&self) -> CustomIconProfile {
-        CustomIconProfile {
+    /// Exports the current settings as a [`CustomizationProfile`].
+    pub fn export_profile(&self) -> CustomizationProfile {
+        CustomizationProfile {
+            solid_color: None,
             color_dot: self.layers.color_dot.config().copied(),
+            decal: None,
             overlay: self.layers.overlay.config().cloned(),
         }
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layer::{
+        DecalConfig, OverlayAnchorMode, OverlayPosition, SolidColorConfig, SvgSource,
+    };
+
+    fn customizer() -> CustomIconCustomizer {
+        CustomIconCustomizer::from_icon_set(IconSet::new())
+    }
+
+    #[test]
+    fn apply_profile_keeps_draw_on_top_intents() {
+        let profile = CustomizationProfile::new()
+            .with_color_dot(ColorDotConfig::new(1, 2, 3))
+            .with_overlay(ImageOverlayConfig::from_svg(
+                "<svg></svg>",
+                OverlayPosition::TopLeft,
+                OverlayAnchorMode::Centered,
+                0.25,
+            ));
+
+        let mut c = customizer();
+        c.apply_profile(&profile);
+
+        assert_eq!(
+            c.layers.color_dot.config().unwrap(),
+            &ColorDotConfig::new(1, 2, 3)
+        );
+        assert_eq!(
+            c.layers.overlay.config().unwrap().position,
+            OverlayPosition::TopLeft
+        );
+    }
+
+    #[test]
+    fn apply_profile_drops_surface_relative_intents() {
+        let profile = CustomizationProfile::new()
+            .with_solid_color(SolidColorConfig::new(76, 175, 80))
+            .with_decal(DecalConfig::new("<svg></svg>", 0.5));
+
+        let mut c = customizer();
+        c.apply_profile(&profile);
+
+        // Custom images have no surface color, so these have nowhere to land.
+        let exported = c.export_profile();
+        assert!(exported.solid_color.is_none());
+        assert!(exported.decal.is_none());
+    }
+
+    #[test]
+    fn profile_roundtrips_through_json() {
+        let mut c = customizer();
+        c.layers
+            .color_dot
+            .set_config(Some(ColorDotConfig::new(9, 8, 7)));
+        c.layers
+            .overlay
+            .set_config(Some(ImageOverlayConfig::from_svg(
+                "<svg>badge</svg>",
+                OverlayPosition::BottomRight,
+                OverlayAnchorMode::Inset,
+                0.25,
+            )));
+
+        let json = c.export_profile().to_json().unwrap();
+        let restored = CustomizationProfile::from_json(&json).unwrap();
+
+        let mut other = customizer();
+        other.apply_profile(&restored);
+
+        assert_eq!(
+            other.layers.color_dot.config().unwrap(),
+            &ColorDotConfig::new(9, 8, 7)
+        );
+        assert_eq!(
+            other.layers.overlay.config().unwrap().source,
+            ImageSource::Svg(SvgSource::Raw("<svg>badge</svg>".into()))
+        );
     }
 }
