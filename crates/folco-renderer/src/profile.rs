@@ -274,4 +274,75 @@ mod tests {
         assert!(profile.decal.is_none());
         assert!(profile.overlay.is_none());
     }
+
+    #[test]
+    fn disabled_layers_export_as_absent() {
+        use crate::FolderIconCustomizer;
+        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
+
+        let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
+            IconSet::new(),
+            SurfaceColor::new(255, 217, 112),
+        ));
+        customizer.apply_profile(
+            &CustomizationProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80)),
+        );
+        customizer.layers.solid_color.set_enabled(false);
+
+        // The layer still remembers its config for the UI toggle...
+        assert!(customizer.layers.solid_color.has_config());
+        // ...but it renders nothing, so the profile must not claim otherwise.
+        assert!(customizer.export_profile().solid_color.is_none());
+    }
+
+    #[test]
+    fn applying_a_profile_re_enables_a_toggled_off_layer() {
+        use crate::FolderIconCustomizer;
+        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
+
+        let profile =
+            CustomizationProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
+
+        let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
+            IconSet::new(),
+            SurfaceColor::new(255, 217, 112),
+        ));
+        customizer.layers.solid_color.set_enabled(false);
+        customizer.apply_profile(&profile);
+
+        assert!(customizer.layers.solid_color.is_active());
+    }
+
+    /// Export must describe exactly what renders, so feeding it back is a no-op.
+    #[test]
+    fn export_import_round_trips() {
+        use crate::FolderIconCustomizer;
+        use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
+
+        let base = || {
+            FolderIconCustomizer::from_folder(FolderIconBase::new(
+                IconSet::new(),
+                SurfaceColor::new(255, 217, 112),
+            ))
+        };
+
+        let mut source = base();
+        source.apply_profile(
+            &CustomizationProfile::new()
+                .with_solid_color(SolidColorConfig::new(76, 175, 80))
+                .with_decal(DecalConfig::new("<svg></svg>", 0.5)),
+        );
+        source.layers.decal.set_enabled(false);
+
+        let exported = source.export_profile();
+        let mut restored = base();
+        restored.apply_profile(&exported);
+
+        assert_eq!(
+            restored.export_profile().to_json().unwrap(),
+            exported.to_json().unwrap()
+        );
+        assert!(restored.layers.solid_color.is_active());
+        assert!(!restored.layers.decal.is_active());
+    }
 }

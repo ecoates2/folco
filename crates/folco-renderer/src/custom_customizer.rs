@@ -114,12 +114,13 @@ impl CustomIconCustomizer {
 
     /// Applies a [`CustomizationProfile`]'s settings to the layers.
     ///
+    /// The profile is authoritative: layers it omits are cleared and disabled.
     /// Intents this base can't realize are dropped — see
     /// [`capabilities`](Self::capabilities).
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         let profile = Self::capabilities().filter(profile);
-        self.layers.color_dot.set_config(profile.color_dot);
-        self.layers.overlay.set_config(profile.overlay);
+        self.layers.color_dot.apply_config(profile.color_dot);
+        self.layers.overlay.apply_config(profile.overlay);
     }
 
     /// What this customizer operates on.
@@ -132,13 +133,13 @@ impl CustomIconCustomizer {
         Self::base_kind().capabilities()
     }
 
-    /// Exports the current settings as a [`CustomizationProfile`].
+    /// Exports the currently rendering settings as a [`CustomizationProfile`].
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
             solid_color: None,
-            color_dot: self.layers.color_dot.config().copied(),
+            color_dot: self.layers.color_dot.active_config().copied(),
             decal: None,
-            overlay: self.layers.overlay.config().cloned(),
+            overlay: self.layers.overlay.active_config().cloned(),
         }
     }
 }

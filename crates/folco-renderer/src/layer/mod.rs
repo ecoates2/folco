@@ -250,8 +250,9 @@ enum CachedOutput {
 /// - The dependency version when each cache entry was stored
 ///
 /// A layer is considered **active** when it has a configuration set
-/// AND is enabled. The `enabled` flag is for live editing (UI toggles)
-/// and is not serialized into profiles.
+/// AND is enabled. The `enabled` flag is for live editing (UI toggles): it is
+/// never written to a profile, but it does decide whether the config is, since
+/// a profile records what renders rather than what the editor remembers.
 pub struct Layer<C: LayerConfig> {
     config: Option<C>,
     enabled: bool,
@@ -274,6 +275,18 @@ impl<C: LayerConfig> Layer<C> {
     /// Returns the current configuration, if any.
     pub fn config(&self) -> Option<&C> {
         self.config.as_ref()
+    }
+
+    /// Returns the configuration only while the layer is contributing.
+    ///
+    /// This is what profiles serialize: a configured-but-disabled layer renders
+    /// nothing, so it must be indistinguishable from an absent one.
+    pub fn active_config(&self) -> Option<&C> {
+        if self.enabled {
+            self.config.as_ref()
+        } else {
+            None
+        }
     }
 
     /// Returns true if this layer is active (has config AND is enabled).
@@ -334,6 +347,17 @@ impl<C: LayerConfig> Layer<C> {
         } else {
             false
         }
+    }
+
+    /// Replaces the configuration and enables the layer exactly when one is given.
+    ///
+    /// Use this when a profile is the source of truth: the profile must fully
+    /// determine what renders, including re-enabling a layer that a UI toggle
+    /// had switched off.
+    pub fn apply_config(&mut self, config: Option<C>) {
+        let enabled = config.is_some();
+        self.set_config(config);
+        self.set_enabled(enabled);
     }
 
     /// Invalidates the cache and increments version.

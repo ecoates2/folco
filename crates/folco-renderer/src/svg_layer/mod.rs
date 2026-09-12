@@ -18,8 +18,9 @@ use crate::layer::LayerConfig;
 /// A generic SVG-medium layer with configuration, live toggle, and versioning.
 ///
 /// A layer is **active** when it has a configuration set AND is enabled. The
-/// `enabled` flag is for live editing (UI toggles) and is not serialized into
-/// profiles.
+/// `enabled` flag is for live editing (UI toggles): it is never written to a
+/// profile, but it does decide whether the config is, since a profile records
+/// what renders rather than what the editor remembers.
 #[derive(Debug)]
 pub struct SvgLayer<C: LayerConfig> {
     config: Option<C>,
@@ -46,6 +47,18 @@ impl<C: LayerConfig> SvgLayer<C> {
     /// Returns true if the layer has a configuration set.
     pub fn has_config(&self) -> bool {
         self.config.is_some()
+    }
+
+    /// Returns the configuration only while the layer is contributing.
+    ///
+    /// This is what profiles serialize: a configured-but-disabled layer renders
+    /// nothing, so it must be indistinguishable from an absent one.
+    pub fn active_config(&self) -> Option<&C> {
+        if self.enabled {
+            self.config.as_ref()
+        } else {
+            None
+        }
     }
 
     /// Returns true if this layer is active (has config AND is enabled).
@@ -93,6 +106,17 @@ impl<C: LayerConfig> SvgLayer<C> {
         } else {
             false
         }
+    }
+
+    /// Replaces the configuration and enables the layer exactly when one is given.
+    ///
+    /// Use this when a profile is the source of truth: the profile must fully
+    /// determine what renders, including re-enabling a layer that a UI toggle
+    /// had switched off.
+    pub fn apply_config(&mut self, config: Option<C>) {
+        let enabled = config.is_some();
+        self.set_config(config);
+        self.set_enabled(enabled);
     }
 
     /// Bumps the version (e.g. when an upstream dependency changes).

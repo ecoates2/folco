@@ -154,22 +154,24 @@ impl FolderIconCustomizer {
     }
 
     /// Applies a [`CustomizationProfile`]'s settings to all layers.
+    ///
+    /// The profile is authoritative: layers it omits are cleared and disabled.
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         self.layers
             .solid_color
-            .set_config(profile.solid_color.clone());
-        self.layers.color_dot.set_config(profile.color_dot);
-        self.layers.decal.set_config(profile.decal.clone());
-        self.layers.overlay.set_config(profile.overlay.clone());
+            .apply_config(profile.solid_color.clone());
+        self.layers.color_dot.apply_config(profile.color_dot);
+        self.layers.decal.apply_config(profile.decal.clone());
+        self.layers.overlay.apply_config(profile.overlay.clone());
     }
 
-    /// Exports the current settings as a [`CustomizationProfile`].
+    /// Exports the currently rendering settings as a [`CustomizationProfile`].
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
-            solid_color: self.layers.solid_color.config().cloned(),
-            color_dot: self.layers.color_dot.config().copied(),
-            decal: self.layers.decal.config().cloned(),
-            overlay: self.layers.overlay.config().cloned(),
+            solid_color: self.layers.solid_color.active_config().cloned(),
+            color_dot: self.layers.color_dot.active_config().copied(),
+            decal: self.layers.decal.active_config().cloned(),
+            overlay: self.layers.overlay.active_config().cloned(),
         }
     }
 
