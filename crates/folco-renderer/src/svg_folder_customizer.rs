@@ -21,7 +21,9 @@
 use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor, SvgFolderIconBase};
-use crate::layer::{ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource};
+use crate::layer::{
+    CacheKey, ColorDotConfig, CompositeLayer, DependencyVersion, ImageOverlayConfig, ImageSource,
+};
 use crate::medium::SvgCanvas;
 use crate::profile::CustomizationProfile;
 use crate::svg_layer::SvgLayer;
@@ -114,6 +116,9 @@ pub struct SvgFolderIconCustomizer {
 
     /// The SVG layer set. Access layers directly to configure them.
     pub layers: SvgFolderLayers,
+
+    /// Rasterized previews, keyed by size and invalidated by layer changes.
+    preview: CompositeLayer,
 }
 
 impl SvgFolderIconCustomizer {
@@ -122,6 +127,7 @@ impl SvgFolderIconCustomizer {
         Self {
             base,
             layers: SvgFolderLayers::default(),
+            preview: CompositeLayer::default(),
         }
     }
 
@@ -153,13 +159,26 @@ impl SvgFolderIconCustomizer {
     /// Previews are pixels so both media can share one display path; the
     /// artifact written to the system still comes from [`render_output`](Self::render_output).
     ///
+    /// Results are cached per size: rasterizing is far more expensive than the
+    /// markup assembly, and a live preview re-renders on every edit.
+    ///
     /// # Errors
     ///
     /// Returns a render error if a layer fails or the SVG cannot be rasterized.
     pub fn render_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
+        let key = CacheKey::new(size, size, 1.0);
+        let deps = self.layers.combined_version();
+
+        if let Some(cached) = self.preview.get_cached(key, deps) {
+            return Ok(cached.clone());
+        }
+
         let svg = self.render_output()?;
         let rgba = ImageSource::svg(svg).render_at_size(size)?;
-        Ok(IconImage::new_full_content(rgba, 1.0))
+        let image = IconImage::new_full_content(rgba, 1.0);
+
+        self.preview.store(key, image.clone(), deps);
+        Ok(image)
     }
 
     /// Applies a [`CustomizationProfile`]'s settings to the SVG layers.
@@ -196,6 +215,7 @@ impl SvgFolderIconCustomizer {
     /// Clears all layer caches.
     pub fn clear_cache(&mut self) {
         self.layers.invalidate_all();
+        self.preview.invalidate();
     }
 }
 
@@ -221,6 +241,52 @@ mod tests {
     fn passthrough_render_returns_base_unchanged() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
+    }
+
+    #[test]
+    fn preview_is_cached_per_size() {
+        let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
+        customizer.render_preview(32).unwrap();
+
+        let key = CacheKey::new(32, 32, 1.0);
+        let deps = customizer.layers.combined_version();
+        assert!(customizer.preview.get_cached(key, deps).is_some());
+        // A size we never asked for must not be served from the 32px entry.
+        assert!(
+            customizer
+                .preview
+                .get_cached(CacheKey::new(64, 64, 1.0), deps)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn preview_cache_invalidates_when_a_layer_changes() {
+        let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
+        let before = customizer.render_preview(32).unwrap();
+
+        customizer
+            .layers
+            .color_dot
+            .apply_config(Some(ColorDotConfig::new(0, 0, 255)));
+        let after = customizer.render_preview(32).unwrap();
+
+        assert_ne!(
+            before.data.as_raw(),
+            after.data.as_raw(),
+            "a stale preview would hide the new color dot"
+        );
+    }
+
+    #[test]
+    fn clear_cache_drops_rendered_previews() {
+        let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
+        customizer.render_preview(32).unwrap();
+        customizer.clear_cache();
+
+        let key = CacheKey::new(32, 32, 1.0);
+        let deps = customizer.layers.combined_version();
+        assert!(customizer.preview.get_cached(key, deps).is_none());
     }
 
     #[test]

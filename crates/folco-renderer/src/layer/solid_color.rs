@@ -25,8 +25,7 @@
 //! and -1.0 drives it to zero.
 
 use super::{
-    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, LayerVersions,
-    RenderContext,
+    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, RenderContext,
 };
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor};
@@ -95,13 +94,11 @@ impl Layer<SolidColorConfig> {
         &mut self,
         ctx: &mut RenderContext,
         key: CacheKey,
-        _versions: &LayerVersions,
+        deps: DependencyVersion,
     ) -> Result<(), RenderError> {
         if !self.is_active() {
             return Ok(());
         }
-
-        let deps = DependencyVersion::NONE; // Root layer — no upstream dependencies
 
         // Check cache first
         if let Some(CachedOutput::Image(img)) = self.get_cached(key, deps) {

@@ -13,7 +13,7 @@ use crate::icon::{IconBase, IconSet, IconSizeSpec};
 use crate::layer::svg::composite_over;
 use crate::layer::{
     CacheKey, ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource, Layer,
-    LayerVersions, RenderContext,
+    RenderContext,
 };
 use crate::profile::CustomizationProfile;
 
@@ -36,18 +36,18 @@ pub struct CustomLayers {
 
 impl LayerSet for CustomLayers {
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
-        let versions = LayerVersions {
-            solid_color: 0,
-            color_dot: self.color_dot.version(),
-            decal: 0,
-            overlay: self.overlay.version(),
-        };
-
-        if let Some(tile) = self.color_dot.render_tile(ctx, key, &versions)? {
+        // Both layers draw on top, so neither depends on an upstream result.
+        if let Some(tile) = self
+            .color_dot
+            .render_tile(ctx, key, DependencyVersion::NONE)?
+        {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
 
-        if let Some(tile) = self.overlay.render_tile(ctx, key, &versions)? {
+        if let Some(tile) = self
+            .overlay
+            .render_tile(ctx, key, DependencyVersion::NONE)?
+        {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
 

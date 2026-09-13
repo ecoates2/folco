@@ -12,8 +12,7 @@
 
 use super::svg::composite_over;
 use super::{
-    CacheKey, CachedOutput, DependencyVersion, ImageSource, Layer, LayerConfig, LayerVersions,
-    RenderContext,
+    CacheKey, CachedOutput, DependencyVersion, ImageSource, Layer, LayerConfig, RenderContext,
 };
 use crate::error::RenderError;
 use image::RgbaImage;
@@ -103,13 +102,11 @@ impl Layer<ColorDotConfig> {
         &mut self,
         ctx: &RenderContext,
         key: CacheKey,
-        _versions: &LayerVersions,
+        deps: DependencyVersion,
     ) -> Result<Option<RgbaImage>, RenderError> {
         if !self.is_active() {
             return Ok(None);
         }
-
-        let deps = DependencyVersion::NONE; // Draws on top; no upstream inputs.
 
         if let Some(CachedOutput::Tile(tile)) = self.get_cached(key, deps) {
             return Ok(Some(tile.clone()));
@@ -165,14 +162,13 @@ mod tests {
         let mut layer: Layer<ColorDotConfig> = Layer::default();
         let ctx = context(64);
         let key = CacheKey::from_icon(&ctx.image);
-        let versions = LayerVersions {
-            solid_color: 0,
-            color_dot: 0,
-            decal: 0,
-            overlay: 0,
-        };
 
-        assert!(layer.render_tile(&ctx, key, &versions).unwrap().is_none());
+        assert!(
+            layer
+                .render_tile(&ctx, key, DependencyVersion::NONE)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -182,14 +178,11 @@ mod tests {
 
         let ctx = context(64);
         let key = CacheKey::from_icon(&ctx.image);
-        let versions = LayerVersions {
-            solid_color: 0,
-            color_dot: layer.version(),
-            decal: 0,
-            overlay: 0,
-        };
 
-        let tile = layer.render_tile(&ctx, key, &versions).unwrap().unwrap();
+        let tile = layer
+            .render_tile(&ctx, key, DependencyVersion::NONE)
+            .unwrap()
+            .unwrap();
 
         // Dot center: 64 - margin(3) - size(25)/2 ≈ 48.
         let center = tile.get_pixel(48, 48);

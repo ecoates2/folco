@@ -37,7 +37,7 @@ use crate::icon::{FolderIconBase, IconBase};
 use crate::layer::svg::composite_over;
 use crate::layer::{
     CacheKey, ColorDotConfig, DecalConfig, DependencyVersion, ImageOverlayConfig, Layer,
-    LayerVersions, RenderContext, SolidColorConfig,
+    RenderContext, SolidColorConfig,
 };
 use crate::profile::CustomizationProfile;
 
@@ -69,35 +69,43 @@ pub struct FolderLayers {
 
 impl FolderLayers {
     /// Returns a snapshot of all layer versions.
-    fn layer_versions(&self) -> LayerVersions {
-        LayerVersions {
-            solid_color: self.solid_color.version(),
-            color_dot: self.color_dot.version(),
-            decal: self.decal.version(),
-            overlay: self.overlay.version(),
-        }
+    fn versions(&self) -> [u64; 4] {
+        [
+            self.solid_color.version(),
+            self.color_dot.version(),
+            self.decal.version(),
+            self.overlay.version(),
+        ]
     }
 }
 
 impl LayerSet for FolderLayers {
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
-        let versions = self.layer_versions();
+        // The pipeline's dependency wiring lives here, not inside the layers:
+        // only the decal reads something an upstream layer produced.
+        let decal_deps = DependencyVersion::from_version(self.solid_color.version());
 
         // 1. Solid color transforms ctx.image directly
-        self.solid_color.apply(ctx, key, &versions)?;
+        self.solid_color.apply(ctx, key, DependencyVersion::NONE)?;
 
-        // 2. Decal tile layer
-        if let Some(tile) = self.decal.render_tile(ctx, key, &versions)? {
+        // 2. Decal tile layer — tints against the dominant color solid color emits
+        if let Some(tile) = self.decal.render_tile(ctx, key, decal_deps)? {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
 
         // 3. Color dot tile layer
-        if let Some(tile) = self.color_dot.render_tile(ctx, key, &versions)? {
+        if let Some(tile) = self
+            .color_dot
+            .render_tile(ctx, key, DependencyVersion::NONE)?
+        {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
 
         // 4. Overlay tile layer
-        if let Some(tile) = self.overlay.render_tile(ctx, key, &versions)? {
+        if let Some(tile) = self
+            .overlay
+            .render_tile(ctx, key, DependencyVersion::NONE)?
+        {
             composite_over(&mut ctx.image.data, &tile, 0, 0);
         }
 
@@ -105,12 +113,7 @@ impl LayerSet for FolderLayers {
     }
 
     fn combined_version(&self) -> DependencyVersion {
-        DependencyVersion::combine(&[
-            self.solid_color.version(),
-            self.color_dot.version(),
-            self.decal.version(),
-            self.overlay.version(),
-        ])
+        DependencyVersion::combine(&self.versions())
     }
 
     fn invalidate_all(&mut self) {
@@ -576,7 +579,7 @@ mod tests {
 
     #[test]
     fn decal_samples_base_when_hsl_disabled() {
-        use crate::layer::{CacheKey, DominantColor, LayerVersions, RenderContext};
+        use crate::layer::{CacheKey, DependencyVersion, DominantColor, RenderContext};
 
         // Create a solid blue image
         let mut blue_img = RgbaImage::new(16, 16);
@@ -596,15 +599,12 @@ mod tests {
         let mut ctx = RenderContext::new(blue_icon.clone());
         ctx.set(TEST_SURFACE);
         let key = CacheKey::from_icon(&blue_icon);
-        let versions = LayerVersions {
-            solid_color: ct_layer.version(),
-            color_dot: 0,
-            decal: decal_layer.version(),
-            overlay: 0,
-        };
+        let decal_deps = DependencyVersion::from_version(ct_layer.version());
 
         // Apply color target layer (should skip because no config)
-        ct_layer.apply(&mut ctx, key, &versions).unwrap();
+        ct_layer
+            .apply(&mut ctx, key, DependencyVersion::NONE)
+            .unwrap();
 
         // Verify no DominantColor was emitted (because color target was skipped)
         assert!(
@@ -621,7 +621,7 @@ mod tests {
 
         // Apply decal - it should fall back to surface color (the golden-yellow)
         // Decal now returns a tile, not modifying ctx.image directly
-        let _tile = decal_layer.render_tile(&mut ctx, key, &versions).unwrap();
+        let _tile = decal_layer.render_tile(&mut ctx, key, decal_deps).unwrap();
 
         // Image should still be unchanged (decal produces a tile, doesn't composite)
         assert_eq!(
@@ -633,7 +633,7 @@ mod tests {
 
     #[test]
     fn disabled_hsl_layer_version_change_invalidates_decal_cache() {
-        use crate::layer::{CacheKey, DominantColor, LayerVersions, RenderContext};
+        use crate::layer::{CacheKey, DependencyVersion, DominantColor, RenderContext};
 
         // Create red and blue test icons
         let mut red_img = RgbaImage::new(16, 16);
@@ -650,17 +650,14 @@ mod tests {
         decal_layer.set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
         // First render: color target enabled
-        let versions_v1 = LayerVersions {
-            solid_color: ct_layer.version(),
-            color_dot: 0,
-            decal: decal_layer.version(),
-            overlay: 0,
-        };
+        let decal_deps_v1 = DependencyVersion::from_version(ct_layer.version());
         let mut ctx1 = RenderContext::new(red_icon.clone());
         ctx1.set(TEST_SURFACE);
-        ct_layer.apply(&mut ctx1, key, &versions_v1).unwrap();
+        ct_layer
+            .apply(&mut ctx1, key, DependencyVersion::NONE)
+            .unwrap();
         decal_layer
-            .render_tile(&mut ctx1, key, &versions_v1)
+            .render_tile(&mut ctx1, key, decal_deps_v1)
             .unwrap();
 
         // Color target should have emitted DominantColor
@@ -680,17 +677,14 @@ mod tests {
         );
 
         // Second render: color target not configured
-        let versions_v2 = LayerVersions {
-            solid_color: ct_layer.version(), // New version!
-            color_dot: 0,
-            decal: decal_layer.version(),
-            overlay: 0,
-        };
+        let decal_deps_v2 = DependencyVersion::from_version(ct_layer.version()); // New version!
         let mut ctx2 = RenderContext::new(red_icon.clone());
         ctx2.set(TEST_SURFACE);
-        ct_layer.apply(&mut ctx2, key, &versions_v2).unwrap();
+        ct_layer
+            .apply(&mut ctx2, key, DependencyVersion::NONE)
+            .unwrap();
         decal_layer
-            .render_tile(&mut ctx2, key, &versions_v2)
+            .render_tile(&mut ctx2, key, decal_deps_v2)
             .unwrap();
 
         // No DominantColor should be emitted (color target was skipped)

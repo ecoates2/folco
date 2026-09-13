@@ -5,9 +5,7 @@
 
 use super::image_source::ImageSource;
 use super::svg::{SvgSource, composite_over};
-use super::{
-    CacheKey, CachedOutput, DependencyVersion, Layer, LayerConfig, LayerVersions, RenderContext,
-};
+use super::{CacheKey, CachedOutput, DependencyVersion, Layer, LayerConfig, RenderContext};
 use crate::error::RenderError;
 use image::RgbaImage;
 
@@ -181,13 +179,11 @@ impl Layer<ImageOverlayConfig> {
         &mut self,
         ctx: &mut RenderContext,
         key: CacheKey,
-        _versions: &LayerVersions,
+        deps: DependencyVersion,
     ) -> Result<Option<RgbaImage>, RenderError> {
         if !self.is_active() {
             return Ok(None);
         }
-
-        let deps = DependencyVersion::NONE; // No upstream dependencies
 
         if let Some(CachedOutput::Tile(tile)) = self.get_cached(key, deps) {
             return Ok(Some(tile.clone()));

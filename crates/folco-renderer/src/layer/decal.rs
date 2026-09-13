@@ -2,8 +2,7 @@
 
 use super::svg::{SvgSource, composite_over, render_source_with_color};
 use super::{
-    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, LayerVersions,
-    RenderContext,
+    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, RenderContext,
 };
 use crate::error::RenderError;
 use crate::icon::SurfaceColor;
@@ -66,13 +65,11 @@ impl Layer<DecalConfig> {
         &mut self,
         ctx: &mut RenderContext,
         key: CacheKey,
-        versions: &LayerVersions,
+        deps: DependencyVersion,
     ) -> Result<Option<RgbaImage>, RenderError> {
         if !self.is_active() {
             return Ok(None);
         }
-
-        let deps = DependencyVersion::from_version(versions.solid_color);
 
         if let Some(CachedOutput::Tile(tile)) = self.get_cached(key, deps) {
             return Ok(Some(tile.clone()));

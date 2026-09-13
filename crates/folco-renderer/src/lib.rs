@@ -72,8 +72,7 @@ pub use icon::{
 };
 pub use layer::{
     CacheKey, ColorDotConfig, DecalConfig, DominantColor, ImageOverlayConfig, ImageSource, Layer,
-    LayerConfig, LayerVersions, OverlayAnchorMode, OverlayPosition, RenderContext,
-    SolidColorConfig, SvgSource,
+    LayerConfig, OverlayAnchorMode, OverlayPosition, RenderContext, SolidColorConfig, SvgSource,
 };
 pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
 pub use profile::CustomizationProfile;

@@ -141,7 +141,7 @@ pub trait LayerConfig: Clone {
 ///
 /// This is used to detect when a layer's cache is stale because an
 /// upstream layer has changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct DependencyVersion(u64);
 
 impl DependencyVersion {
@@ -153,35 +153,22 @@ impl DependencyVersion {
         Self(version)
     }
 
-    /// Creates a dependency version from a single upstream layer.
-    pub fn from_layer<C: LayerConfig>(layer: &Layer<C>) -> Self {
-        Self(layer.version())
-    }
-
     /// Combines multiple upstream layer versions into one.
+    ///
+    /// Order-sensitive on purpose. Summing would let distinct pipeline states
+    /// collide — `[1, 0]` and `[0, 1]` sum alike — and a collision hands back a
+    /// stale cache entry as though it were fresh.
     pub fn combine(versions: &[u64]) -> Self {
-        Self(versions.iter().fold(0u64, |acc, v| acc.wrapping_add(*v)))
+        const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+        const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+        let mut hash = FNV_OFFSET;
+        for version in versions {
+            hash ^= version;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+        Self(hash)
     }
-}
-
-// ============================================================================
-// Layer Versions
-// ============================================================================
-
-/// Snapshot of all layer versions in the pipeline.
-///
-/// Passed to [`LayerEffect::dependencies`] so each layer can declare
-/// which upstream layers it depends on for cache invalidation.
-#[derive(Debug, Clone, Copy)]
-pub struct LayerVersions {
-    /// Version of the solid color layer.
-    pub solid_color: u64,
-    /// Version of the color dot layer.
-    pub color_dot: u64,
-    /// Version of the decal layer.
-    pub decal: u64,
-    /// Version of the overlay layer.
-    pub overlay: u64,
 }
 
 // ============================================================================
@@ -435,3 +422,32 @@ impl CompositeLayer {
 // NOTE: LayerPipeline has been replaced by the LayerSet trait.
 // See customizer.rs for the generic engine and
 // folder_customizer.rs / custom_customizer.rs for concrete layer sets.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn combine_distinguishes_which_layer_changed() {
+        assert_ne!(
+            DependencyVersion::combine(&[1, 0]),
+            DependencyVersion::combine(&[0, 1])
+        );
+    }
+
+    /// A collision here would serve a stale composite as if it were current.
+    #[test]
+    fn combine_is_injective_over_a_small_version_space() {
+        let mut seen = std::collections::HashSet::new();
+        for a in 0..12u64 {
+            for b in 0..12u64 {
+                for c in 0..12u64 {
+                    assert!(
+                        seen.insert(DependencyVersion::combine(&[a, b, c])),
+                        "collision at {a},{b},{c}"
+                    );
+                }
+            }
+        }
+    }
+}
