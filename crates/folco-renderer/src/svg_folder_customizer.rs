@@ -188,8 +188,8 @@ impl SvgFolderIconCustomizer {
     /// [`capabilities`](Self::capabilities).
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         let profile = Self::capabilities().filter(profile);
-        self.layers.color_dot.apply_config(profile.color_dot);
-        self.layers.overlay.apply_config(profile.overlay);
+        self.layers.color_dot.set(profile.color_dot);
+        self.layers.overlay.set(profile.overlay);
     }
 
     /// What this customizer operates on.
@@ -206,9 +206,9 @@ impl SvgFolderIconCustomizer {
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
             solid_color: None,
-            color_dot: self.layers.color_dot.active_config().copied(),
+            color_dot: self.layers.color_dot.config().copied(),
             decal: None,
-            overlay: self.layers.overlay.active_config().cloned(),
+            overlay: self.layers.overlay.config().cloned(),
         }
     }
 
@@ -268,7 +268,7 @@ mod tests {
         customizer
             .layers
             .color_dot
-            .apply_config(Some(ColorDotConfig::new(0, 0, 255)));
+            .set(Some(ColorDotConfig::new(0, 0, 255)));
         let after = customizer.render_preview(32).unwrap();
 
         assert_ne!(

@@ -216,6 +216,7 @@ impl CacheKey {
 ///   directly and cache the full transformed result.
 /// - **Tile layers** (e.g., color_dot, decal, overlay) render to a transparent
 ///   canvas of the same dimensions, which the pipeline composites on top.
+#[derive(Debug)]
 enum CachedOutput {
     /// Full transformed image (e.g., solid_color mutates the base icon).
     Image(IconImage),
@@ -230,19 +231,18 @@ enum CachedOutput {
 /// A generic layer with configuration, caching, and version tracking.
 ///
 /// The layer tracks:
-/// - Optional configuration of type `C`
-/// - An enabled flag for live toggling (does not affect config or cache)
+/// - Optional configuration of type `C` — `Some(config)` means active, `None` means inactive
 /// - A version number that increments on any state change
 /// - A cache of rendered outputs keyed by size
 /// - The dependency version when each cache entry was stored
 ///
-/// A layer is considered **active** when it has a configuration set
-/// AND is enabled. The `enabled` flag is for live editing (UI toggles): it is
-/// never written to a profile, but it does decide whether the config is, since
-/// a profile records what renders rather than what the editor remembers.
+/// A layer is **active** when it has a configuration set. Presence/absence of
+/// config is the sole on/off switch: `Some(config)` = render with this config,
+/// `None` = render nothing (base passes through). This makes export/import
+/// lossless — what you see is what you get.
+#[derive(Debug)]
 pub struct Layer<C: LayerConfig> {
     config: Option<C>,
-    enabled: bool,
     version: u64,
     cache: HashMap<CacheKey, (CachedOutput, u64)>,
 }
@@ -251,7 +251,6 @@ impl<C: LayerConfig> Default for Layer<C> {
     fn default() -> Self {
         Self {
             config: None,
-            enabled: true,
             version: 0,
             cache: HashMap::new(),
         }
@@ -260,55 +259,24 @@ impl<C: LayerConfig> Default for Layer<C> {
 
 impl<C: LayerConfig> Layer<C> {
     /// Returns the current configuration, if any.
+    ///
+    /// `Some(config)` means the layer is active and will render.
+    /// `None` means the layer is inactive and produces no output.
     pub fn config(&self) -> Option<&C> {
         self.config.as_ref()
     }
 
-    /// Returns the configuration only while the layer is contributing.
-    ///
-    /// This is what profiles serialize: a configured-but-disabled layer renders
-    /// nothing, so it must be indistinguishable from an absent one.
-    pub fn active_config(&self) -> Option<&C> {
-        if self.enabled {
-            self.config.as_ref()
-        } else {
-            None
-        }
-    }
-
-    /// Returns true if this layer is active (has config AND is enabled).
+    /// Returns true if this layer is active (has a configuration set).
     pub fn is_active(&self) -> bool {
-        self.enabled && self.config.is_some()
-    }
-
-    /// Returns true if the layer has a configuration set.
-    pub fn has_config(&self) -> bool {
         self.config.is_some()
     }
 
-    /// Returns whether the layer is enabled.
+    /// Returns true if the layer has a configuration set.
     ///
-    /// This is a live-editing toggle that does not affect the stored
-    /// configuration or cached outputs. It is not serialized into profiles.
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-
-    /// Sets whether the layer is enabled.
-    ///
-    /// Toggling preserves the layer's configuration and cache.
-    /// Only the version is bumped so downstream/composite caches
-    /// know to re-evaluate.
-    ///
-    /// Returns true if the enabled state changed.
-    pub fn set_enabled(&mut self, enabled: bool) -> bool {
-        if self.enabled != enabled {
-            self.enabled = enabled;
-            self.version = self.version.wrapping_add(1);
-            true
-        } else {
-            false
-        }
+    /// Alias for [`is_active`](Self::is_active) — kept for readability
+    /// in contexts where "configured" is the natural term.
+    pub fn is_configured(&self) -> bool {
+        self.config.is_some()
     }
 
     /// Returns the current version number.
@@ -318,8 +286,10 @@ impl<C: LayerConfig> Layer<C> {
 
     /// Sets the configuration. Returns true if it changed.
     ///
-    /// Clears the cache and increments version if the config differs.
-    pub fn set_config(&mut self, config: Option<C>) -> bool {
+    /// Setting to `Some(config)` activates the layer; setting to `None`
+    /// deactivates it. Clears the cache and increments version when
+    /// the config differs.
+    pub fn set(&mut self, config: Option<C>) -> bool {
         let differs = match (&self.config, &config) {
             (None, None) => false,
             (Some(_), None) | (None, Some(_)) => true,
@@ -334,17 +304,6 @@ impl<C: LayerConfig> Layer<C> {
         } else {
             false
         }
-    }
-
-    /// Replaces the configuration and enables the layer exactly when one is given.
-    ///
-    /// Use this when a profile is the source of truth: the profile must fully
-    /// determine what renders, including re-enabling a layer that a UI toggle
-    /// had switched off.
-    pub fn apply_config(&mut self, config: Option<C>) {
-        let enabled = config.is_some();
-        self.set_config(config);
-        self.set_enabled(enabled);
     }
 
     /// Invalidates the cache and increments version.

@@ -141,8 +141,8 @@ impl LayerSet for FolderLayers {
 /// let base = FolderIconBase::new(IconSet::new(), surface);
 /// let mut customizer = FolderIconCustomizer::from_folder(base);
 ///
-/// customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
-/// customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
+/// customizer.layers.solid_color.set(Some(SolidColorConfig::new(33, 150, 243)));
+/// customizer.layers.decal.set(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 ///
 /// let output = customizer.render_all();
 /// ```
@@ -162,19 +162,19 @@ impl FolderIconCustomizer {
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         self.layers
             .solid_color
-            .apply_config(profile.solid_color.clone());
-        self.layers.color_dot.apply_config(profile.color_dot);
-        self.layers.decal.apply_config(profile.decal.clone());
-        self.layers.overlay.apply_config(profile.overlay.clone());
+            .set(profile.solid_color.clone());
+        self.layers.color_dot.set(profile.color_dot);
+        self.layers.decal.set(profile.decal.clone());
+        self.layers.overlay.set(profile.overlay.clone());
     }
 
     /// Exports the currently rendering settings as a [`CustomizationProfile`].
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
-            solid_color: self.layers.solid_color.active_config().cloned(),
-            color_dot: self.layers.color_dot.active_config().copied(),
-            decal: self.layers.decal.active_config().cloned(),
-            overlay: self.layers.overlay.active_config().cloned(),
+            solid_color: self.layers.solid_color.config().cloned(),
+            color_dot: self.layers.color_dot.config().copied(),
+            decal: self.layers.decal.config().cloned(),
+            overlay: self.layers.overlay.config().cloned(),
         }
     }
 
@@ -244,7 +244,7 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(33, 150, 243)));
+            .set(Some(SolidColorConfig::new(33, 150, 243)));
         assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 33);
         assert_eq!(
             customizer.layers.solid_color.config().unwrap().target_g,
@@ -255,7 +255,7 @@ mod tests {
             243
         );
 
-        customizer.layers.solid_color.set_config(None);
+        customizer.layers.solid_color.set(None);
         assert!(customizer.layers.solid_color.config().is_none());
     }
 
@@ -288,7 +288,7 @@ mod tests {
         customizer
             .layers
             .color_dot
-            .set_config(Some(ColorDotConfig::new(0, 0, 255)));
+            .set(Some(ColorDotConfig::new(0, 0, 255)));
 
         // The 32px base is solid green; only the dot area should turn blue.
         let rendered = customizer.render(32).unwrap();
@@ -311,7 +311,7 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(0, 188, 212)));
+            .set(Some(SolidColorConfig::new(0, 188, 212)));
 
         let rendered = customizer.render(16).unwrap();
         let pixel = rendered.data.get_pixel(0, 0);
@@ -336,14 +336,14 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(76, 175, 80)));
+            .set(Some(SolidColorConfig::new(76, 175, 80)));
         let first = customizer.render(16).unwrap();
 
         // Change color and render again
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(33, 150, 243)));
+            .set(Some(SolidColorConfig::new(33, 150, 243)));
         let second = customizer.render(16).unwrap();
 
         // Results should be different
@@ -363,7 +363,7 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(76, 175, 80)));
+            .set(Some(SolidColorConfig::new(76, 175, 80)));
 
         // Render twice with same config
         let first = customizer.render(16).unwrap();
@@ -374,63 +374,30 @@ mod tests {
     }
 
     #[test]
-    fn layer_generic_set_config() {
+    fn layer_generic_set() {
         let mut layer: Layer<DecalConfig> = Layer::default();
 
         // No config yet
-        assert!(!layer.has_config());
+        assert!(!layer.is_configured());
         assert!(!layer.is_active()); // Not active without config
         assert_eq!(layer.version(), 0);
 
         // Setting config should increment version
-        let changed = layer.set_config(Some(DecalConfig::new("svg", 0.5)));
+        let changed = layer.set(Some(DecalConfig::new("svg", 0.5)));
         assert!(changed);
-        assert!(layer.has_config());
+        assert!(layer.is_configured());
         assert!(layer.is_active()); // Now active
         assert_eq!(layer.version(), 1);
 
         // Same config should not increment
-        let changed = layer.set_config(Some(DecalConfig::new("svg", 0.5)));
+        let changed = layer.set(Some(DecalConfig::new("svg", 0.5)));
         assert!(!changed);
         assert_eq!(layer.version(), 1);
 
         // Different config should increment
-        let changed = layer.set_config(Some(DecalConfig::new("svg2", 0.5)));
+        let changed = layer.set(Some(DecalConfig::new("svg2", 0.5)));
         assert!(changed);
         assert_eq!(layer.version(), 2);
-    }
-
-    #[test]
-    fn layer_toggle_without_losing_config() {
-        let mut layer: Layer<DecalConfig> = Layer::default();
-
-        // Set config
-        layer.set_config(Some(DecalConfig::new("my-svg", 0.5)));
-        assert!(layer.is_active());
-        assert!(layer.is_enabled());
-        assert_eq!(layer.version(), 1);
-
-        // Disable via toggle — config preserved
-        layer.set_enabled(false);
-        assert!(!layer.is_active());
-        assert!(!layer.is_enabled());
-        assert!(layer.has_config()); // Config still present!
-        assert_eq!(layer.version(), 2);
-
-        // Re-enable — should be active again
-        layer.set_enabled(true);
-        assert!(layer.is_active());
-        assert!(layer.is_enabled());
-        assert_eq!(
-            layer.config().unwrap().source,
-            crate::layer::SvgSource::Raw("my-svg".into())
-        );
-        assert_eq!(layer.version(), 3);
-
-        // set_enabled(true) when already enabled should not bump version
-        let changed = layer.set_enabled(true);
-        assert!(!changed);
-        assert_eq!(layer.version(), 3);
     }
 
     #[test]
@@ -438,19 +405,19 @@ mod tests {
         let mut layer: Layer<DecalConfig> = Layer::default();
 
         // Set config
-        layer.set_config(Some(DecalConfig::new("my-svg", 0.5)));
+        layer.set(Some(DecalConfig::new("my-svg", 0.5)));
         assert!(layer.is_active());
         assert_eq!(layer.version(), 1);
 
-        // Clear config (disable)
-        let changed = layer.set_config(None);
+        // Clear config (deactivate)
+        let changed = layer.set(None);
         assert!(changed);
         assert!(!layer.is_active());
-        assert!(!layer.has_config());
+        assert!(!layer.is_configured());
         assert_eq!(layer.version(), 2);
 
-        // Re-set config (re-enable)
-        let changed = layer.set_config(Some(DecalConfig::new("my-svg", 0.5)));
+        // Re-set config (reactivate)
+        let changed = layer.set(Some(DecalConfig::new("my-svg", 0.5)));
         assert!(changed);
         assert!(layer.is_active());
         assert_eq!(
@@ -469,20 +436,20 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(0, 188, 212)));
+            .set(Some(SolidColorConfig::new(0, 188, 212)));
         assert!(customizer.layers.solid_color.is_active());
         let rotated = customizer.render(16).unwrap();
         let rotated_pixel = rotated.data.get_pixel(0, 0).0;
 
-        // Disable via toggle (config and cache preserved)
-        customizer.layers.solid_color.set_enabled(false);
+        // Deactivate by clearing config
+        customizer.layers.solid_color.set(None);
         assert!(!customizer.layers.solid_color.is_active());
-        assert!(customizer.layers.solid_color.has_config()); // Config still present
+        assert!(!customizer.layers.solid_color.is_configured());
         let disabled = customizer.render(16).unwrap();
         assert_eq!(disabled.data.get_pixel(0, 0).0, [255, 0, 0, 255]); // Original red
 
-        // Re-enable
-        customizer.layers.solid_color.set_enabled(true);
+        // Re-activate
+        customizer.layers.solid_color.set(Some(SolidColorConfig::new(0, 188, 212)));
         let re_enabled = customizer.render(16).unwrap();
         assert_eq!(re_enabled.data.get_pixel(0, 0).0, rotated_pixel);
     }
@@ -593,7 +560,7 @@ mod tests {
         // No config set — layer is inactive
 
         let mut decal_layer: Layer<DecalConfig> = Layer::default();
-        decal_layer.set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
+        decal_layer.set(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
         // Create context and apply through Layer::apply
         let mut ctx = RenderContext::new(blue_icon.clone());
@@ -645,9 +612,9 @@ mod tests {
 
         // Set up layers
         let mut ct_layer: Layer<SolidColorConfig> = Layer::default();
-        ct_layer.set_config(Some(SolidColorConfig::new(0, 188, 212)));
+        ct_layer.set(Some(SolidColorConfig::new(0, 188, 212)));
         let mut decal_layer: Layer<DecalConfig> = Layer::default();
-        decal_layer.set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
+        decal_layer.set(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
         // First render: color target enabled
         let decal_deps_v1 = DependencyVersion::from_version(ct_layer.version());
@@ -669,7 +636,7 @@ mod tests {
 
         // Now clear color target config — version should change
         let old_version = ct_layer.version();
-        ct_layer.set_config(None);
+        ct_layer.set(None);
         let new_version = ct_layer.version();
         assert_ne!(
             old_version, new_version,
@@ -719,18 +686,18 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(ct_config.clone()));
+            .set(Some(ct_config.clone()));
         customizer
             .layers
             .decal
-            .set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
+            .set(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
         // Render with color target enabled
         let with_ct = customizer.render(16).unwrap();
         let ct_pixel = with_ct.data.get_pixel(0, 0).0;
 
-        // Disable color target via toggle, keep decal
-        customizer.layers.solid_color.set_enabled(false);
+        // Deactivate color target, keep decal
+        customizer.layers.solid_color.set(None);
         let without_ct = customizer.render(16).unwrap();
         let no_ct_pixel = without_ct.data.get_pixel(0, 0).0;
 
@@ -747,13 +714,13 @@ mod tests {
             "With color target disabled, should be original red"
         );
 
-        // Re-enable color target - should go back to shifted
-        customizer.layers.solid_color.set_enabled(true);
+        // Re-activate color target - should go back to shifted
+        customizer.layers.solid_color.set(Some(ct_config));
         let re_enabled = customizer.render(16).unwrap();
         assert_eq!(
             re_enabled.data.get_pixel(0, 0).0,
             ct_pixel,
-            "Re-enabling color target should restore shifted result"
+            "Re-activating color target should restore shifted result"
         );
     }
 }

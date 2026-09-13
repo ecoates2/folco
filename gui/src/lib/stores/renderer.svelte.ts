@@ -231,9 +231,12 @@ class RendererStore {
 		this.version++;
 	}
 
-	setSolidColorEnabled(enabled: boolean) {
+	/**
+	 * Clears the solid color configuration, deactivating the layer.
+	 */
+	clearSolidColor() {
 		this.#assertRenderer();
-		this.renderer!.setSolidColorEnabled(enabled);
+		this.renderer!.clearSolidColor();
 		this.version++;
 	}
 
@@ -246,29 +249,28 @@ class RendererStore {
 		this.version++;
 	}
 
-	setColorDotEnabled(enabled: boolean) {
+	/**
+	 * Clears the color-dot configuration, deactivating the layer.
+	 */
+	clearColorDot() {
 		this.#assertRenderer();
-		this.renderer!.setColorDotEnabled(enabled);
+		this.renderer!.clearColorDot();
 		this.version++;
 	}
 
 	/**
 	 * Sets the decal configuration. Ignored when `supportsDecal` is false.
+	 * Pass `null` to clear/deactivate.
 	 */
 	setDecal(svgData: string | null | undefined, scale: number) {
 		this.#assertRenderer();
-		this.renderer!.setDecal(svgData, scale);
-		this.version++;
-	}
-
-	setDecalEnabled(enabled: boolean) {
-		this.#assertRenderer();
-		this.renderer!.setDecalEnabled(enabled);
+		this.renderer!.setDecal(svgData ?? null, scale);
 		this.version++;
 	}
 
 	/**
 	 * Sets the overlay configuration.
+	 * Pass `null` to clear/deactivate.
 	 */
 	setOverlay(
 		svgData: string | null | undefined,
@@ -277,7 +279,7 @@ class RendererStore {
 		scale: number
 	) {
 		this.#assertRenderer();
-		this.renderer!.setOverlay(svgData, position, anchorMode, scale);
+		this.renderer!.setOverlay(svgData ?? null, position, anchorMode, scale);
 		this.version++;
 	}
 
@@ -291,12 +293,6 @@ class RendererStore {
 		} catch (e) {
 			console.error('Failed to set overlay emoji:', e);
 		}
-		this.version++;
-	}
-
-	setOverlayEnabled(enabled: boolean) {
-		this.#assertRenderer();
-		this.renderer!.setOverlayEnabled(enabled);
 		this.version++;
 	}
 

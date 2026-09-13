@@ -24,8 +24,9 @@
 
   const WORKFLOW_IDS = Object.keys(WORKFLOWS) as WorkflowId[];
 
-  let solidColorEnabled = $state(false);
-  let colorDotEnabled = $state(false);
+  // Track whether color pickers have set a color (layer is active when true).
+  let solidColorActive = $state(false);
+  let colorDotActive = $state(false);
 
   function handleIconSelect(e: Event) {
     const detail = (e as CustomEvent).detail;
@@ -94,13 +95,13 @@
         disabled={!section.available}
         disabledReason={section.reason}
         enabled={section.id === 'source-image' ||
-          (section.id === 'solid-color' && solidColorEnabled) ||
-          (section.id === 'color-dot' && colorDotEnabled) ||
+          (section.id === 'solid-color' && solidColorActive) ||
+          (section.id === 'color-dot' && colorDotActive) ||
           (section.id === 'emoji' && artwork.kind === 'emoji') ||
           (section.id === 'icon' && artwork.kind === 'icon')}
         onToggle={(on) => {
-          if (section.id === 'solid-color') { solidColorEnabled = on; renderer.setSolidColorEnabled(on); }
-          else if (section.id === 'color-dot') { colorDotEnabled = on; renderer.setColorDotEnabled(on); }
+          if (section.id === 'solid-color') { solidColorActive = on; if (!on) renderer.clearSolidColor(); }
+          else if (section.id === 'color-dot') { colorDotActive = on; if (!on) renderer.clearColorDot(); }
           else if (section.id === 'emoji') artwork.setKind(on ? 'emoji' : 'none');
           else if (section.id === 'icon') artwork.setKind(on ? 'icon' : 'none');
         }}

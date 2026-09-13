@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn svg_source_embeds_as_svg_data_uri() {
         let mut layer: SvgLayer<ImageOverlayConfig> = SvgLayer::default();
-        layer.set_config(Some(ImageOverlayConfig::from_svg(
+        layer.set(Some(ImageOverlayConfig::from_svg(
             "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
             OverlayPosition::Center,
             OverlayAnchorMode::Inset,
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn raster_source_wraps_in_image_png_uri() {
         let mut layer: SvgLayer<ImageOverlayConfig> = SvgLayer::default();
-        layer.set_config(Some(ImageOverlayConfig::new(
+        layer.set(Some(ImageOverlayConfig::new(
             red_png_source(),
             OverlayPosition::BottomRight,
             OverlayAnchorMode::Inset,

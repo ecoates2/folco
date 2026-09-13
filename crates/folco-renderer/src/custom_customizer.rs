@@ -82,7 +82,7 @@ impl LayerSet for CustomLayers {
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
 /// let mut customizer = CustomIconCustomizer::from_image(&source, &specs).unwrap();
 ///
-/// customizer.layers.overlay.set_config(Some(
+/// customizer.layers.overlay.set(Some(
 ///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
 /// ));
 ///
@@ -119,8 +119,8 @@ impl CustomIconCustomizer {
     /// [`capabilities`](Self::capabilities).
     pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
         let profile = Self::capabilities().filter(profile);
-        self.layers.color_dot.apply_config(profile.color_dot);
-        self.layers.overlay.apply_config(profile.overlay);
+        self.layers.color_dot.set(profile.color_dot);
+        self.layers.overlay.set(profile.overlay);
     }
 
     /// What this customizer operates on.
@@ -137,9 +137,9 @@ impl CustomIconCustomizer {
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
             solid_color: None,
-            color_dot: self.layers.color_dot.active_config().copied(),
+            color_dot: self.layers.color_dot.config().copied(),
             decal: None,
-            overlay: self.layers.overlay.active_config().cloned(),
+            overlay: self.layers.overlay.config().cloned(),
         }
     }
 }
@@ -203,10 +203,10 @@ mod tests {
         let mut c = customizer();
         c.layers
             .color_dot
-            .set_config(Some(ColorDotConfig::new(9, 8, 7)));
+            .set(Some(ColorDotConfig::new(9, 8, 7)));
         c.layers
             .overlay
-            .set_config(Some(ImageOverlayConfig::from_svg(
+            .set(Some(ImageOverlayConfig::from_svg(
                 "<svg>badge</svg>",
                 OverlayPosition::BottomRight,
                 OverlayAnchorMode::Inset,

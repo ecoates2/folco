@@ -149,9 +149,9 @@ impl CanvasRenderer {
 
     fn set_overlay_config(&mut self, config: Option<ImageOverlayConfig>) {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.layers.overlay.apply_config(config),
-            ActiveCustomizer::SvgFolder(c) => c.layers.overlay.apply_config(config),
-            ActiveCustomizer::Custom(c) => c.layers.overlay.apply_config(config),
+            ActiveCustomizer::Folder(c) => { c.layers.overlay.set(config); }
+            ActiveCustomizer::SvgFolder(c) => { c.layers.overlay.set(config); }
+            ActiveCustomizer::Custom(c) => { c.layers.overlay.set(config); }
         }
     }
 
@@ -396,15 +396,15 @@ impl CanvasRenderer {
         if let ActiveCustomizer::Folder(c) = &mut self.active {
             c.layers
                 .solid_color
-                .apply_config(Some(SolidColorConfig::new(target_r, target_g, target_b)));
+                .set(Some(SolidColorConfig::new(target_r, target_g, target_b)));
         }
     }
 
-    /// Sets the solid color enabled state without changing the parameters.
-    #[wasm_bindgen(js_name = "setSolidColorEnabled")]
-    pub fn set_solid_color_enabled(&mut self, enabled: bool) {
+    /// Clears the solid color configuration, deactivating the layer.
+    #[wasm_bindgen(js_name = "clearSolidColor")]
+    pub fn clear_solid_color(&mut self) {
         if let ActiveCustomizer::Folder(c) = &mut self.active {
-            c.layers.solid_color.set_enabled(enabled);
+            c.layers.solid_color.set(None);
         }
     }
 
@@ -421,20 +421,20 @@ impl CanvasRenderer {
     pub fn set_color_dot(&mut self, r: u8, g: u8, b: u8) {
         let config = Some(ColorDotConfig::new(r, g, b));
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.layers.color_dot.apply_config(config),
-            ActiveCustomizer::SvgFolder(c) => c.layers.color_dot.apply_config(config),
-            ActiveCustomizer::Custom(c) => c.layers.color_dot.apply_config(config),
+            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set(config); }
+            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set(config); }
+            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set(config); }
         }
     }
 
-    /// Sets the color dot enabled state without changing the parameters.
-    #[wasm_bindgen(js_name = "setColorDotEnabled")]
-    pub fn set_color_dot_enabled(&mut self, enabled: bool) {
+    /// Clears the color-dot configuration, deactivating the layer.
+    #[wasm_bindgen(js_name = "clearColorDot")]
+    pub fn clear_color_dot(&mut self) {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.layers.color_dot.set_enabled(enabled),
-            ActiveCustomizer::SvgFolder(c) => c.layers.color_dot.set_enabled(enabled),
-            ActiveCustomizer::Custom(c) => c.layers.color_dot.set_enabled(enabled),
-        };
+            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set(None); }
+            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set(None); }
+            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set(None); }
+        }
     }
 
     /// Sets the decal configuration.
@@ -454,15 +454,7 @@ impl CanvasRenderer {
             Some(svg) if !svg.is_empty() => Some(DecalConfig::new(svg, scale)),
             _ => None,
         };
-        c.layers.decal.apply_config(config);
-    }
-
-    /// Sets the decal enabled state without changing the configuration.
-    #[wasm_bindgen(js_name = "setDecalEnabled")]
-    pub fn set_decal_enabled(&mut self, enabled: bool) {
-        if let ActiveCustomizer::Folder(c) = &mut self.active {
-            c.layers.decal.set_enabled(enabled);
-        }
+        c.layers.decal.set(config);
     }
 
     /// Sets the overlay configuration.
@@ -495,16 +487,6 @@ impl CanvasRenderer {
         };
 
         self.set_overlay_config(config);
-    }
-
-    /// Sets the overlay enabled state without changing the configuration.
-    #[wasm_bindgen(js_name = "setOverlayEnabled")]
-    pub fn set_overlay_enabled(&mut self, enabled: bool) {
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.layers.overlay.set_enabled(enabled),
-            ActiveCustomizer::SvgFolder(c) => c.layers.overlay.set_enabled(enabled),
-            ActiveCustomizer::Custom(c) => c.layers.overlay.set_enabled(enabled),
-        };
     }
 
     /// Sets the overlay to an emoji character.
@@ -631,18 +613,18 @@ impl CanvasRenderer {
     pub fn reset(&mut self) {
         match &mut self.active {
             ActiveCustomizer::Folder(c) => {
-                c.layers.solid_color.set_config(None);
-                c.layers.color_dot.set_config(None);
-                c.layers.decal.set_config(None);
-                c.layers.overlay.set_config(None);
+                c.layers.solid_color.set(None);
+                c.layers.color_dot.set(None);
+                c.layers.decal.set(None);
+                c.layers.overlay.set(None);
             }
             ActiveCustomizer::SvgFolder(c) => {
-                c.layers.color_dot.set_config(None);
-                c.layers.overlay.set_config(None);
+                c.layers.color_dot.set(None);
+                c.layers.overlay.set(None);
             }
             ActiveCustomizer::Custom(c) => {
-                c.layers.color_dot.set_config(None);
-                c.layers.overlay.set_config(None);
+                c.layers.color_dot.set(None);
+                c.layers.overlay.set(None);
             }
         }
     }

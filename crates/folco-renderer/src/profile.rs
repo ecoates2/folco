@@ -221,7 +221,7 @@ mod tests {
         assert!(customizer.layers.solid_color.is_active());
         assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 76);
 
-        assert!(!customizer.layers.decal.has_config());
+        assert!(!customizer.layers.decal.is_configured());
         assert!(!customizer.layers.decal.is_active());
     }
 
@@ -236,7 +236,7 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set_config(Some(SolidColorConfig::new(76, 175, 80)));
+            .set(Some(SolidColorConfig::new(76, 175, 80)));
 
         let profile = customizer.export_profile();
 
@@ -276,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn disabled_layers_export_as_absent() {
+    fn inactive_layers_export_as_absent() {
         use crate::FolderIconCustomizer;
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
@@ -287,16 +287,17 @@ mod tests {
         customizer.apply_profile(
             &CustomizationProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80)),
         );
-        customizer.layers.solid_color.set_enabled(false);
+        // Deactivate by setting config to None
+        customizer.layers.solid_color.set(None);
 
-        // The layer still remembers its config for the UI toggle...
-        assert!(customizer.layers.solid_color.has_config());
-        // ...but it renders nothing, so the profile must not claim otherwise.
+        // The layer has no config, so it's inactive.
+        assert!(!customizer.layers.solid_color.is_configured());
+        // The profile must not claim otherwise.
         assert!(customizer.export_profile().solid_color.is_none());
     }
 
     #[test]
-    fn applying_a_profile_re_enables_a_toggled_off_layer() {
+    fn applying_a_profile_replaces_config() {
         use crate::FolderIconCustomizer;
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
@@ -307,10 +308,12 @@ mod tests {
             IconSet::new(),
             SurfaceColor::new(255, 217, 112),
         ));
-        customizer.layers.solid_color.set_enabled(false);
+        // Start with no config (inactive)
+        customizer.layers.solid_color.set(None);
         customizer.apply_profile(&profile);
 
         assert!(customizer.layers.solid_color.is_active());
+        assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 76);
     }
 
     /// Export must describe exactly what renders, so feeding it back is a no-op.
@@ -332,7 +335,7 @@ mod tests {
                 .with_solid_color(SolidColorConfig::new(76, 175, 80))
                 .with_decal(DecalConfig::new("<svg></svg>", 0.5)),
         );
-        source.layers.decal.set_enabled(false);
+        source.layers.decal.set(None);
 
         let exported = source.export_profile();
         let mut restored = base();

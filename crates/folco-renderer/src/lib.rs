@@ -13,11 +13,8 @@
 //! let mut customizer = FolderIconCustomizer::from_folder(base);
 //!
 //! // Configure layers directly through the layers field
-//! customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
-//! customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
-//!
-//! // Toggle layers without losing config
-//! customizer.layers.solid_color.set_enabled(false);
+//! customizer.layers.solid_color.set(Some(SolidColorConfig::new(33, 150, 243)));
+//! customizer.layers.decal.set(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 //!
 //! let output = customizer.render_all();
 //! ```
