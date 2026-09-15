@@ -148,6 +148,166 @@ impl CustomizationProfile {
 }
 
 // ============================================================================
+// Workflow-specific profile types (compile-time safety)
+// ============================================================================
+
+/// Profile for folder icon workflows: solid color, color dot, decal, overlay.
+///
+/// This is the compile-time-safe counterpart to [`CustomizationProfile`].
+/// Where `CustomizationProfile` is the wire format (union type accepted by all
+/// customizers), `FolderProfile` carries only the fields that folder icons can
+/// realize.
+///
+/// # Conversion
+///
+/// Convert from the wire format with [`From<&CustomizationProfile>`]:
+/// ```
+/// use folco_renderer::{FolderProfile, CustomizationProfile, SolidColorConfig};
+///
+/// let wire = CustomizationProfile::new().with_solid_color(SolidColorConfig::new(33, 150, 243));
+/// let folder = FolderProfile::from(&wire);
+/// assert!(folder.solid_color.is_some());
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct FolderProfile {
+    /// Solid recolor layer config. `None` means not configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub solid_color: Option<SolidColorConfig>,
+
+    /// Color dot layer config. `None` means not configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_dot: Option<ColorDotConfig>,
+
+    /// Decal imprint layer config. `None` means not configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decal: Option<DecalConfig>,
+
+    /// Image overlay layer config. `None` means not configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overlay: Option<ImageOverlayConfig>,
+}
+
+impl FolderProfile {
+    /// Creates an empty profile with no layers configured.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Serializes the profile to a JSON string.
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Deserializes a profile from a JSON string.
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Sets the solid color config and returns self for builder-style chaining.
+    pub fn with_solid_color(mut self, config: SolidColorConfig) -> Self {
+        self.solid_color = Some(config);
+        self
+    }
+
+    /// Sets the color dot config and returns self for builder-style chaining.
+    pub fn with_color_dot(mut self, config: ColorDotConfig) -> Self {
+        self.color_dot = Some(config);
+        self
+    }
+
+    /// Sets the decal config and returns self for builder-style chaining.
+    pub fn with_decal(mut self, config: DecalConfig) -> Self {
+        self.decal = Some(config);
+        self
+    }
+
+    /// Sets the overlay config and returns self for builder-style chaining.
+    pub fn with_overlay(mut self, config: ImageOverlayConfig) -> Self {
+        self.overlay = Some(config);
+        self
+    }
+}
+
+impl From<&CustomizationProfile> for FolderProfile {
+    fn from(profile: &CustomizationProfile) -> Self {
+        Self {
+            solid_color: profile.solid_color.clone(),
+            color_dot: profile.color_dot,
+            decal: profile.decal.clone(),
+            overlay: profile.overlay.clone(),
+        }
+    }
+}
+
+/// Profile for custom icon workflows: color dot and overlay only.
+///
+/// Custom images lack surface color metadata, so solid color and decal are
+/// not applicable. This type enforces that at compile time.
+///
+/// # Conversion
+///
+/// Convert from the wire format with [`From<&CustomizationProfile>`]:
+/// ```
+/// use folco_renderer::{CustomProfile, CustomizationProfile, ColorDotConfig};
+///
+/// let wire = CustomizationProfile::new().with_color_dot(ColorDotConfig::new(33, 150, 243));
+/// let custom = CustomProfile::from(&wire);
+/// assert!(custom.color_dot.is_some());
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct CustomProfile {
+    /// Color dot layer config. `None` means not configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_dot: Option<ColorDotConfig>,
+
+    /// Image overlay layer config. `None` means not configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overlay: Option<ImageOverlayConfig>,
+}
+
+impl CustomProfile {
+    /// Creates an empty profile with no layers configured.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Serializes the profile to a JSON string.
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Deserializes a profile from a JSON string.
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Sets the color dot config and returns self for builder-style chaining.
+    pub fn with_color_dot(mut self, config: ColorDotConfig) -> Self {
+        self.color_dot = Some(config);
+        self
+    }
+
+    /// Sets the overlay config and returns self for builder-style chaining.
+    pub fn with_overlay(mut self, config: ImageOverlayConfig) -> Self {
+        self.overlay = Some(config);
+        self
+    }
+}
+
+impl From<&CustomizationProfile> for CustomProfile {
+    fn from(profile: &CustomizationProfile) -> Self {
+        Self {
+            color_dot: profile.color_dot,
+            overlay: profile.overlay.clone(),
+        }
+    }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -209,7 +369,7 @@ mod tests {
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
         let profile =
-            CustomizationProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
+            FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
         // No decal in profile → decal layer should be unconfigured
 
         let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
@@ -221,7 +381,7 @@ mod tests {
         assert!(customizer.layers.solid_color.is_active());
         assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 76);
 
-        assert!(!customizer.layers.decal.is_configured());
+        assert!(!customizer.layers.decal.is_active());
         assert!(!customizer.layers.decal.is_active());
     }
 
@@ -236,7 +396,7 @@ mod tests {
         customizer
             .layers
             .solid_color
-            .set(Some(SolidColorConfig::new(76, 175, 80)));
+            .set_config(Some(SolidColorConfig::new(76, 175, 80)));
 
         let profile = customizer.export_profile();
 
@@ -285,13 +445,13 @@ mod tests {
             SurfaceColor::new(255, 217, 112),
         ));
         customizer.apply_profile(
-            &CustomizationProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80)),
+            &FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80)),
         );
         // Deactivate by setting config to None
-        customizer.layers.solid_color.set(None);
+        customizer.layers.solid_color.set_config(None);
 
         // The layer has no config, so it's inactive.
-        assert!(!customizer.layers.solid_color.is_configured());
+        assert!(!customizer.layers.solid_color.is_active());
         // The profile must not claim otherwise.
         assert!(customizer.export_profile().solid_color.is_none());
     }
@@ -302,14 +462,14 @@ mod tests {
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
         let profile =
-            CustomizationProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
+            FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
 
         let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
             IconSet::new(),
             SurfaceColor::new(255, 217, 112),
         ));
         // Start with no config (inactive)
-        customizer.layers.solid_color.set(None);
+        customizer.layers.solid_color.set_config(None);
         customizer.apply_profile(&profile);
 
         assert!(customizer.layers.solid_color.is_active());
@@ -331,15 +491,16 @@ mod tests {
 
         let mut source = base();
         source.apply_profile(
-            &CustomizationProfile::new()
+            &FolderProfile::new()
                 .with_solid_color(SolidColorConfig::new(76, 175, 80))
                 .with_decal(DecalConfig::new("<svg></svg>", 0.5)),
         );
-        source.layers.decal.set(None);
+        source.layers.decal.set_config(None);
 
         let exported = source.export_profile();
         let mut restored = base();
-        restored.apply_profile(&exported);
+        let restored_profile: FolderProfile = (&exported).into();
+        restored.apply_profile(&restored_profile);
 
         assert_eq!(
             restored.export_profile().to_json().unwrap(),

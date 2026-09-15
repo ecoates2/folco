@@ -13,8 +13,8 @@
 //! let mut customizer = FolderIconCustomizer::from_folder(base);
 //!
 //! // Configure layers directly through the layers field
-//! customizer.layers.solid_color.set(Some(SolidColorConfig::new(33, 150, 243)));
-//! customizer.layers.decal.set(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
+//! customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
+//! customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 //!
 //! let output = customizer.render_all();
 //! ```
@@ -28,14 +28,14 @@
 //! ```
 //! use folco_renderer::{
 //!     FolderIconCustomizer, FolderIconBase, IconSet, SurfaceColor,
-//!     CustomizationProfile, SolidColorConfig,
+//!     FolderProfile, SolidColorConfig,
 //! };
 //!
 //! let surface = SurfaceColor::new(255, 217, 112);
 //! let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
 //!
 //! // Apply a profile
-//! let profile = CustomizationProfile::new()
+//! let profile = FolderProfile::new()
 //!     .with_solid_color(SolidColorConfig::new(33, 150, 243));
 //! customizer.apply_profile(&profile);
 //!
@@ -72,6 +72,6 @@ pub use layer::{
     LayerConfig, OverlayAnchorMode, OverlayPosition, RenderContext, SolidColorConfig, SvgSource,
 };
 pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
-pub use profile::CustomizationProfile;
+pub use profile::{CustomProfile, CustomizationProfile, FolderProfile};
 pub use svg_folder_customizer::{SvgFolderIconCustomizer, SvgFolderLayers, SvgLayerSet};
 pub use svg_layer::SvgLayer;

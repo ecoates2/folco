@@ -299,7 +299,10 @@ mod tests {
     #[test]
     fn capabilities_match_what_customizers_keep() {
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor, SvgFolderIconBase};
-        use crate::{CustomIconCustomizer, FolderIconCustomizer, SvgFolderIconCustomizer};
+        use crate::{
+            CustomProfile, CustomizationProfile, FolderProfile, CustomIconCustomizer,
+            FolderIconCustomizer, SvgFolderIconCustomizer,
+        };
 
         fn assert_keeps_exactly(caps: IconCapabilities, exported: &CustomizationProfile) {
             for layer in LayerKind::ALL {
@@ -307,12 +310,12 @@ mod tests {
             }
         }
 
-        let profile = full_profile();
+        let wire = full_profile();
         let surface = SurfaceColor::new(255, 217, 112);
 
         let mut folder =
             FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
-        folder.apply_profile(&profile);
+        folder.apply_profile(&FolderProfile::from(&wire));
         assert_keeps_exactly(
             FolderIconCustomizer::capabilities(),
             &folder.export_profile(),
@@ -322,14 +325,14 @@ mod tests {
             r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
             surface,
         ));
-        svg.apply_profile(&profile);
+        svg.apply_profile(&FolderProfile::from(&wire));
         assert_keeps_exactly(
             SvgFolderIconCustomizer::capabilities(),
             &svg.export_profile(),
         );
 
         let mut custom = CustomIconCustomizer::from_icon_set(IconSet::new());
-        custom.apply_profile(&profile);
+        custom.apply_profile(&CustomProfile::from(&wire));
         assert_keeps_exactly(
             CustomIconCustomizer::capabilities(),
             &custom.export_profile(),

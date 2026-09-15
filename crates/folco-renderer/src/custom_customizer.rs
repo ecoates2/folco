@@ -15,7 +15,7 @@ use crate::layer::{
     CacheKey, ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource, Layer,
     RenderContext,
 };
-use crate::profile::CustomizationProfile;
+use crate::{CustomProfile, CustomizationProfile};
 
 // ============================================================================
 // CustomLayers
@@ -82,7 +82,7 @@ impl LayerSet for CustomLayers {
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
 /// let mut customizer = CustomIconCustomizer::from_image(&source, &specs).unwrap();
 ///
-/// customizer.layers.overlay.set(Some(
+/// customizer.layers.overlay.set_config(Some(
 ///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
 /// ));
 ///
@@ -112,15 +112,12 @@ impl CustomIconCustomizer {
         IconCustomizer::new(IconBase::Custom(icons), CustomLayers::default())
     }
 
-    /// Applies a [`CustomizationProfile`]'s settings to the layers.
+    /// Applies a [`CustomProfile`]'s settings to the layers.
     ///
-    /// The profile is authoritative: layers it omits are cleared and disabled.
-    /// Intents this base can't realize are dropped — see
-    /// [`capabilities`](Self::capabilities).
-    pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
-        let profile = Self::capabilities().filter(profile);
-        self.layers.color_dot.set(profile.color_dot);
-        self.layers.overlay.set(profile.overlay);
+    /// The profile is authoritative: layers it omits are cleared.
+    pub fn apply_profile(&mut self, profile: &CustomProfile) {
+        self.layers.color_dot.set_config(profile.color_dot);
+        self.layers.overlay.set_config(profile.overlay.clone());
     }
 
     /// What this customizer operates on.
@@ -161,7 +158,7 @@ mod tests {
 
     #[test]
     fn apply_profile_keeps_draw_on_top_intents() {
-        let profile = CustomizationProfile::new()
+        let profile = CustomProfile::new()
             .with_color_dot(ColorDotConfig::new(1, 2, 3))
             .with_overlay(ImageOverlayConfig::from_svg(
                 "<svg></svg>",
@@ -185,14 +182,16 @@ mod tests {
 
     #[test]
     fn apply_profile_drops_surface_relative_intents() {
-        let profile = CustomizationProfile::new()
+        // CustomProfile has no solid_color or decal fields — this test verifies
+        // that even if we convert a CustomizationProfile carrying them, they're dropped.
+        let wire = CustomizationProfile::new()
             .with_solid_color(SolidColorConfig::new(76, 175, 80))
             .with_decal(DecalConfig::new("<svg></svg>", 0.5));
+        let profile: CustomProfile = (&wire).into();
 
         let mut c = customizer();
         c.apply_profile(&profile);
 
-        // Custom images have no surface color, so these have nowhere to land.
         let exported = c.export_profile();
         assert!(exported.solid_color.is_none());
         assert!(exported.decal.is_none());
@@ -203,10 +202,10 @@ mod tests {
         let mut c = customizer();
         c.layers
             .color_dot
-            .set(Some(ColorDotConfig::new(9, 8, 7)));
+            .set_config(Some(ColorDotConfig::new(9, 8, 7)));
         c.layers
             .overlay
-            .set(Some(ImageOverlayConfig::from_svg(
+            .set_config(Some(ImageOverlayConfig::from_svg(
                 "<svg>badge</svg>",
                 OverlayPosition::BottomRight,
                 OverlayAnchorMode::Inset,
@@ -214,7 +213,7 @@ mod tests {
             )));
 
         let json = c.export_profile().to_json().unwrap();
-        let restored = CustomizationProfile::from_json(&json).unwrap();
+        let restored = CustomProfile::from_json(&json).unwrap();
 
         let mut other = customizer();
         other.apply_profile(&restored);

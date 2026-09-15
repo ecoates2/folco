@@ -11,8 +11,9 @@ use crate::progress::{Progress, ProgressSender};
 
 use folco_renderer::ImageSource;
 use folco_renderer::{
-    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer, IconBaseKind,
-    LayerKind, SurfaceColor, SvgFolderIconBase, SvgFolderIconCustomizer,
+    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
+    FolderProfile, IconBaseKind, LayerKind, SurfaceColor, SvgFolderIconBase,
+    SvgFolderIconCustomizer,
 };
 use icon_sys::IconSet as SysIconSet;
 use icon_sys::folder_settings::{FolderSettingsProvider, PlatformFolderSettingsProvider};
@@ -216,10 +217,14 @@ impl FolderStrategy {
     }
 
     /// Applies a customization profile to the underlying customizer.
+    ///
+    /// Converts the wire-format [`CustomizationProfile`] into a
+    /// [`FolderProfile`] so the customizer receives the workflow-specific type.
     fn apply_profile(&mut self, profile: &CustomizationProfile) {
+        let folder: FolderProfile = profile.into();
         match self {
-            FolderStrategy::Raster(c) => c.apply_profile(profile),
-            FolderStrategy::Svg(c) => c.apply_profile(profile),
+            FolderStrategy::Raster(c) => c.apply_profile(&folder),
+            FolderStrategy::Svg(c) => c.apply_profile(&folder),
         }
     }
 

@@ -47,14 +47,6 @@ impl<C: LayerConfig> SvgLayer<C> {
         self.config.is_some()
     }
 
-    /// Returns true if the layer has a configuration set.
-    ///
-    /// Alias for [`is_active`](Self::is_active) — kept for readability
-    /// in contexts where "configured" is the natural term.
-    pub fn is_configured(&self) -> bool {
-        self.config.is_some()
-    }
-
     /// Returns the current version number.
     pub fn version(&self) -> u64 {
         self.version
@@ -64,7 +56,7 @@ impl<C: LayerConfig> SvgLayer<C> {
     ///
     /// Setting to `Some(config)` activates the layer; setting to `None`
     /// deactivates it. Increments the version when the config differs.
-    pub fn set(&mut self, config: Option<C>) -> bool {
+    pub fn set_config(&mut self, config: Option<C>) -> bool {
         let differs = match (&self.config, &config) {
             (None, None) => false,
             (Some(_), None) | (None, Some(_)) => true,
@@ -86,7 +78,7 @@ impl<C: LayerConfig> SvgLayer<C> {
     /// determine what renders. The layer is active when a config is given,
     /// inactive when `None` is given.
     pub fn apply(&mut self, config: Option<C>) {
-        self.set(config);
+        self.set_config(config);
     }
 
     /// Bumps the version (e.g. when an upstream dependency changes).

@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
-    CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageOverlayConfig,
-    ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
+    CustomizationContextBuilder, CustomProfile, CustomizationProfile, DecalConfig,
+    ImageOverlayConfig, ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -503,7 +503,8 @@ async fn customize_custom_icon(
         .create_custom_icon_customizer(&image_source)
         .context("Failed to create custom icon customizer")?;
 
-    customizer.apply_profile(&profile);
+    let custom: CustomProfile = (&profile).into();
+    customizer.apply_profile(&custom);
 
     let (tx, mut rx) = progress_channel(32);
 

@@ -41,14 +41,14 @@ mod tests {
     #[test]
     fn inactive_layer_renders_nothing() {
         let mut layer: SvgLayer<ColorDotConfig> = SvgLayer::default();
-        layer.set(None);
+        layer.set_config(None);
         assert!(layer.render_fragment().is_none());
     }
 
     #[test]
     fn active_layer_renders_circle_with_color() {
         let mut layer: SvgLayer<ColorDotConfig> = SvgLayer::default();
-        layer.set(Some(ColorDotConfig::new(33, 150, 243)));
+        layer.set_config(Some(ColorDotConfig::new(33, 150, 243)));
         let fragment = layer.render_fragment().unwrap();
 
         assert!(fragment.contains("<circle"));
@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn fragment_is_inset_from_the_bottom_right_corner() {
         let mut layer: SvgLayer<ColorDotConfig> = SvgLayer::default();
-        layer.set(Some(ColorDotConfig::new(0, 0, 0)));
+        layer.set_config(Some(ColorDotConfig::new(0, 0, 0)));
         let fragment = layer.render_fragment().unwrap();
 
         assert!(fragment.contains("x=\"55%\""));

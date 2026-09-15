@@ -37,10 +37,11 @@ use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use folco_renderer::{
-    ColorDotConfig, CustomIconCustomizer, CustomizationProfile, DecalConfig, FolderIconBase,
-    FolderIconCustomizer, IconBaseKind, IconCapabilities, IconImage, IconSet, IconSizeSpec,
-    ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode, OverlayPosition, RectPx,
-    SolidColorConfig, SurfaceColor, SvgFolderIconBase, SvgFolderIconCustomizer,
+    ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
+    FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconCapabilities,
+    IconImage, IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections,
+    OverlayAnchorMode, OverlayPosition, RectPx, SolidColorConfig, SurfaceColor,
+    SvgFolderIconBase, SvgFolderIconCustomizer,
 };
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
@@ -149,9 +150,9 @@ impl CanvasRenderer {
 
     fn set_overlay_config(&mut self, config: Option<ImageOverlayConfig>) {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => { c.layers.overlay.set(config); }
-            ActiveCustomizer::SvgFolder(c) => { c.layers.overlay.set(config); }
-            ActiveCustomizer::Custom(c) => { c.layers.overlay.set(config); }
+            ActiveCustomizer::Folder(c) => { c.layers.overlay.set_config(config); }
+            ActiveCustomizer::SvgFolder(c) => { c.layers.overlay.set_config(config); }
+            ActiveCustomizer::Custom(c) => { c.layers.overlay.set_config(config); }
         }
     }
 
@@ -396,7 +397,7 @@ impl CanvasRenderer {
         if let ActiveCustomizer::Folder(c) = &mut self.active {
             c.layers
                 .solid_color
-                .set(Some(SolidColorConfig::new(target_r, target_g, target_b)));
+                .set_config(Some(SolidColorConfig::new(target_r, target_g, target_b)));
         }
     }
 
@@ -404,7 +405,7 @@ impl CanvasRenderer {
     #[wasm_bindgen(js_name = "clearSolidColor")]
     pub fn clear_solid_color(&mut self) {
         if let ActiveCustomizer::Folder(c) = &mut self.active {
-            c.layers.solid_color.set(None);
+            c.layers.solid_color.set_config(None);
         }
     }
 
@@ -421,9 +422,9 @@ impl CanvasRenderer {
     pub fn set_color_dot(&mut self, r: u8, g: u8, b: u8) {
         let config = Some(ColorDotConfig::new(r, g, b));
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set(config); }
-            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set(config); }
-            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set(config); }
+            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set_config(config); }
+            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set_config(config); }
+            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set_config(config); }
         }
     }
 
@@ -431,9 +432,9 @@ impl CanvasRenderer {
     #[wasm_bindgen(js_name = "clearColorDot")]
     pub fn clear_color_dot(&mut self) {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set(None); }
-            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set(None); }
-            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set(None); }
+            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set_config(None); }
+            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set_config(None); }
+            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set_config(None); }
         }
     }
 
@@ -454,7 +455,7 @@ impl CanvasRenderer {
             Some(svg) if !svg.is_empty() => Some(DecalConfig::new(svg, scale)),
             _ => None,
         };
-        c.layers.decal.set(config);
+        c.layers.decal.set_config(config);
     }
 
     /// Sets the overlay configuration.
@@ -599,12 +600,21 @@ impl CanvasRenderer {
     /// saved from one icon still applies to another.
     #[wasm_bindgen(js_name = "importProfileJson")]
     pub fn import_profile_json(&mut self, json: &str) -> Result<(), JsError> {
-        let profile = CustomizationProfile::from_json(json)
+        let wire = CustomizationProfile::from_json(json)
             .map_err(|e| JsError::new(&format!("Failed to parse profile: {}", e)))?;
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.apply_profile(&profile),
-            ActiveCustomizer::SvgFolder(c) => c.apply_profile(&profile),
-            ActiveCustomizer::Custom(c) => c.apply_profile(&profile),
+            ActiveCustomizer::Folder(c) => {
+                let folder: FolderProfile = (&wire).into();
+                c.apply_profile(&folder);
+            }
+            ActiveCustomizer::SvgFolder(c) => {
+                let folder: FolderProfile = (&wire).into();
+                c.apply_profile(&folder);
+            }
+            ActiveCustomizer::Custom(c) => {
+                let custom: CustomProfile = (&wire).into();
+                c.apply_profile(&custom);
+            }
         }
         Ok(())
     }
@@ -613,18 +623,18 @@ impl CanvasRenderer {
     pub fn reset(&mut self) {
         match &mut self.active {
             ActiveCustomizer::Folder(c) => {
-                c.layers.solid_color.set(None);
-                c.layers.color_dot.set(None);
-                c.layers.decal.set(None);
-                c.layers.overlay.set(None);
+                c.layers.solid_color.set_config(None);
+                c.layers.color_dot.set_config(None);
+                c.layers.decal.set_config(None);
+                c.layers.overlay.set_config(None);
             }
             ActiveCustomizer::SvgFolder(c) => {
-                c.layers.color_dot.set(None);
-                c.layers.overlay.set(None);
+                c.layers.color_dot.set_config(None);
+                c.layers.overlay.set_config(None);
             }
             ActiveCustomizer::Custom(c) => {
-                c.layers.color_dot.set(None);
-                c.layers.overlay.set(None);
+                c.layers.color_dot.set_config(None);
+                c.layers.overlay.set_config(None);
             }
         }
     }

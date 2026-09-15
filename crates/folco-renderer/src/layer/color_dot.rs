@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn active_layer_draws_into_bottom_right() {
         let mut layer: Layer<ColorDotConfig> = Layer::default();
-        layer.set(Some(ColorDotConfig::new(33, 150, 243)));
+        layer.set_config(Some(ColorDotConfig::new(33, 150, 243)));
 
         let ctx = context(64);
         let key = CacheKey::from_icon(&ctx.image);

@@ -60,8 +60,8 @@ pub trait LayerSet {
 /// let base = FolderIconBase::new(IconSet::new(), surface);
 /// let mut customizer = FolderIconCustomizer::from_folder(base);
 ///
-/// customizer.layers.solid_color.set(Some(SolidColorConfig::new(33, 150, 243)));
-/// customizer.layers.decal.set(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
+/// customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
+/// customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 ///
 /// let output = customizer.render_all();
 /// ```
@@ -75,7 +75,7 @@ pub trait LayerSet {
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
 /// let mut customizer = CustomIconCustomizer::from_image(&source, &specs).unwrap();
 ///
-/// customizer.layers.overlay.set(Some(
+/// customizer.layers.overlay.set_config(Some(
 ///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
 /// ));
 ///

@@ -21,8 +21,9 @@
 use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor, SvgFolderIconBase};
+use crate::{FolderProfile, ImageSource};
 use crate::layer::{
-    CacheKey, ColorDotConfig, CompositeLayer, DependencyVersion, ImageOverlayConfig, ImageSource,
+    CacheKey, ColorDotConfig, CompositeLayer, DependencyVersion, ImageOverlayConfig,
 };
 use crate::medium::SvgCanvas;
 use crate::profile::CustomizationProfile;
@@ -181,15 +182,14 @@ impl SvgFolderIconCustomizer {
         Ok(image)
     }
 
-    /// Applies a [`CustomizationProfile`]'s settings to the SVG layers.
+    /// Applies a [`FolderProfile`]'s settings to the SVG layers.
     ///
-    /// The profile is authoritative: layers it omits are cleared and disabled.
-    /// Intents this base can't realize are dropped — see
-    /// [`capabilities`](Self::capabilities).
-    pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
-        let profile = Self::capabilities().filter(profile);
-        self.layers.color_dot.set(profile.color_dot);
-        self.layers.overlay.set(profile.overlay);
+    /// The profile is authoritative: layers it omits are cleared.
+    /// Only `color_dot` and `overlay` are used — `solid_color` and `decal`
+    /// are ignored because an arbitrary SVG has no surface color to shift.
+    pub fn apply_profile(&mut self, profile: &FolderProfile) {
+        self.layers.color_dot.set_config(profile.color_dot);
+        self.layers.overlay.set_config(profile.overlay.clone());
     }
 
     /// What this customizer operates on.
@@ -268,7 +268,7 @@ mod tests {
         customizer
             .layers
             .color_dot
-            .set(Some(ColorDotConfig::new(0, 0, 255)));
+            .set_config(Some(ColorDotConfig::new(0, 0, 255)));
         let after = customizer.render_preview(32).unwrap();
 
         assert_ne!(
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn apply_profile_adds_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let profile = CustomizationProfile::new().with_color_dot(ColorDotConfig::new(33, 150, 243));
+        let profile = FolderProfile::new().with_color_dot(ColorDotConfig::new(33, 150, 243));
         customizer.apply_profile(&profile);
 
         let svg = customizer.render_output().unwrap();
@@ -321,9 +321,9 @@ mod tests {
     #[test]
     fn solid_color_intent_is_ignored_by_the_vector_medium() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        customizer.apply_profile(
-            &CustomizationProfile::new().with_solid_color(SolidColorConfig::new(33, 150, 243)),
-        );
+        // FolderProfile carries solid_color but the SVG customizer ignores it.
+        let profile = FolderProfile::new().with_solid_color(SolidColorConfig::new(33, 150, 243));
+        customizer.apply_profile(&profile);
 
         assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
         assert!(customizer.export_profile().solid_color.is_none());
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn profile_round_trips_through_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let profile = CustomizationProfile::new().with_color_dot(ColorDotConfig::new(10, 20, 30));
+        let profile = FolderProfile::new().with_color_dot(ColorDotConfig::new(10, 20, 30));
         customizer.apply_profile(&profile);
 
         let exported = customizer.export_profile();
@@ -343,9 +343,9 @@ mod tests {
     fn empty_profile_clears_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         customizer.apply_profile(
-            &CustomizationProfile::new().with_color_dot(ColorDotConfig::new(1, 2, 3)),
+            &FolderProfile::new().with_color_dot(ColorDotConfig::new(1, 2, 3)),
         );
-        customizer.apply_profile(&CustomizationProfile::new());
+        customizer.apply_profile(&FolderProfile::new());
 
         assert!(customizer.export_profile().color_dot.is_none());
         assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
@@ -361,7 +361,7 @@ mod tests {
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
         customizer.apply_profile(
-            &CustomizationProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
+            &FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
         );
         let svg = customizer.render_output().unwrap();
 
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn apply_profile_adds_overlay_image() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let profile = CustomizationProfile::new().with_overlay(ImageOverlayConfig::from_svg(
+        let profile = FolderProfile::new().with_overlay(ImageOverlayConfig::from_svg(
             "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
             OverlayPosition::BottomRight,
             OverlayAnchorMode::Inset,
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn overlay_round_trips_through_profile() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let profile = CustomizationProfile::new().with_overlay(ImageOverlayConfig::from_svg(
+        let profile = FolderProfile::new().with_overlay(ImageOverlayConfig::from_svg(
             "<svg/>",
             OverlayPosition::TopLeft,
             OverlayAnchorMode::Centered,
@@ -421,7 +421,7 @@ mod tests {
 
         let blue = RgbaImage::from_pixel(8, 8, Rgba([0, 0, 255, 255]));
         let source = ImageSource::from_rgba_image(&blue).unwrap();
-        customizer.apply_profile(&CustomizationProfile::new().with_overlay(
+        customizer.apply_profile(&FolderProfile::new().with_overlay(
             ImageOverlayConfig::new(
                 source,
                 OverlayPosition::BottomRight,
@@ -457,7 +457,7 @@ mod tests {
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
         customizer.apply_profile(
-            &CustomizationProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
+            &FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
         );
 
         let preview = customizer.render_preview(64).unwrap();
