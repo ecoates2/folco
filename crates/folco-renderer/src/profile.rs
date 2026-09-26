@@ -368,8 +368,7 @@ mod tests {
         use crate::FolderIconCustomizer;
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
-        let profile =
-            FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
+        let profile = FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
         // No decal in profile → decal layer should be unconfigured
 
         let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
@@ -461,8 +460,7 @@ mod tests {
         use crate::FolderIconCustomizer;
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor};
 
-        let profile =
-            FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
+        let profile = FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80));
 
         let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(
             IconSet::new(),

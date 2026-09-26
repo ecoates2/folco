@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 /// system folder icon to the desired color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 #[serde(rename_all = "kebab-case")]
 pub enum FolderColor {
     Red,
@@ -175,7 +174,6 @@ impl FolderColor {
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 #[serde(rename_all = "camelCase")]
 pub struct FolderColorMetadata {
     /// Machine-readable color identifier (kebab-case).

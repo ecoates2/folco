@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
-    CustomizationContextBuilder, CustomProfile, CustomizationProfile, DecalConfig,
+    CustomProfile, CustomizationContextBuilder, CustomizationProfile, DecalConfig,
     ImageOverlayConfig, ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},

@@ -25,7 +25,6 @@ use serde::{Deserialize, Serialize};
 /// that indicate where the actual icon content exists (excluding padding/margins).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RectPx {
     /// X offset from the left edge of the image
     pub x: u32,
@@ -107,7 +106,6 @@ impl SizePx {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct IconSizeSpec {
     /// Target pixel width.
     pub width: u32,
@@ -158,7 +156,6 @@ impl IconSizeSpec {
 /// for the golden-yellow Windows folder icon).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SurfaceColor {
     /// Red channel (0–255).
     pub r: u8,

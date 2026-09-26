@@ -21,13 +21,13 @@
 use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor, SvgFolderIconBase};
-use crate::{FolderProfile, ImageSource};
 use crate::layer::{
     CacheKey, ColorDotConfig, CompositeLayer, DependencyVersion, ImageOverlayConfig,
 };
 use crate::medium::SvgCanvas;
 use crate::profile::CustomizationProfile;
 use crate::svg_layer::SvgLayer;
+use crate::{FolderProfile, ImageSource};
 
 // ============================================================================
 // SvgLayerSet
@@ -342,9 +342,8 @@ mod tests {
     #[test]
     fn empty_profile_clears_color_dot() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        customizer.apply_profile(
-            &FolderProfile::new().with_color_dot(ColorDotConfig::new(1, 2, 3)),
-        );
+        customizer
+            .apply_profile(&FolderProfile::new().with_color_dot(ColorDotConfig::new(1, 2, 3)));
         customizer.apply_profile(&FolderProfile::new());
 
         assert!(customizer.export_profile().color_dot.is_none());
@@ -360,9 +359,8 @@ mod tests {
             SurfaceColor::new(255, 217, 112),
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
-        customizer.apply_profile(
-            &FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
-        );
+        customizer
+            .apply_profile(&FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)));
         let svg = customizer.render_output().unwrap();
 
         let img = ImageSource::svg(&svg).render_at_size(64).unwrap();
@@ -421,14 +419,12 @@ mod tests {
 
         let blue = RgbaImage::from_pixel(8, 8, Rgba([0, 0, 255, 255]));
         let source = ImageSource::from_rgba_image(&blue).unwrap();
-        customizer.apply_profile(&FolderProfile::new().with_overlay(
-            ImageOverlayConfig::new(
-                source,
-                OverlayPosition::BottomRight,
-                OverlayAnchorMode::Inset,
-                0.25,
-            ),
-        ));
+        customizer.apply_profile(&FolderProfile::new().with_overlay(ImageOverlayConfig::new(
+            source,
+            OverlayPosition::BottomRight,
+            OverlayAnchorMode::Inset,
+            0.25,
+        )));
         let svg = customizer.render_output().unwrap();
 
         let img = ImageSource::svg(&svg).render_at_size(64).unwrap();
@@ -456,9 +452,8 @@ mod tests {
             SurfaceColor::new(255, 217, 112),
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
-        customizer.apply_profile(
-            &FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)),
-        );
+        customizer
+            .apply_profile(&FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)));
 
         let preview = customizer.render_preview(64).unwrap();
         let px = preview.data.get_pixel(48, 48).0;

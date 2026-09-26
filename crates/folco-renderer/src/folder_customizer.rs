@@ -39,7 +39,7 @@ use crate::layer::{
     CacheKey, ColorDotConfig, DecalConfig, DependencyVersion, ImageOverlayConfig, Layer,
     RenderContext, SolidColorConfig,
 };
-use crate::{FolderProfile, CustomizationProfile};
+use crate::{CustomizationProfile, FolderProfile};
 
 // ============================================================================
 // FolderLayers
@@ -445,7 +445,10 @@ mod tests {
         assert_eq!(disabled.data.get_pixel(0, 0).0, [255, 0, 0, 255]); // Original red
 
         // Re-activate
-        customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(0, 188, 212)));
+        customizer
+            .layers
+            .solid_color
+            .set_config(Some(SolidColorConfig::new(0, 188, 212)));
         let re_enabled = customizer.render(16).unwrap();
         assert_eq!(re_enabled.data.get_pixel(0, 0).0, rotated_pixel);
     }

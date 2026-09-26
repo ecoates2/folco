@@ -32,16 +32,18 @@
 //! const profileJson = renderer.export_profile_json();
 //! ```
 
+use tsify::Ts;
+use tsify::Tsify;
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
-    FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconCapabilities,
-    IconImage, IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections,
-    OverlayAnchorMode, OverlayPosition, RectPx, SolidColorConfig, SurfaceColor,
-    SvgFolderIconBase, SvgFolderIconCustomizer,
+    FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconCapabilities, IconImage,
+    IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode,
+    OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgFolderIconBase,
+    SvgFolderIconCustomizer,
 };
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
@@ -150,9 +152,15 @@ impl CanvasRenderer {
 
     fn set_overlay_config(&mut self, config: Option<ImageOverlayConfig>) {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => { c.layers.overlay.set_config(config); }
-            ActiveCustomizer::SvgFolder(c) => { c.layers.overlay.set_config(config); }
-            ActiveCustomizer::Custom(c) => { c.layers.overlay.set_config(config); }
+            ActiveCustomizer::Folder(c) => {
+                c.layers.overlay.set_config(config);
+            }
+            ActiveCustomizer::SvgFolder(c) => {
+                c.layers.overlay.set_config(config);
+            }
+            ActiveCustomizer::Custom(c) => {
+                c.layers.overlay.set_config(config);
+            }
         }
     }
 
@@ -273,9 +281,10 @@ impl CanvasRenderer {
     /// * `folder_icon_base` - A serializable icon base (PNG-encoded images + surface color)
     #[wasm_bindgen(js_name = "fromFolderIconBase")]
     pub fn from_folder_icon_base(
-        folder_icon_base: SerializableFolderIconBase,
+        folder_icon_base: Ts<SerializableFolderIconBase>,
     ) -> Result<CanvasRenderer, JsError> {
         let base = folder_icon_base
+            .to_rust()?
             .into_folder_icon_base()
             .map_err(|e| JsError::new(&format!("Failed to decode icon base: {e}")))?;
 
@@ -286,14 +295,17 @@ impl CanvasRenderer {
     ///
     /// Accepts the DTO the Tauri backend sends for vector folder icons.
     #[wasm_bindgen(js_name = "fromSvgFolderIconBase")]
-    pub fn from_svg_folder_icon_base(base: SerializableSvgFolderIconBase) -> CanvasRenderer {
+    pub fn from_svg_folder_icon_base(
+        base: Ts<SerializableSvgFolderIconBase>,
+    ) -> Result<CanvasRenderer, JsError> {
+        let base_rust = base.to_rust()?;
         let customizer = SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(
-            base.svg,
-            base.surface_color,
+            base_rust.svg,
+            base_rust.surface_color,
         ));
-        Self {
+        Ok(Self {
             active: ActiveCustomizer::SvgFolder(Box::new(customizer)),
-        }
+        })
     }
 
     /// Creates a renderer for a user-supplied raster image.
@@ -339,7 +351,7 @@ impl CanvasRenderer {
     /// control rather than let it silently do nothing.
     #[wasm_bindgen(js_name = "supportsDecal")]
     pub fn supports_decal(&self) -> bool {
-        self.capabilities().decal
+        self.base_kind().capabilities().decal
     }
 
     /// Returns `true` if the active customizer supports the solid color layer.
@@ -350,7 +362,7 @@ impl CanvasRenderer {
     /// Every other case offers the color dot instead.
     #[wasm_bindgen(js_name = "supportsSolidColor")]
     pub fn supports_solid_color(&self) -> bool {
-        self.capabilities().solid_color
+        self.base_kind().capabilities().solid_color
     }
 
     /// Which layers the resolved base can realize.
@@ -359,14 +371,14 @@ impl CanvasRenderer {
     /// one value, and it comes straight from the renderer's own rules rather
     /// than being reassembled on the JS side.
     #[wasm_bindgen(js_name = "capabilities")]
-    pub fn capabilities(&self) -> IconCapabilities {
-        self.base_kind().capabilities()
+    pub fn capabilities(&self) -> Result<Ts<IconCapabilities>, JsError> {
+        Ok(self.base_kind().capabilities().into_ts()?)
     }
 
     /// Why each unrealizable layer is unavailable, for explaining disabled controls.
     #[wasm_bindgen(js_name = "layerRejections")]
-    pub fn layer_rejections(&self) -> LayerRejections {
-        self.base_kind().rejections()
+    pub fn layer_rejections(&self) -> Result<Ts<LayerRejections>, JsError> {
+        Ok(self.base_kind().rejections().into_ts()?)
     }
 
     /// Returns `true` if the active customizer uses the vector pipeline.
@@ -422,9 +434,15 @@ impl CanvasRenderer {
     pub fn set_color_dot(&mut self, r: u8, g: u8, b: u8) {
         let config = Some(ColorDotConfig::new(r, g, b));
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set_config(config); }
-            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set_config(config); }
-            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set_config(config); }
+            ActiveCustomizer::Folder(c) => {
+                c.layers.color_dot.set_config(config);
+            }
+            ActiveCustomizer::SvgFolder(c) => {
+                c.layers.color_dot.set_config(config);
+            }
+            ActiveCustomizer::Custom(c) => {
+                c.layers.color_dot.set_config(config);
+            }
         }
     }
 
@@ -432,9 +450,15 @@ impl CanvasRenderer {
     #[wasm_bindgen(js_name = "clearColorDot")]
     pub fn clear_color_dot(&mut self) {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => { c.layers.color_dot.set_config(None); }
-            ActiveCustomizer::SvgFolder(c) => { c.layers.color_dot.set_config(None); }
-            ActiveCustomizer::Custom(c) => { c.layers.color_dot.set_config(None); }
+            ActiveCustomizer::Folder(c) => {
+                c.layers.color_dot.set_config(None);
+            }
+            ActiveCustomizer::SvgFolder(c) => {
+                c.layers.color_dot.set_config(None);
+            }
+            ActiveCustomizer::Custom(c) => {
+                c.layers.color_dot.set_config(None);
+            }
         }
     }
 

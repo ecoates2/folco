@@ -146,7 +146,6 @@ impl IconBaseKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 #[serde(rename_all = "camelCase")]
 pub struct LayerRejections {
     pub solid_color: Option<String>,
@@ -166,7 +165,6 @@ pub struct LayerRejections {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 #[serde(rename_all = "camelCase")]
 pub struct IconCapabilities {
     pub solid_color: bool,
@@ -300,8 +298,8 @@ mod tests {
     fn capabilities_match_what_customizers_keep() {
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor, SvgFolderIconBase};
         use crate::{
-            CustomProfile, CustomizationProfile, FolderProfile, CustomIconCustomizer,
-            FolderIconCustomizer, SvgFolderIconCustomizer,
+            CustomIconCustomizer, CustomProfile, CustomizationProfile, FolderIconCustomizer,
+            FolderProfile, SvgFolderIconCustomizer,
         };
 
         fn assert_keeps_exactly(caps: IconCapabilities, exported: &CustomizationProfile) {

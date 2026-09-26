@@ -25,7 +25,6 @@ use serde::{Deserialize, Serialize};
 /// PNG-encoded representation of an icon image for boundary transfer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SerializableIconImage {
     /// PNG-encoded image bytes.
     pub png_data: Vec<u8>,
@@ -43,7 +42,6 @@ pub struct SerializableIconImage {
 /// Serializable representation of a [`FolderIconBase`] for boundary transfer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SerializableFolderIconBase {
     /// PNG-encoded icon images at various sizes/scales.
     pub images: Vec<SerializableIconImage>,
@@ -58,7 +56,6 @@ pub struct SerializableFolderIconBase {
 /// they need.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SerializableSvgFolderIconBase {
     /// Raw SVG markup for the base folder icon.
     pub svg: String,
