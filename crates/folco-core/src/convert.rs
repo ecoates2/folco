@@ -14,6 +14,45 @@ use icon_sys::IconSet as SysIconSet;
 
 use crate::sys::get_folder_icon_content_bounds;
 
+/// The output of a folder icon customization, carrying either raster or vector results.
+///
+/// Raster output is a set of pixel-based icons (PNG); vector output is raw SVG markup.
+/// The [`RendererOutput::to_sys`] method converts whichever variant is present into a
+/// platform-compatible [`SysIconSet`].
+#[derive(Debug, Clone)]
+pub enum RendererOutput {
+    /// Raster icon set: pixel-based icons with metadata.
+    Raster(RendererIconSet),
+    /// Vector icon: raw SVG markup.
+    Vector(String),
+}
+
+impl RendererOutput {
+    /// Converts this output into a platform-compatible [`SysIconSet`].
+    ///
+    /// Raster output becomes a set of pixel-based icons; vector output becomes
+    /// an SVG-only set. This is the single conversion point for both customization
+    /// paths.
+    pub fn to_sys(&self) -> SysIconSet {
+        match self {
+            Self::Raster(set) => {
+                let images: Vec<icon_sys::IconImage> = set
+                    .iter()
+                    .map(|renderer_image| {
+                        let dynamic = image::DynamicImage::ImageRgba8(renderer_image.data.clone());
+                        icon_sys::IconImage { data: dynamic }
+                    })
+                    .collect();
+                SysIconSet { images, svg: None }
+            }
+            Self::Vector(svg) => SysIconSet {
+                images: Vec::new(),
+                svg: Some(svg.clone()),
+            },
+        }
+    }
+}
+
 /// Converts an `icon-sys` IconSet to a `folco-renderer` IconSet.
 ///
 /// This function is useful for:
@@ -69,18 +108,9 @@ pub fn convert_icon_set(sys_icon_set: &SysIconSet) -> RendererIconSet {
 ///
 /// An `icon-sys` IconSet suitable for use with `FolderSettingsProvider`.
 pub fn convert_icon_set_to_sys(renderer_icon_set: &RendererIconSet) -> SysIconSet {
-    let images: Vec<icon_sys::IconImage> = renderer_icon_set
-        .iter()
-        .map(|renderer_image| {
-            // Convert RgbaImage to DynamicImage
-            let dynamic = image::DynamicImage::ImageRgba8(renderer_image.data.clone());
-            icon_sys::IconImage { data: dynamic }
-        })
-        .collect();
-
-    // TODO: Support SVG for linux
-    SysIconSet { images, svg: None }
+    RendererOutput::Raster(renderer_icon_set.clone()).to_sys()
 }
+
 /// Builds an `icon-sys` [`SysIconSet`] carrying only a scalable SVG variant.
 ///
 /// Used by the SVG folder strategy: on platforms that provide vector folder
@@ -88,10 +118,7 @@ pub fn convert_icon_set_to_sys(renderer_icon_set: &RendererIconSet) -> SysIconSe
 /// settings provider writes the `.svg` directly, falling back to raster only
 /// when no SVG is present, so an SVG-only set is sufficient.
 pub fn convert_svg_to_sys(svg: &str) -> SysIconSet {
-    SysIconSet {
-        images: Vec::new(),
-        svg: Some(svg.to_string()),
-    }
+    RendererOutput::Vector(svg.to_string()).to_sys()
 }
 #[cfg(test)]
 mod tests {
@@ -132,6 +159,26 @@ mod tests {
         let img = &sys_set.images[0];
         assert_eq!(img.data.width(), 16);
         assert_eq!(img.data.height(), 16);
+    }
+
+    #[test]
+    fn test_renderer_output_to_sys_raster() {
+        let rgba = RgbaImage::from_pixel(16, 16, image::Rgba([0, 255, 0, 255]));
+        let renderer_img = RendererIconImage::new_full_content(rgba, 1.0);
+        let renderer_set = RendererIconSet::from_images(vec![renderer_img]);
+        let output = RendererOutput::Raster(renderer_set);
+
+        let sys_set = output.to_sys();
+        assert_eq!(sys_set.images.len(), 1);
+        assert!(sys_set.svg.is_none());
+    }
+
+    #[test]
+    fn test_renderer_output_to_sys_vector() {
+        let output = RendererOutput::Vector("<svg/>".to_string());
+        let sys_set = output.to_sys();
+        assert_eq!(sys_set.images.len(), 0);
+        assert_eq!(sys_set.svg.as_deref(), Some("<svg/>"));
     }
 
     #[test]

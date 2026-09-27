@@ -109,7 +109,7 @@ This is **correct in principle** (Mutex provides serialization), but it's a secu
 
 ---
 
-### 7. Public struct fields on `AppInfo` (Rust)
+### 7. Public struct fields on `AppInfo` (Rust) — **False positive, no fix needed**
 
 **File:** `crates/folco-core/src/context.rs:38-44`
 
@@ -121,9 +121,7 @@ pub struct AppInfo {
 }
 ```
 
-Public fields on a public struct makes it impossible to add validation or change field types without breaking API compatibility.
-
-**Fix:** Make fields private with getter methods, or at least document that this is a public API.
+This is a simple data-carrying struct with no validation, no invariants, and internal usage only. Public fields are idiomatic Rust here — adding getters would be boilerplate with no benefit. No change needed.
 
 ---
 
@@ -308,7 +306,7 @@ This clones the entire profile contents even though it's just filtering which fi
 | 4 | High | `unwrap()` in render_tile | folco-renderer/layer/*.rs | Low |
 | 5 | High | `expect()` for user-facing errors | folco-core/sys/windows.rs | Low |
 | 6 | Medium | `SendableContext` unsafe impl | gui/src-tauri/state.rs | Low |
-| 7 | Medium | Public struct fields | folco-core/context.rs | Low |
+| 7 | — | Public struct fields (false positive) | folco-core/context.rs | — |
 | 8 | Medium | Silent default in parse functions | folco-renderer-wasm/canvas.rs | Low |
 | 9 | Medium | Dead code `#platformSizes` | gui/renderer.svelte.ts | Low |
 | 10 | Medium | Spinner invisible bug | gui/icon-preview/IconPreview.svelte | Medium |

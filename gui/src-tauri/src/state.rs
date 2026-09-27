@@ -9,7 +9,18 @@ use folco_core::{CustomizationContext, CustomizationContextBuilder, FolderIconBa
 /// this is safe.
 struct SendableContext(CustomizationContext);
 
-// SAFETY: Access is always serialized through a Mutex.
+// SAFETY: `CustomizationContext` holds platform-specific handles (e.g., Windows COM pointers)
+/// that are not `Send`/`Sync`. This wrapper is safe because:
+///
+/// 1. **Send**: Tauri may send `AppState` across thread boundaries (e.g., from the main thread
+///    to a command handler). We guarantee mutual exclusion by requiring `Mutex::lock()` before
+///    any access, so no two threads ever touch the inner `CustomizationContext` concurrently.
+/// 2. **Sync**: `Mutex` itself is `Sync`, but the inner type's lack of `Sync` prevents the
+///    compiler from auto-deriving it. We manually implement `Sync` because all public access
+///    to the context goes through `AppState::with_ctx()`, which acquires the lock first.
+///    The invariant — "every access is serialized through the mutex" — is enforced by the
+///    module's API surface: `SendableContext` is `pub(crate)` with no public methods, and
+///    the only way to read it is via `with_ctx()` which borrows behind the lock.
 unsafe impl Send for SendableContext {}
 unsafe impl Sync for SendableContext {}
 
