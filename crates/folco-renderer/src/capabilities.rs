@@ -116,8 +116,10 @@ impl IconBaseKind {
                     "decals are tinted against a folder's surface color, which a custom image has none of"
                 }
             },
-            // Realizes everything, so `supports` already returned above.
-            Self::RasterFolder => unreachable!(),
+            // Realizes every layer, so `supports` already returned None above.
+            Self::RasterFolder => {
+                panic!("RasterFolder supports all layers — this branch is unreachable; if reached, a new IconBaseKind variant was added without updating rejection()")
+            }
         })
     }
 

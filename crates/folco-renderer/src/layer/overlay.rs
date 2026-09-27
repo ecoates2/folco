@@ -189,7 +189,7 @@ impl Layer<ImageOverlayConfig> {
             return Ok(Some(tile.clone()));
         }
 
-        let config = self.config().unwrap();
+        let config = self.config().expect("active layer always has a config");
         let tile = render_overlay(config, ctx)?;
 
         self.store(key, CachedOutput::Tile(tile.clone()), deps);
