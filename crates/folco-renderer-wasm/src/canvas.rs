@@ -32,6 +32,7 @@
 //! const profileJson = renderer.export_profile_json();
 //! ```
 
+use folco_renderer::Render;
 use tsify::Ts;
 use tsify::Tsify;
 use wasm_bindgen::Clamped;
@@ -166,9 +167,9 @@ impl CanvasRenderer {
 
     fn render_preview(&mut self, size: u32) -> Result<IconImage, JsError> {
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.render(size),
-            ActiveCustomizer::SvgFolder(c) => c.render_preview(size),
-            ActiveCustomizer::Custom(c) => c.render(size),
+            ActiveCustomizer::Folder(c) => c.render_raster_preview(size),
+            ActiveCustomizer::SvgFolder(c) => c.render_raster_preview(size),
+            ActiveCustomizer::Custom(c) => c.render_raster_preview(size),
         }
         .map_err(|e| JsError::new(&e.to_string()))
     }
@@ -597,8 +598,8 @@ impl CanvasRenderer {
         match &mut self.active {
             ActiveCustomizer::Folder(_) | ActiveCustomizer::Custom(_) => Ok(None),
             ActiveCustomizer::SvgFolder(c) => c
-                .render_output()
-                .map(Some)
+                .render_full_output()
+                .map(|svg_render_output| Some(svg_render_output.rendered_svg))
                 .map_err(|e| JsError::new(&e.to_string())),
         }
     }

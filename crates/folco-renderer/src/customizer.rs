@@ -7,6 +7,7 @@
 //! - [`FolderIconCustomizer`](crate::FolderIconCustomizer) = `IconCustomizer<FolderLayers>`
 //! - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<CustomLayers>`
 
+use crate::Render;
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconImage, IconSet, SurfaceColor};
 use crate::layer::{CacheKey, CompositeLayer, DependencyVersion, RenderContext};
@@ -130,7 +131,7 @@ impl<L: LayerSet> IconCustomizer<L> {
     ///
     /// Returns [`RenderError::NoBaseIcon`] if no base icon matches the size,
     /// or a render error if a layer fails.
-    pub fn render(&mut self, logical_size: u32) -> Result<IconImage, RenderError> {
+    fn render(&mut self, logical_size: u32) -> Result<IconImage, RenderError> {
         let base = self
             .base
             .icons()
@@ -147,7 +148,7 @@ impl<L: LayerSet> IconCustomizer<L> {
     /// # Errors
     ///
     /// Returns a render error if any layer fails.
-    pub fn render_all(&mut self) -> Result<IconSet, RenderError> {
+    fn render_all(&mut self) -> Result<IconSet, RenderError> {
         let base_images: Vec<_> = self.base.icons().iter().cloned().collect();
         let mut rendered = Vec::with_capacity(base_images.len());
         for base in &base_images {
@@ -184,5 +185,16 @@ impl<L: LayerSet> IconCustomizer<L> {
     pub fn clear_cache(&mut self) {
         self.layers.invalidate_all();
         self.composite.invalidate();
+    }
+}
+
+impl<L: LayerSet> Render for IconCustomizer<L> {
+    /// Rasterized icon images
+    type Output = IconSet;
+    fn render_full_output(&mut self) -> Result<Self::Output, RenderError> {
+        self.render_all()
+    }
+    fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
+        self.render(size)
     }
 }

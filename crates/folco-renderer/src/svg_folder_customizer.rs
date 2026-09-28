@@ -27,7 +27,7 @@ use crate::layer::{
 use crate::medium::SvgCanvas;
 use crate::profile::CustomizationProfile;
 use crate::svg_layer::SvgLayer;
-use crate::{FolderProfile, ImageSource};
+use crate::{FolderProfile, ImageSource, Render};
 
 // ============================================================================
 // SvgLayerSet
@@ -47,6 +47,10 @@ pub trait SvgLayerSet {
 
     /// Invalidate all layer caches.
     fn invalidate_all(&mut self);
+}
+
+pub struct SvgRenderOutput {
+    pub rendered_svg: String,
 }
 
 // ============================================================================
@@ -149,10 +153,12 @@ impl SvgFolderIconCustomizer {
     /// # Errors
     ///
     /// Returns a render error if a layer fails.
-    pub fn render_output(&mut self) -> Result<String, RenderError> {
+    fn render_output(&mut self) -> Result<SvgRenderOutput, RenderError> {
         let mut canvas = SvgCanvas::new(&self.base.svg);
         self.layers.execute(&mut canvas)?;
-        Ok(canvas.into_svg())
+        Ok(SvgRenderOutput {
+            rendered_svg: canvas.into_svg(),
+        })
     }
 
     /// Renders a rasterized preview at `size` px for on-screen display.
@@ -166,7 +172,7 @@ impl SvgFolderIconCustomizer {
     /// # Errors
     ///
     /// Returns a render error if a layer fails or the SVG cannot be rasterized.
-    pub fn render_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
+    fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
         let key = CacheKey::new(size, size, 1.0);
         let deps = self.layers.combined_version();
 
@@ -175,7 +181,7 @@ impl SvgFolderIconCustomizer {
         }
 
         let svg = self.render_output()?;
-        let rgba = ImageSource::svg(svg).render_at_size(size)?;
+        let rgba = ImageSource::svg(svg.rendered_svg).render_at_size(size)?;
         let image = IconImage::new_full_content(rgba, 1.0);
 
         self.preview.store(key, image.clone(), deps);
@@ -219,6 +225,16 @@ impl SvgFolderIconCustomizer {
     }
 }
 
+impl Render for SvgFolderIconCustomizer {
+    type Output = SvgRenderOutput;
+    fn render_full_output(&mut self) -> Result<Self::Output, RenderError> {
+        self.render_output()
+    }
+    fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
+        self.render_raster_preview(size)
+    }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -240,13 +256,13 @@ mod tests {
     #[test]
     fn passthrough_render_returns_base_unchanged() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
+        assert_eq!(customizer.render_output().unwrap().rendered_svg, BASE_SVG);
     }
 
     #[test]
     fn preview_is_cached_per_size() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        customizer.render_preview(32).unwrap();
+        customizer.render_raster_preview(32).unwrap();
 
         let key = CacheKey::new(32, 32, 1.0);
         let deps = customizer.layers.combined_version();
@@ -263,13 +279,13 @@ mod tests {
     #[test]
     fn preview_cache_invalidates_when_a_layer_changes() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let before = customizer.render_preview(32).unwrap();
+        let before = customizer.render_raster_preview(32).unwrap();
 
         customizer
             .layers
             .color_dot
             .set_config(Some(ColorDotConfig::new(0, 0, 255)));
-        let after = customizer.render_preview(32).unwrap();
+        let after = customizer.render_raster_preview(32).unwrap();
 
         assert_ne!(
             before.data.as_raw(),
@@ -281,7 +297,7 @@ mod tests {
     #[test]
     fn clear_cache_drops_rendered_previews() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        customizer.render_preview(32).unwrap();
+        customizer.render_raster_preview(32).unwrap();
         customizer.clear_cache();
 
         let key = CacheKey::new(32, 32, 1.0);
@@ -302,7 +318,7 @@ mod tests {
     fn clear_cache_does_not_panic() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         customizer.clear_cache();
-        assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
+        assert_eq!(customizer.render_output().unwrap().rendered_svg, BASE_SVG);
     }
 
     #[test]
@@ -311,7 +327,7 @@ mod tests {
         let profile = FolderProfile::new().with_color_dot(ColorDotConfig::new(33, 150, 243));
         customizer.apply_profile(&profile);
 
-        let svg = customizer.render_output().unwrap();
+        let svg = customizer.render_output().unwrap().rendered_svg;
         assert!(svg.contains("<circle"));
         assert!(svg.contains("#2196f3"));
         // The dot is injected before the base's closing tag.
@@ -325,7 +341,7 @@ mod tests {
         let profile = FolderProfile::new().with_solid_color(SolidColorConfig::new(33, 150, 243));
         customizer.apply_profile(&profile);
 
-        assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
+        assert_eq!(customizer.render_output().unwrap().rendered_svg, BASE_SVG);
         assert!(customizer.export_profile().solid_color.is_none());
     }
 
@@ -347,7 +363,7 @@ mod tests {
         customizer.apply_profile(&FolderProfile::new());
 
         assert!(customizer.export_profile().color_dot.is_none());
-        assert_eq!(customizer.render_output().unwrap(), BASE_SVG);
+        assert_eq!(customizer.render_output().unwrap().rendered_svg, BASE_SVG);
     }
 
     #[test]
@@ -363,7 +379,9 @@ mod tests {
             .apply_profile(&FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)));
         let svg = customizer.render_output().unwrap();
 
-        let img = ImageSource::svg(&svg).render_at_size(64).unwrap();
+        let img = ImageSource::svg(&svg.rendered_svg)
+            .render_at_size(64)
+            .unwrap();
         // Center of the dot sits at ~(48, 48) for a 64px render.
         let px = img.get_pixel(48, 48).0;
         assert!(px[0] > 150, "expected red-dominant dot, got {px:?}");
@@ -385,7 +403,7 @@ mod tests {
         ));
         customizer.apply_profile(&profile);
 
-        let svg = customizer.render_output().unwrap();
+        let svg = customizer.render_output().unwrap().rendered_svg;
         assert!(svg.contains("<image"));
         assert!(svg.contains("data:image/svg+xml;base64,"));
         assert!(svg.ends_with("</svg>"));
@@ -427,7 +445,9 @@ mod tests {
         )));
         let svg = customizer.render_output().unwrap();
 
-        let img = ImageSource::svg(&svg).render_at_size(64).unwrap();
+        let img = ImageSource::svg(&svg.rendered_svg)
+            .render_at_size(64)
+            .unwrap();
         // The overlay occupies the bottom-right 25%; sample its center ~(56, 56).
         let px = img.get_pixel(56, 56).0;
         assert!(px[2] > 150, "expected blue-dominant overlay, got {px:?}");
@@ -440,7 +460,7 @@ mod tests {
     #[test]
     fn render_preview_rasterizes_at_requested_size() {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        let preview = customizer.render_preview(64).unwrap();
+        let preview = customizer.render_raster_preview(64).unwrap();
         assert_eq!(preview.dimensions().width, 64);
         assert_eq!(preview.dimensions().height, 64);
     }
@@ -455,7 +475,7 @@ mod tests {
         customizer
             .apply_profile(&FolderProfile::new().with_color_dot(ColorDotConfig::new(255, 0, 0)));
 
-        let preview = customizer.render_preview(64).unwrap();
+        let preview = customizer.render_raster_preview(64).unwrap();
         let px = preview.data.get_pixel(48, 48).0;
         assert!(
             px[0] > 150,

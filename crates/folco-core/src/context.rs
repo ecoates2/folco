@@ -5,16 +5,16 @@
 //! icon cache.
 
 use crate::cache::{CacheConfig, IconCache};
-use crate::convert::{convert_icon_set, convert_icon_set_to_sys, convert_svg_to_sys};
+use crate::convert::{SystemFormat, convert_icon_set};
 use crate::error::{Error, Result};
 use crate::progress::{Progress, ProgressSender};
 
-use folco_renderer::ImageSource;
 use folco_renderer::{
     CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
     FolderProfile, IconBaseKind, LayerKind, SurfaceColor, SvgFolderIconBase,
     SvgFolderIconCustomizer,
 };
+use folco_renderer::{ImageSource, Render};
 use icon_sys::IconSet as SysIconSet;
 use icon_sys::folder_settings::{FolderSettingsProvider, PlatformFolderSettingsProvider};
 
@@ -264,12 +264,12 @@ impl FolderStrategy {
     fn render_output(&mut self) -> Result<SysIconSet> {
         match self {
             FolderStrategy::Raster(c) => {
-                let rendered = c.render_all()?;
-                Ok(convert_icon_set_to_sys(&rendered))
+                let rendered = c.render_full_output()?;
+                Ok(rendered.to_sys())
             }
             FolderStrategy::Svg(c) => {
-                let svg = c.render_output()?;
-                Ok(convert_svg_to_sys(&svg))
+                let svg = c.render_full_output()?;
+                Ok(svg.to_sys())
             }
         }
     }
@@ -751,13 +751,13 @@ impl CustomizationContext {
         customizer: &mut CustomIconCustomizer,
     ) -> Vec<Result<()>> {
         // Render the custom icons
-        let rendered = match customizer.render_all() {
+        let rendered = match customizer.render_full_output() {
             Ok(icons) => icons,
             Err(e) => return vec![Err(Error::Render(e))],
         };
 
         // Convert to system format
-        let sys_icons = convert_icon_set_to_sys(&rendered);
+        let sys_icons = rendered.to_sys();
 
         // Apply to each folder
         folders
@@ -816,7 +816,7 @@ impl CustomizationContext {
 
         // Render the custom icons
         let _ = progress.send(Progress::Rendering).await;
-        let rendered = match customizer.render_all() {
+        let rendered = match customizer.render_full_output() {
             Ok(icons) => icons,
             Err(e) => {
                 let _ = progress
@@ -835,7 +835,7 @@ impl CustomizationContext {
         };
 
         // Convert to system format
-        let sys_icons = convert_icon_set_to_sys(&rendered);
+        let sys_icons = rendered.to_sys();
 
         let mut succeeded = 0usize;
         let mut failed = 0usize;

@@ -118,7 +118,9 @@ impl IconBaseKind {
             },
             // Realizes every layer, so `supports` already returned None above.
             Self::RasterFolder => {
-                panic!("RasterFolder supports all layers — this branch is unreachable; if reached, a new IconBaseKind variant was added without updating rejection()")
+                panic!(
+                    "RasterFolder supports all layers — this branch is unreachable; if reached, a new IconBaseKind variant was added without updating rejection()"
+                )
             }
         })
     }

@@ -196,6 +196,7 @@ impl FolderIconCustomizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Render;
     use crate::icon::{IconImage, IconSet, SurfaceColor};
     use crate::layer::decal::darken_color;
     use crate::layer::{Layer, OverlayAnchorMode, OverlayPosition};
@@ -264,7 +265,7 @@ mod tests {
         let base = create_test_icon_base();
         let mut customizer = FolderIconCustomizer::from_folder(base);
 
-        let rendered = customizer.render(16).unwrap();
+        let rendered = customizer.render_raster_preview(16).unwrap();
         assert_eq!(rendered.dimensions().width, 16);
 
         // Verify the image is unchanged
@@ -277,7 +278,7 @@ mod tests {
         let base = create_test_icon_base();
         let mut customizer = FolderIconCustomizer::from_folder(base);
 
-        let result = customizer.render_all().unwrap();
+        let result = customizer.render_full_output().unwrap();
         assert_eq!(result.len(), 2);
     }
 
@@ -291,7 +292,7 @@ mod tests {
             .set_config(Some(ColorDotConfig::new(0, 0, 255)));
 
         // The 32px base is solid green; only the dot area should turn blue.
-        let rendered = customizer.render(32).unwrap();
+        let rendered = customizer.render_raster_preview(32).unwrap();
         assert_eq!(rendered.data.get_pixel(0, 0).0, [0, 255, 0, 255]);
 
         // Dot center: 32 - margin(1) - size(12)/2 ≈ 25.
@@ -313,7 +314,7 @@ mod tests {
             .solid_color
             .set_config(Some(SolidColorConfig::new(0, 188, 212)));
 
-        let rendered = customizer.render(16).unwrap();
+        let rendered = customizer.render_raster_preview(16).unwrap();
         let pixel = rendered.data.get_pixel(0, 0);
 
         // Green channel should be dominant after rotation
@@ -337,14 +338,14 @@ mod tests {
             .layers
             .solid_color
             .set_config(Some(SolidColorConfig::new(76, 175, 80)));
-        let first = customizer.render(16).unwrap();
+        let first = customizer.render_raster_preview(16).unwrap();
 
         // Change color and render again
         customizer
             .layers
             .solid_color
             .set_config(Some(SolidColorConfig::new(33, 150, 243)));
-        let second = customizer.render(16).unwrap();
+        let second = customizer.render_raster_preview(16).unwrap();
 
         // Results should be different
         let p1 = first.data.get_pixel(0, 0);
@@ -366,8 +367,8 @@ mod tests {
             .set_config(Some(SolidColorConfig::new(76, 175, 80)));
 
         // Render twice with same config
-        let first = customizer.render(16).unwrap();
-        let second = customizer.render(16).unwrap();
+        let first = customizer.render_raster_preview(16).unwrap();
+        let second = customizer.render_raster_preview(16).unwrap();
 
         // Results should be identical (from cache)
         assert_eq!(first.data.get_pixel(0, 0), second.data.get_pixel(0, 0));
@@ -435,13 +436,13 @@ mod tests {
             .solid_color
             .set_config(Some(SolidColorConfig::new(0, 188, 212)));
         assert!(customizer.layers.solid_color.is_active());
-        let rotated = customizer.render(16).unwrap();
+        let rotated = customizer.render_raster_preview(16).unwrap();
         let rotated_pixel = rotated.data.get_pixel(0, 0).0;
 
         // Deactivate by clearing config
         customizer.layers.solid_color.set_config(None);
         assert!(!customizer.layers.solid_color.is_active());
-        let disabled = customizer.render(16).unwrap();
+        let disabled = customizer.render_raster_preview(16).unwrap();
         assert_eq!(disabled.data.get_pixel(0, 0).0, [255, 0, 0, 255]); // Original red
 
         // Re-activate
@@ -449,7 +450,7 @@ mod tests {
             .layers
             .solid_color
             .set_config(Some(SolidColorConfig::new(0, 188, 212)));
-        let re_enabled = customizer.render(16).unwrap();
+        let re_enabled = customizer.render_raster_preview(16).unwrap();
         assert_eq!(re_enabled.data.get_pixel(0, 0).0, rotated_pixel);
     }
 
@@ -692,12 +693,12 @@ mod tests {
             .set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
         // Render with color target enabled
-        let with_ct = customizer.render(16).unwrap();
+        let with_ct = customizer.render_raster_preview(16).unwrap();
         let ct_pixel = with_ct.data.get_pixel(0, 0).0;
 
         // Deactivate color target, keep decal
         customizer.layers.solid_color.set_config(None);
-        let without_ct = customizer.render(16).unwrap();
+        let without_ct = customizer.render_raster_preview(16).unwrap();
         let no_ct_pixel = without_ct.data.get_pixel(0, 0).0;
 
         // With color target: image should be shifted (more green than red)
@@ -715,7 +716,7 @@ mod tests {
 
         // Re-activate color target - should go back to shifted
         customizer.layers.solid_color.set_config(Some(ct_config));
-        let re_enabled = customizer.render(16).unwrap();
+        let re_enabled = customizer.render_raster_preview(16).unwrap();
         assert_eq!(
             re_enabled.data.get_pixel(0, 0).0,
             ct_pixel,
