@@ -49,20 +49,26 @@ use folco_renderer::{
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
 
-fn parse_overlay_position(position: &str) -> OverlayPosition {
+fn parse_overlay_position(position: &str) -> Result<OverlayPosition, JsError> {
     match position {
-        "top-left" => OverlayPosition::TopLeft,
-        "top-right" => OverlayPosition::TopRight,
-        "bottom-left" => OverlayPosition::BottomLeft,
-        "center" => OverlayPosition::Center,
-        _ => OverlayPosition::BottomRight,
+        "top-left" => Ok(OverlayPosition::TopLeft),
+        "top-right" => Ok(OverlayPosition::TopRight),
+        "bottom-left" => Ok(OverlayPosition::BottomLeft),
+        "center" => Ok(OverlayPosition::Center),
+        "bottom-right" => Ok(OverlayPosition::BottomRight),
+        _ => Err(JsError::new(&format!(
+            "Invalid overlay position: {position:?}. Expected one of: top-left, top-right, bottom-left, bottom-right, center"
+        ))),
     }
 }
 
-pub(crate) fn parse_overlay_anchor_mode(anchor_mode: &str) -> OverlayAnchorMode {
+pub(crate) fn parse_overlay_anchor_mode(anchor_mode: &str) -> Result<OverlayAnchorMode, JsError> {
     match anchor_mode {
-        "centered" => OverlayAnchorMode::Centered,
-        _ => OverlayAnchorMode::Inset,
+        "centered" => Ok(OverlayAnchorMode::Centered),
+        "inset" => Ok(OverlayAnchorMode::Inset),
+        _ => Err(JsError::new(&format!(
+            "Invalid overlay anchor mode: {anchor_mode:?}. Expected one of: inset, centered"
+        ))),
     }
 }
 
@@ -501,9 +507,9 @@ impl CanvasRenderer {
         position: &str,
         anchor_mode: &str,
         scale: f32,
-    ) {
-        let pos = parse_overlay_position(position);
-        let anchor_mode = parse_overlay_anchor_mode(anchor_mode);
+    ) -> Result<(), JsError> {
+        let pos = parse_overlay_position(position)?;
+        let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
 
         let config = match svg_data {
             Some(svg) if !svg.is_empty() => {
@@ -513,6 +519,7 @@ impl CanvasRenderer {
         };
 
         self.set_overlay_config(config);
+        Ok(())
     }
 
     /// Sets the overlay to an emoji character.
@@ -534,8 +541,8 @@ impl CanvasRenderer {
         anchor_mode: &str,
         scale: f32,
     ) -> Result<(), JsError> {
-        let pos = parse_overlay_position(position);
-        let anchor_mode = parse_overlay_anchor_mode(anchor_mode);
+        let pos = parse_overlay_position(position)?;
+        let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
         let config = ImageOverlayConfig::from_emoji(emoji, pos, anchor_mode, scale)
             .map_err(|e| JsError::new(&e.to_string()))?;
         self.set_overlay_config(Some(config));
