@@ -35,11 +35,43 @@ class ArtworkStore {
 	anchorMode = $state<AnchorMode>('inset');
 
 	// Kept per source so toggling one off and back on restores the pick.
-	#emoji = $state<Extract<Artwork, { kind: 'emoji' }> | null>(null);
+	// Emoji data is set once in selectEmoji and never mutated; skin is stored
+	// separately so tone changes are a single primitive write — no spread, no
+	// shared mutable references.
+	#emoji = $state<{ kind: 'emoji'; data: Emoji } | null>(null);
+	#skin = $state<number | null>(null);
 	#icon = $state<Extract<Artwork, { kind: 'icon' }> | null>(null);
 
+	/** Whether an emoji was selected. */
+	#isEmoji = $derived(this.kind === 'emoji' && this.#emoji !== null && this.#skin !== null);
+
+	/** Whether an icon was selected. */
+	#isIcon = $derived(this.kind === 'icon');
+
+	/** The currently selected emoji, or null. */
+	#activeEmoji = $derived(
+		this.#isEmoji
+			? { kind: 'emoji' as const, data: this.#emoji!.data, skin: this.#skin! }
+			: null
+	);
+
+	/** The currently selected icon, or null. */
+	#activeIcon = $derived(this.#isIcon ? this.#icon : null);
+
+	/** The native emoji character for the active skin tone. */
+	#activeEmojiNative = $derived(
+		this.#activeEmoji !== null
+			? this.#activeEmoji.data.skins[this.#activeEmoji.skin].native
+			: null
+	);
+
+	/** The active artwork, composed at read time so emoji is always up to date. */
 	readonly selection = $derived<Artwork | null>(
-		this.kind === 'emoji' ? this.#emoji : this.kind === 'icon' ? this.#icon : null
+		this.#isEmoji
+			? { kind: 'emoji', emoji: this.#activeEmojiNative!, data: this.#activeEmoji!.data, skin: this.#activeEmoji!.skin }
+			: this.#isIcon
+				? this.#activeIcon
+				: null
 	);
 
 	/**
@@ -61,21 +93,16 @@ class ArtworkStore {
 	}
 
 	selectEmoji(selected: SelectedEmoji) {
-		this.#emoji = {
-			kind: 'emoji',
-			emoji: selected.emoji,
-			data: selected.data,
-			skin: selected.skin
-		};
+		this.#emoji = { kind: 'emoji', data: selected.data };
+		this.#skin = selected.skin;
 		this.kind = 'emoji';
 		this.#push();
 	}
 
-	/** Re-emits the current emoji at a new skin tone. */
+	/** Switches to a new skin tone for the current emoji. */
 	setEmojiSkin(skin: EmojiPickerSkin) {
-		const current = this.#emoji;
-		if (!current || current.data.skins.length <= 1) return;
-		this.#emoji = { ...current, emoji: current.data.skins[skin].native, skin };
+		if (this.#emoji === null || this.#emoji.data.skins.length <= 1) return;
+		this.#skin = skin;
 		this.#push();
 	}
 
