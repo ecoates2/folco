@@ -137,6 +137,23 @@ impl IconBaseKind {
             overlay: self.rejection(LayerKind::Overlay).map(str::to_owned),
         }
     }
+
+    /// The layers `profile` carries that this base can't realize, in pipeline order.
+    ///
+    /// Each entry pairs the layer with a human-readable reason, so callers don't
+    /// need to look up the reason a second time. Empty means the profile applies
+    /// in full.
+    pub fn unsupported_in(
+        self,
+        profile: &CustomizationProfile,
+    ) -> Vec<(LayerKind, &'static str)> {
+        let caps = self.capabilities();
+        LayerKind::ALL
+            .into_iter()
+            .filter(|&layer| profile.carries(layer) && !caps.supports(layer))
+            .map(|layer| (layer, self.rejection(layer).unwrap()))
+            .collect()
+    }
 }
 
 // ============================================================================
@@ -188,9 +205,9 @@ impl IconCapabilities {
         }
     }
 
-    /// The layers `profile` carries that this base can't realize, in pipeline order.
+    /// Whether `profile` carries layers this base can't realize.
     ///
-    /// Empty means the profile applies in full.
+    /// For the full list with reasons, use [`IconBaseKind::unsupported_in`].
     pub fn unsupported_in(&self, profile: &CustomizationProfile) -> Vec<LayerKind> {
         LayerKind::ALL
             .into_iter()
@@ -241,29 +258,31 @@ mod tests {
     fn raster_folder_realizes_everything() {
         let caps = IconBaseKind::RasterFolder.capabilities();
         assert!(LayerKind::ALL.iter().all(|&l| caps.supports(l)));
-        assert!(caps.unsupported_in(&full_profile()).is_empty());
+        // Capabilities has no unsupported layers; IconBaseKind::unsupported_in also empty.
+        assert!(IconBaseKind::RasterFolder.unsupported_in(&full_profile()).is_empty());
     }
 
     #[test]
     fn surface_relative_layers_need_a_raster_folder() {
         for kind in [IconBaseKind::VectorFolder, IconBaseKind::CustomImage] {
-            assert_eq!(
-                kind.capabilities().unsupported_in(&full_profile()),
-                vec![LayerKind::SolidColor, LayerKind::Decal],
-                "{kind:?}"
-            );
+            let unsupported: Vec<LayerKind> = kind
+                .unsupported_in(&full_profile())
+                .into_iter()
+                .map(|(layer, _)| layer)
+                .collect();
+            assert_eq!(unsupported, vec![LayerKind::SolidColor, LayerKind::Decal], "{kind:?}");
         }
     }
 
     #[test]
     fn unsupported_only_reports_layers_the_profile_carries() {
         let profile = CustomizationProfile::new().with_decal(DecalConfig::new("<svg></svg>", 0.5));
-        assert_eq!(
-            IconBaseKind::VectorFolder
-                .capabilities()
-                .unsupported_in(&profile),
-            vec![LayerKind::Decal]
-        );
+        let unsupported: Vec<LayerKind> = IconBaseKind::VectorFolder
+            .unsupported_in(&profile)
+            .into_iter()
+            .map(|(layer, _)| layer)
+            .collect();
+        assert_eq!(unsupported, vec![LayerKind::Decal]);
     }
 
     #[test]

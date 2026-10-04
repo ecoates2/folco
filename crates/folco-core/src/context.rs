@@ -232,15 +232,9 @@ impl FolderStrategy {
     /// silently drop.
     fn unsupported_layers(&self, profile: &CustomizationProfile) -> Vec<UnsupportedLayer> {
         let kind = self.base_kind();
-        kind.capabilities()
-            .unsupported_in(profile)
+        kind.unsupported_in(profile)
             .into_iter()
-            .map(|layer| UnsupportedLayer {
-                layer,
-                reason: kind
-                    .rejection(layer)
-                    .expect("unsupported_in only yields layers the base rejects"),
-            })
+            .map(|(layer, reason)| UnsupportedLayer { layer, reason })
             .collect()
     }
 

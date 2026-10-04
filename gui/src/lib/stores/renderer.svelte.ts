@@ -32,6 +32,7 @@ const NO_REJECTIONS: LayerRejections = {
 };
 
 // SVG icons are resolution-independent, so the preview ladder is ours to pick.
+// TODO: Potentially get rid of this. Since SVG looks the same at any size
 const SVG_PREVIEW_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
 /** Logical (unscaled) sizes offered by the preview, deduped and ascending. */
