@@ -11,7 +11,9 @@ Covers `.clone()`, `.cloned()`, `.to_vec()`, `.to_string()` on already-owned dat
 
 ## Category 1: Avoidable, worth fixing
 
-### 1.1 Profile application clones each heap config twice
+### 1.1 Profile application clones each heap config twice — ✅ DONE
+
+> **Completed 2026-10-08.** All three `apply_profile` methods take their profile by value and move each config into `set_config`. Added `From<CustomizationProfile>` (by value) for `FolderProfile` and `CustomProfile`, and kept `From<&_>` for callers that need to hold on to the profile. `CustomizationContext::apply_profile`, `customize_folder`, `customize_folders` and `customize_folders_async` now take `CustomizationProfile` by value. The CLI and wasm `import_profile_json` move their owned profiles through, so neither path clones. `SolidColorConfig` now derives `Copy`. `set_config_ref` wasn't needed: no non-test caller is left with only a borrow.
 
 The two halves were listed separately in the previous version. They stack:
 
@@ -35,7 +37,9 @@ CustomizationProfile ──From<&_> (clone #1)──▶ FolderProfile / CustomPr
 - For callers that really only hold a borrow, add `set_config_ref(Option<&C>)` to `Layer` and `SvgLayer`. It compares first and clones only if the config differs.
 - `CustomizationContext::apply_profile` / `customize_folders(_async)` take `&CustomizationProfile`, but the CLI owns its profile. Either take it by value or accept one clone there (one instead of two).
 
-### 1.2 Base images cloned to get around the borrow checker (`customizer.rs:140`, `:152`)
+### 1.2 Base images cloned to get around the borrow checker (`customizer.rs:140`, `:152`) — ✅ DONE
+
+> **Completed 2026-10-08.** `render_icon` is now an associated fn taking `(&mut L, &mut CompositeLayer, Option<&SurfaceColor>, &IconImage)`. `render` and `render_all` destructure `self` and pass the base icons by reference, so the only base copy left is the required one into `RenderContext`.
 
 - `render()` clones the base `IconImage` (140), and `render_icon` then clones it again into the context (171). That's two full-image copies per preview frame, and one of them is wasted.
 - `render_all()` clones **every** base image (152), only so it can call a `&mut self` method while iterating `self.base`. **This was missing from the previous version.**
@@ -43,7 +47,9 @@ CustomizationProfile ──From<&_> (clone #1)──▶ FolderProfile / CustomPr
 - **Fix:** split borrows. Make `render_icon` an associated fn taking `(&mut L, &mut CompositeLayer, Option<&SurfaceColor>, &IconImage)`, then destructure `self` in `render` / `render_all`.
 - The clone at 171 stays: the context needs an owned image it can mutate. The earlier idea of `RenderContext::new(&IconImage)` would only move that clone inside the constructor.
 
-### 1.3 Tile layers clone on cache hit *and* on store (6 sites)
+### 1.3 Tile layers clone on cache hit *and* on store (6 sites) — ✅ DONE
+
+> **Completed 2026-10-08.** `render_tile` now returns `Option<&RgbaImage>` via the shared `Layer::cached_tile` helper (`layer/mod.rs`), so tiles are never cloned. Validity is checked first, then the tile is rendered and stored on a miss, then read back once to get around the borrowck issue below.
 
 `layer/color_dot.rs:112,118`, `layer/decal.rs:75,81` (previously listed as `:118`), `layer/overlay.rs:189,195`.
 
@@ -52,35 +58,47 @@ CustomizationProfile ──From<&_> (clone #1)──▶ FolderProfile / CustomPr
 - **Borrowck gotcha:** `if let Some(t) = self.get_cached(..) { return Ok(Some(t)); } self.store(..)` won't compile (NLL "problem case #3"). Check validity first (`bool`), render and store on a miss, then do a single `self.cache.get(&key)` at the end. The entry API works too.
 - The previous `Option::take()` / `store_or_clone` suggestion would empty the cache, so it doesn't work here.
 
-### 1.4 Solid color copies the image it's about to replace (`layer/solid_color.rs:121` → `:189`)
+### 1.4 Solid color copies the image it's about to replace (`layer/solid_color.rs:121` → `:189`) — ✅ DONE
+
+> **Completed 2026-10-08.** `apply_solid_color` now takes `&mut IconImage` and recolors `ctx.image` in place. `SurfaceColor` is copied out of the context first so the image can be borrowed mutably. The test at `folder_customizer.rs:515` is updated.
 
 - `ctx.image = apply_solid_color(&ctx.image, ..)` clones `icon.data` (189), recolors the copy, then overwrites `ctx.image`.
 - **Fix:** have `apply_solid_color` take `&mut IconImage` and recolor in place. That saves one full-image copy per cache miss. The test at `folder_customizer.rs:517` needs updating.
 
-### 1.5 `to_sys()` clones render output that's dropped right after (`folco-core/src/convert.rs:27`, `:39`)
+### 1.5 `to_sys()` clones render output that's dropped right after (`folco-core/src/convert.rs:27`, `:39`) — ✅ DONE
+
+> **Completed 2026-10-08.** `SystemFormat::to_sys(&self)` became `into_sys(self)`. The raster set moves each `RgbaImage` into `DynamicImage::ImageRgba8`, and the SVG output moves its `String`. All four callers in `context.rs` and the tests are updated. The trait is crate-private, so no public API changed.
 
 - `IconSet::to_sys(&self)` clones every rendered `RgbaImage`, and `SvgRenderOutput::to_sys(&self)` clones the SVG `String`.
 - Every caller passes a temporary or a local that's never used again: `context.rs:262`, `:266`, `:754`, `:832`.
 - **Fix:** consume it with `into_sys(self)`, using `DynamicImage::ImageRgba8(img.data)`.
 
-### 1.6 `folder_icon_base()` clones the whole base `IconSet` for a caller that only borrows it (`context.rs:275`)
+### 1.6 `folder_icon_base()` clones the whole base `IconSet` for a caller that only borrows it (`context.rs:275`) — ✅ DONE
+
+> **Completed 2026-10-08.** `CustomizationContext::folder_icon_base()` now returns `Option<&FolderIconBase>`, borrowed straight from `IconBase::Folder`. In the GUI, `AppState::get_folder_icon_base` builds the DTO inside `with_ctx` and returns `Option<FolderIconBaseDto>`, and the Tauri command just forwards it. Trade-off: PNG encoding now runs while the context mutex is held, which is fine for this startup-time call.
 
 - It builds a new `FolderIconBase` from `c.base_icons().clone()`, but `IconBase::Folder(FolderIconBase)` already holds one.
 - The only consumer is `gui/src-tauri/src/state.rs:69` → `lib.rs:24`, and it only needs `FolderIconBaseDto::try_from(&base)`.
 - **Fix:** return `Option<&FolderIconBase>` by matching on `c.base()`, and convert to the DTO inside the `with_ctx` closure.
 
-### 1.7 Startup: the system icon set is copied instead of moved
+### 1.7 Startup: the system icon set is copied instead of moved — ✅ DONE
+
+> **Completed 2026-10-08.** `FolderStrategy::from_sys_icon_set` takes `SysIconSet` by value and moves the SVG. A new crate-private `into_renderer_icon_set(SysIconSet)` uses `into_rgba8()` and is called by `from_sys_icon_set` and `IconCache::get_renderer_icon_set`. The public borrowing `convert_icon_set` is kept, and both versions share a `to_renderer_image` helper. `fetch_and_cache` saves the `DynamicImage` directly instead of converting it to RGBA first.
 
 - `context.rs:208`: `from_sys_icon_set(&SysIconSet)` clones the SVG. Both callers (`context.rs:143-146`, `:585-586`) own the set and drop it afterwards. Take it by value and move the SVG.
 - `convert.rs:74`: `convert_icon_set(&SysIconSet)` calls `to_rgba8()`, which always allocates. With ownership, `into_rgba8()` costs nothing when the image is already RGBA8. `convert_icon_set` is re-exported (`lib.rs:44`), so add a consuming variant rather than changing the signature.
 - `cache.rs:166`: `image.data.to_rgba8()` exists only to read the width and save the image. `DynamicImage` has `width()` and `save()` itself. The reload path normalises through `convert_icon_set` anyway.
 
-### 1.8 `to_rgba8()` on an owned `DynamicImage` → `into_rgba8()`
+### 1.8 `to_rgba8()` on an owned `DynamicImage` → `into_rgba8()` — ✅ DONE
+
+> **Completed 2026-10-08.** Switched to `into_rgba8()` in `folco-transfer/src/lib.rs`, `canvas.rs` (`from_png`, `from_png_multiple`) and `image_source.rs`. `render_at_size` now checks dimensions on the decoded image before converting, so the resize path no longer throws away a full RGBA copy. The borrowed `to_rgba8()` calls in `convert.rs` and `cache.rs` belong to 1.7.
 
 - `folco-transfer/src/lib.rs:105`, `folco-renderer-wasm/src/canvas.rs:225`, `:268`, `layer/image_source.rs:122` (`resized.to_rgba8()`).
 - `layer/image_source.rs:112`: the whole decoded image is converted to RGBA *before* checking whether a resize is needed, and that copy is thrown away when it is. Compare `img.width().max(img.height())` first, then use `img.into_rgba8()` or `img.resize(..).into_rgba8()`. This runs on every raster overlay tile miss and on every custom-icon size.
 
-### 1.9 Copies of SVG strings
+### 1.9 Copies of SVG strings — ✅ DONE
+
+> **Completed 2026-10-08.** `SvgCanvas<'a>` now borrows `base: &'a str`, and `into_svg` builds the output in one allocation (it no longer `concat`s the overlays into an intermediate string). `Medium::Canvas` became a GAT so `SvgMedium` can name `SvgCanvas<'a>`. `render_svg_with_color` uses `Cow<str>` and only allocates when recoloring. `replace_svg_colors` feeds the input straight into the first `replace_color_attr` pass.
 
 - `svg_folder_customizer.rs:157`: `SvgCanvas::new(&self.base.svg)` goes through `impl Into<String>`, which copies the whole base SVG on every `render_output` (every SVG preview miss and every apply). Make `SvgCanvas` borrow (`base: &'a str`) and allocate once in `into_svg`.
 - `layer/svg.rs:203`: `svg_data.to_string()` when there's no fill color, only to hand `&svg_data` to `Tree::from_str`. Use `Cow<str>`. This runs on every SVG, emoji and SVG-preview rasterization.
@@ -150,18 +168,18 @@ CustomizationProfile ──From<&_> (clone #1)──▶ FolderProfile / CustomPr
 
 | # | Item | Path | Per-call cost | Effort |
 |---|------|------|---------------|--------|
-| 1.3 | Tile clones (6) | Preview + apply | 2 full-size RGBA copies per tile layer | Low (borrowck gotcha) |
-| 1.2 | Base image clones | Preview + apply | 1 image per preview; N images per apply | Low |
-| 1.1 | Profile double clone | Apply / import | 2× each heap config (raster overlay = whole PNG) | Medium (API) |
-| 1.4 | Solid color in place | Preview + apply | 1 image per miss | Low |
-| 1.9 | SVG string copies | SVG preview / decal | 1–2 SVG copies per render | Low–Medium |
-| 1.8 | `into_rgba8` / resize order | Overlay / custom / load | 1 decoded image | Trivial |
-| 1.5 | `into_sys` | Apply | N rendered images / SVG | Trivial |
-| 1.6 | `folder_icon_base` borrow | GUI IPC | Full base `IconSet` | Low |
-| 1.7 | Consume `SysIconSet` | Startup | SVG + N images | Low |
+| 1.3 | ✅ Tile clones (6) | Preview + apply | 2 full-size RGBA copies per tile layer | Done |
+| 1.2 | ✅ Base image clones | Preview + apply | 1 image per preview; N images per apply | Done |
+| 1.1 | ✅ Profile double clone | Apply / import | 2× each heap config (raster overlay = whole PNG) | Done |
+| 1.4 | ✅ Solid color in place | Preview + apply | 1 image per miss | Done |
+| 1.9 | ✅ SVG string copies | SVG preview / decal | 1–2 SVG copies per render | Done |
+| 1.8 | ✅ `into_rgba8` / resize order | Overlay / custom / load | 1 decoded image | Done |
+| 1.5 | ✅ `into_sys` | Apply | N rendered images / SVG | Done |
+| 1.6 | ✅ `folder_icon_base` borrow | GUI IPC | Full base `IconSet` | Done |
+| 1.7 | ✅ Consume `SysIconSet` | Startup | SVG + N images | Done |
 | 1.10–1.12 | Misc. | Tests / CLI | Negligible | Trivial |
 
-**Suggested order:** 1.3 → 1.2 → 1.4 (all inside the preview loop, mostly mechanical), then 1.1 (API change), then 1.9 and 1.5–1.8, then the trivial ones.
+**Suggested order:** ~~1.3~~ → ~~1.2~~ → ~~1.4~~ (all inside the preview loop, mostly mechanical), then ~~1.1~~ (API change), then ~~1.9~~ and ~~1.5~~, ~~1.6~~, ~~1.7~~, ~~1.8~~, then the trivial ones.
 
 ### Corrections to the previous version
 - 1.1: `set_config` doesn't clone twice. The clone is in the caller, and it compounds with the `From<&_>` clone.

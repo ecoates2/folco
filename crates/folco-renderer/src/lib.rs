@@ -37,7 +37,7 @@
 //! // Apply a profile
 //! let profile = FolderProfile::new()
 //!     .with_solid_color(SolidColorConfig::new(33, 150, 243));
-//! customizer.apply_profile(&profile);
+//! customizer.apply_profile(profile);
 //!
 //! // Export current settings
 //! let exported = customizer.export_profile();

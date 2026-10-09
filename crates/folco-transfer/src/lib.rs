@@ -102,7 +102,7 @@ impl SerializableFolderIconBase {
         let mut icon_set = IconSet::new();
 
         for img in &self.images {
-            let rgba = image::load_from_memory(&img.png_data)?.to_rgba8();
+            let rgba = image::load_from_memory(&img.png_data)?.into_rgba8();
             let width = rgba.width();
             let height = rgba.height();
             let bounds = img

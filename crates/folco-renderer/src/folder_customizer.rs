@@ -90,7 +90,7 @@ impl LayerSet for FolderLayers {
 
         // 2. Decal tile layer — tints against the dominant color solid color emits
         if let Some(tile) = self.decal.render_tile(ctx, key, decal_deps)? {
-            composite_over(&mut ctx.image.data, &tile, 0, 0);
+            composite_over(&mut ctx.image.data, tile, 0, 0);
         }
 
         // 3. Color dot tile layer
@@ -98,7 +98,7 @@ impl LayerSet for FolderLayers {
             .color_dot
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, &tile, 0, 0);
+            composite_over(&mut ctx.image.data, tile, 0, 0);
         }
 
         // 4. Overlay tile layer
@@ -106,7 +106,7 @@ impl LayerSet for FolderLayers {
             .overlay
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, &tile, 0, 0);
+            composite_over(&mut ctx.image.data, tile, 0, 0);
         }
 
         Ok(())
@@ -159,19 +159,17 @@ impl FolderIconCustomizer {
     /// Applies a [`FolderProfile`]'s settings to all layers.
     ///
     /// The profile is authoritative: layers it omits are cleared.
-    pub fn apply_profile(&mut self, profile: &FolderProfile) {
-        self.layers
-            .solid_color
-            .set_config(profile.solid_color.clone());
+    pub fn apply_profile(&mut self, profile: FolderProfile) {
+        self.layers.solid_color.set_config(profile.solid_color);
         self.layers.color_dot.set_config(profile.color_dot);
-        self.layers.decal.set_config(profile.decal.clone());
-        self.layers.overlay.set_config(profile.overlay.clone());
+        self.layers.decal.set_config(profile.decal);
+        self.layers.overlay.set_config(profile.overlay);
     }
 
     /// Exports the currently rendering settings as a [`CustomizationProfile`] (wire format).
     pub fn export_profile(&self) -> CustomizationProfile {
         CustomizationProfile {
-            solid_color: self.layers.solid_color.config().cloned(),
+            solid_color: self.layers.solid_color.config().copied(),
             color_dot: self.layers.color_dot.config().copied(),
             decal: self.layers.decal.config().cloned(),
             overlay: self.layers.overlay.config().cloned(),
@@ -514,7 +512,7 @@ mod tests {
         let config = SolidColorConfig::new(0, 188, 212);
         let mut ctx = RenderContext::new(red_icon.clone());
         ctx.set(TEST_SURFACE);
-        ctx.image = apply_solid_color(&ctx.image, &TEST_SURFACE, &config);
+        apply_solid_color(&mut ctx.image, &TEST_SURFACE, &config);
         ctx.set(DominantColor::new(
             config.target_r,
             config.target_g,
@@ -683,10 +681,7 @@ mod tests {
 
         // Enable both color target and decal
         let ct_config = SolidColorConfig::new(0, 188, 212);
-        customizer
-            .layers
-            .solid_color
-            .set_config(Some(ct_config.clone()));
+        customizer.layers.solid_color.set_config(Some(ct_config));
         customizer
             .layers
             .decal

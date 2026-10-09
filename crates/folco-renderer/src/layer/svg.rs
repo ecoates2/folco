@@ -3,6 +3,8 @@
 //! This module provides shared SVG parsing and rendering functionality
 //! used by both the decal and overlay layers.
 
+use std::borrow::Cow;
+
 use image::{Rgba, RgbaImage};
 use resvg::tiny_skia::{Pixmap, Transform};
 use resvg::usvg::{Options, Tree};
@@ -196,11 +198,9 @@ pub fn render_svg_with_color(
     size: u32,
     fill_color: Option<(u8, u8, u8, u8)>,
 ) -> Result<RgbaImage, RenderError> {
-    // Apply color replacement if needed
-    let svg_data = if let Some((r, g, b, _a)) = fill_color {
-        replace_svg_colors(svg_data, r, g, b)
-    } else {
-        svg_data.to_string()
+    let svg_data = match fill_color {
+        Some((r, g, b, _a)) => Cow::Owned(replace_svg_colors(svg_data, r, g, b)),
+        None => Cow::Borrowed(svg_data),
     };
 
     // Parse the SVG
@@ -264,14 +264,10 @@ fn replace_svg_colors(svg_data: &str, r: u8, g: u8, b: u8) -> String {
 
     // Replace fill and stroke attributes
     // This is a simple approach; for production, consider using an XML parser
-    let mut result = svg_data.to_string();
-
     // Replace fill="..." (but not fill="none")
-    result = replace_color_attr(&result, "fill", &hex_color);
+    let result = replace_color_attr(svg_data, "fill", &hex_color);
     // Replace stroke="..." (but not stroke="none")
-    result = replace_color_attr(&result, "stroke", &hex_color);
-
-    result
+    replace_color_attr(&result, "stroke", &hex_color)
 }
 
 /// Replaces a color attribute value, preserving "none" values.

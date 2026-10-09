@@ -11,9 +11,7 @@
 //! in the output document.
 
 use super::svg::composite_over;
-use super::{
-    CacheKey, CachedOutput, DependencyVersion, ImageSource, Layer, LayerConfig, RenderContext,
-};
+use super::{CacheKey, DependencyVersion, ImageSource, Layer, LayerConfig, RenderContext};
 use crate::error::RenderError;
 use image::RgbaImage;
 
@@ -103,20 +101,8 @@ impl Layer<ColorDotConfig> {
         ctx: &RenderContext,
         key: CacheKey,
         deps: DependencyVersion,
-    ) -> Result<Option<RgbaImage>, RenderError> {
-        if !self.is_active() {
-            return Ok(None);
-        }
-
-        if let Some(CachedOutput::Tile(tile)) = self.get_cached(key, deps) {
-            return Ok(Some(tile.clone()));
-        }
-
-        let config = self.config().expect("active layer always has a config");
-        let tile = render_color_dot(config, ctx)?;
-
-        self.store(key, CachedOutput::Tile(tile.clone()), deps);
-        Ok(Some(tile))
+    ) -> Result<Option<&RgbaImage>, RenderError> {
+        self.cached_tile(key, deps, |config| render_color_dot(config, ctx))
     }
 }
 

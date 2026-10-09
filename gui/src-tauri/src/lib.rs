@@ -18,12 +18,7 @@ fn set_startup_theme(app: tauri::AppHandle, theme: StartupTheme) -> Result<(), S
 fn get_folder_icon_base(
     state: tauri::State<AppState>,
 ) -> Result<Option<FolderIconBaseDto>, String> {
-    let Some(base) = state.get_folder_icon_base()? else {
-        return Ok(None);
-    };
-    FolderIconBaseDto::try_from(&base)
-        .map(Some)
-        .map_err(|e| e.to_string())
+    state.get_folder_icon_base()
 }
 
 #[tauri::command]

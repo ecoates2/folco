@@ -479,7 +479,7 @@ async fn customize_folders(
     });
 
     // Run customization
-    ctx.customize_folders_async(directories, &profile, tx).await;
+    ctx.customize_folders_async(directories, profile, tx).await;
 
     // Wait for progress handler to finish
     progress_handle.await?;
@@ -503,8 +503,7 @@ async fn customize_custom_icon(
         .create_custom_icon_customizer(&image_source)
         .context("Failed to create custom icon customizer")?;
 
-    let custom: CustomProfile = (&profile).into();
-    customizer.apply_profile(&custom);
+    customizer.apply_profile(CustomProfile::from(profile));
 
     let (tx, mut rx) = progress_channel(32);
 

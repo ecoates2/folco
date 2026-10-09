@@ -25,7 +25,7 @@
 //!
 //! // Customize folders with a profile
 //! let folders = vec![PathBuf::from("/path/to/folder")];
-//! ctx.customize_folders(&folders, &profile)?;
+//! ctx.customize_folders(&folders, profile)?;
 //!
 //! // Reset folders to default
 //! ctx.reset_folders(&folders)?;

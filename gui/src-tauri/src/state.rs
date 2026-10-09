@@ -1,6 +1,8 @@
 use std::sync::Mutex;
 
-use folco_core::{CustomizationContext, CustomizationContextBuilder, FolderIconBase, SurfaceColor};
+use folco_core::{CustomizationContext, CustomizationContextBuilder, SurfaceColor};
+
+use crate::dto::FolderIconBaseDto;
 
 /// Wrapper to make `CustomizationContext` usable in Tauri managed state.
 ///
@@ -64,9 +66,16 @@ impl AppState {
         self.with_ctx(|_| ())
     }
 
-    /// Returns the current folder icon base, or `None` for vector folder icons.
-    pub fn get_folder_icon_base(&self) -> Result<Option<FolderIconBase>, String> {
-        self.with_ctx(|ctx| ctx.folder_icon_base())
+    /// Returns the current folder icon base as a DTO, or `None` for vector folder icons.
+    ///
+    /// Encodes while holding the lock so the base icons are borrowed, not cloned.
+    pub fn get_folder_icon_base(&self) -> Result<Option<FolderIconBaseDto>, String> {
+        self.with_ctx(|ctx| {
+            ctx.folder_icon_base()
+                .map(FolderIconBaseDto::try_from)
+                .transpose()
+                .map_err(|e| e.to_string())
+        })?
     }
 
     /// Returns the scalable folder icon markup and surface color, if vector.

@@ -4,7 +4,7 @@
 //! in the application's data directory to avoid repeatedly extracting them
 //! from system resources.
 
-use crate::convert::convert_icon_set;
+use crate::convert::into_renderer_icon_set;
 use crate::error::{Error, Result};
 
 use folco_renderer::IconSet as RendererIconSet;
@@ -143,7 +143,7 @@ impl IconCache {
     /// It handles caching automatically and converts to the renderer's format.
     pub fn get_renderer_icon_set(&self) -> Result<RendererIconSet> {
         let sys_set = self.get_sys_icon_set()?;
-        Ok(convert_icon_set(&sys_set))
+        Ok(into_renderer_icon_set(sys_set))
     }
 
     /// Fetches the system folder icon and caches it.
@@ -163,11 +163,10 @@ impl IconCache {
         };
 
         for (index, image) in icon_set.images.iter().enumerate() {
-            let rgba = image.data.to_rgba8();
-            let size = rgba.width();
+            let size = image.data.width();
             let path = self.icon_path(size, index);
 
-            rgba.save(&path)?;
+            image.data.save(&path)?;
 
             manifest.icons.push(CachedIconInfo {
                 size,

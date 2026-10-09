@@ -160,12 +160,13 @@ impl CustomizationProfile {
 ///
 /// # Conversion
 ///
-/// Convert from the wire format with [`From<&CustomizationProfile>`]:
+/// Convert from the wire format with [`From<CustomizationProfile>`], or
+/// [`From<&CustomizationProfile>`] when the profile must be kept (clones each config):
 /// ```
 /// use folco_renderer::{FolderProfile, CustomizationProfile, SolidColorConfig};
 ///
 /// let wire = CustomizationProfile::new().with_solid_color(SolidColorConfig::new(33, 150, 243));
-/// let folder = FolderProfile::from(&wire);
+/// let folder = FolderProfile::from(wire);
 /// assert!(folder.solid_color.is_some());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -230,10 +231,21 @@ impl FolderProfile {
     }
 }
 
+impl From<CustomizationProfile> for FolderProfile {
+    fn from(profile: CustomizationProfile) -> Self {
+        Self {
+            solid_color: profile.solid_color,
+            color_dot: profile.color_dot,
+            decal: profile.decal,
+            overlay: profile.overlay,
+        }
+    }
+}
+
 impl From<&CustomizationProfile> for FolderProfile {
     fn from(profile: &CustomizationProfile) -> Self {
         Self {
-            solid_color: profile.solid_color.clone(),
+            solid_color: profile.solid_color,
             color_dot: profile.color_dot,
             decal: profile.decal.clone(),
             overlay: profile.overlay.clone(),
@@ -248,12 +260,13 @@ impl From<&CustomizationProfile> for FolderProfile {
 ///
 /// # Conversion
 ///
-/// Convert from the wire format with [`From<&CustomizationProfile>`]:
+/// Convert from the wire format with [`From<CustomizationProfile>`], or
+/// [`From<&CustomizationProfile>`] when the profile must be kept (clones each config):
 /// ```
 /// use folco_renderer::{CustomProfile, CustomizationProfile, ColorDotConfig};
 ///
 /// let wire = CustomizationProfile::new().with_color_dot(ColorDotConfig::new(33, 150, 243));
-/// let custom = CustomProfile::from(&wire);
+/// let custom = CustomProfile::from(wire);
 /// assert!(custom.color_dot.is_some());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -295,6 +308,15 @@ impl CustomProfile {
     pub fn with_overlay(mut self, config: ImageOverlayConfig) -> Self {
         self.overlay = Some(config);
         self
+    }
+}
+
+impl From<CustomizationProfile> for CustomProfile {
+    fn from(profile: CustomizationProfile) -> Self {
+        Self {
+            color_dot: profile.color_dot,
+            overlay: profile.overlay,
+        }
     }
 }
 
@@ -375,7 +397,7 @@ mod tests {
             IconSet::new(),
             SurfaceColor::new(255, 217, 112),
         ));
-        customizer.apply_profile(&profile);
+        customizer.apply_profile(profile);
 
         assert!(customizer.layers.solid_color.is_active());
         assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 76);
@@ -444,7 +466,7 @@ mod tests {
             SurfaceColor::new(255, 217, 112),
         ));
         customizer.apply_profile(
-            &FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80)),
+            FolderProfile::new().with_solid_color(SolidColorConfig::new(76, 175, 80)),
         );
         // Deactivate by setting config to None
         customizer.layers.solid_color.set_config(None);
@@ -468,7 +490,7 @@ mod tests {
         ));
         // Start with no config (inactive)
         customizer.layers.solid_color.set_config(None);
-        customizer.apply_profile(&profile);
+        customizer.apply_profile(profile);
 
         assert!(customizer.layers.solid_color.is_active());
         assert_eq!(customizer.layers.solid_color.config().unwrap().target_r, 76);
@@ -489,7 +511,7 @@ mod tests {
 
         let mut source = base();
         source.apply_profile(
-            &FolderProfile::new()
+            FolderProfile::new()
                 .with_solid_color(SolidColorConfig::new(76, 175, 80))
                 .with_decal(DecalConfig::new("<svg></svg>", 0.5)),
         );
@@ -498,7 +520,7 @@ mod tests {
         let exported = source.export_profile();
         let mut restored = base();
         let restored_profile: FolderProfile = (&exported).into();
-        restored.apply_profile(&restored_profile);
+        restored.apply_profile(restored_profile);
 
         assert_eq!(
             restored.export_profile().to_json().unwrap(),

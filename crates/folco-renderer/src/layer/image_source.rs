@@ -109,17 +109,15 @@ impl ImageSource {
             Self::Svg(source) => render_source(source, size),
             Self::Raster(png_data) => {
                 let img = image::load_from_memory(png_data).map_err(RenderError::ImageDecode)?;
-                let rgba = img.to_rgba8();
 
                 // If already the right size, return as-is
-                let max_dim = rgba.width().max(rgba.height());
-                if max_dim == size {
-                    return Ok(rgba);
+                if img.width().max(img.height()) == size {
+                    return Ok(img.into_rgba8());
                 }
 
                 // Resize preserving aspect ratio (fit within size×size)
                 let resized = img.resize(size, size, image::imageops::FilterType::Lanczos3);
-                Ok(resized.to_rgba8())
+                Ok(resized.into_rgba8())
             }
         }
     }

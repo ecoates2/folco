@@ -222,7 +222,7 @@ impl CanvasRenderer {
         let surface_color = SurfaceColor::new(surface_r, surface_g, surface_b);
         let img = image::load_from_memory(png_data)
             .map_err(|e| JsError::new(&format!("Failed to decode PNG: {}", e)))?
-            .to_rgba8();
+            .into_rgba8();
 
         let width = img.width();
         let height = img.height();
@@ -265,7 +265,7 @@ impl CanvasRenderer {
             let bytes = png_data.to_vec();
             let img = image::load_from_memory(&bytes)
                 .map_err(|e| JsError::new(&format!("Failed to decode PNG at index {}: {}", i, e)))?
-                .to_rgba8();
+                .into_rgba8();
 
             let width = img.width();
             let height = img.height();
@@ -635,18 +635,9 @@ impl CanvasRenderer {
         let wire = CustomizationProfile::from_json(json)
             .map_err(|e| JsError::new(&format!("Failed to parse profile: {}", e)))?;
         match &mut self.active {
-            ActiveCustomizer::Folder(c) => {
-                let folder: FolderProfile = (&wire).into();
-                c.apply_profile(&folder);
-            }
-            ActiveCustomizer::SvgFolder(c) => {
-                let folder: FolderProfile = (&wire).into();
-                c.apply_profile(&folder);
-            }
-            ActiveCustomizer::Custom(c) => {
-                let custom: CustomProfile = (&wire).into();
-                c.apply_profile(&custom);
-            }
+            ActiveCustomizer::Folder(c) => c.apply_profile(FolderProfile::from(wire)),
+            ActiveCustomizer::SvgFolder(c) => c.apply_profile(FolderProfile::from(wire)),
+            ActiveCustomizer::Custom(c) => c.apply_profile(CustomProfile::from(wire)),
         }
         Ok(())
     }

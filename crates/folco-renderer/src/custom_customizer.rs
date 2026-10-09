@@ -41,14 +41,14 @@ impl LayerSet for CustomLayers {
             .color_dot
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, &tile, 0, 0);
+            composite_over(&mut ctx.image.data, tile, 0, 0);
         }
 
         if let Some(tile) = self
             .overlay
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, &tile, 0, 0);
+            composite_over(&mut ctx.image.data, tile, 0, 0);
         }
 
         Ok(())
@@ -115,9 +115,9 @@ impl CustomIconCustomizer {
     /// Applies a [`CustomProfile`]'s settings to the layers.
     ///
     /// The profile is authoritative: layers it omits are cleared.
-    pub fn apply_profile(&mut self, profile: &CustomProfile) {
+    pub fn apply_profile(&mut self, profile: CustomProfile) {
         self.layers.color_dot.set_config(profile.color_dot);
-        self.layers.overlay.set_config(profile.overlay.clone());
+        self.layers.overlay.set_config(profile.overlay);
     }
 
     /// What this customizer operates on.
@@ -168,7 +168,7 @@ mod tests {
             ));
 
         let mut c = customizer();
-        c.apply_profile(&profile);
+        c.apply_profile(profile);
 
         assert_eq!(
             c.layers.color_dot.config().unwrap(),
@@ -187,10 +187,10 @@ mod tests {
         let wire = CustomizationProfile::new()
             .with_solid_color(SolidColorConfig::new(76, 175, 80))
             .with_decal(DecalConfig::new("<svg></svg>", 0.5));
-        let profile: CustomProfile = (&wire).into();
+        let profile: CustomProfile = wire.into();
 
         let mut c = customizer();
-        c.apply_profile(&profile);
+        c.apply_profile(profile);
 
         let exported = c.export_profile();
         assert!(exported.solid_color.is_none());
@@ -216,7 +216,7 @@ mod tests {
         let restored = CustomProfile::from_json(&json).unwrap();
 
         let mut other = customizer();
-        other.apply_profile(&restored);
+        other.apply_profile(restored);
 
         assert_eq!(
             other.layers.color_dot.config().unwrap(),

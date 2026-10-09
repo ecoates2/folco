@@ -33,7 +33,7 @@ use crate::icon::{IconImage, IconSet};
 /// A rendering medium: the canvas layers draw onto plus the final output type.
 pub trait Medium {
     /// The mutable drawing surface threaded through the layer pipeline.
-    type Canvas;
+    type Canvas<'a>;
 
     /// The final rendered artifact produced from the canvas.
     type Output;
@@ -47,7 +47,7 @@ pub trait Medium {
 pub enum RasterMedium {}
 
 impl Medium for RasterMedium {
-    type Canvas = IconImage;
+    type Canvas<'a> = IconImage;
     type Output = IconSet;
 }
 
@@ -59,7 +59,7 @@ impl Medium for RasterMedium {
 pub enum SvgMedium {}
 
 impl Medium for SvgMedium {
-    type Canvas = SvgCanvas;
+    type Canvas<'a> = SvgCanvas<'a>;
     type Output = String;
 }
 
@@ -69,20 +69,20 @@ impl Medium for SvgMedium {
 
 /// A mutable SVG document under construction.
 ///
-/// Wraps the base folder-icon markup and accumulates overlay fragments that
+/// Borrows the base folder-icon markup and accumulates overlay fragments that
 /// are injected just before the closing `</svg>` tag when serialized. With no
 /// overlays the base markup passes through byte-for-byte.
 #[derive(Debug, Clone)]
-pub struct SvgCanvas {
-    base: String,
+pub struct SvgCanvas<'a> {
+    base: &'a str,
     overlays: Vec<String>,
 }
 
-impl SvgCanvas {
-    /// Creates a canvas from base SVG markup.
-    pub fn new(base: impl Into<String>) -> Self {
+impl<'a> SvgCanvas<'a> {
+    /// Creates a canvas over base SVG markup.
+    pub fn new(base: &'a str) -> Self {
         Self {
-            base: base.into(),
+            base,
             overlays: Vec::new(),
         }
     }
@@ -96,34 +96,27 @@ impl SvgCanvas {
     }
 
     /// Returns the base markup without any overlays applied.
-    pub fn base(&self) -> &str {
-        &self.base
+    pub fn base(&self) -> &'a str {
+        self.base
     }
 
     /// Serializes the canvas to a single SVG string.
     ///
-    /// Overlay fragments are inserted immediately before the final `</svg>`.
-    /// If no overlays were pushed, the base markup is returned unchanged.
+    /// Overlay fragments are inserted immediately before the final `</svg>`,
+    /// or appended if there is none. If no overlays were pushed, the base
+    /// markup is returned unchanged.
     pub fn into_svg(self) -> String {
-        if self.overlays.is_empty() {
-            return self.base;
-        }
+        let split = self.base.rfind("</svg>").unwrap_or(self.base.len());
+        let (head, tail) = self.base.split_at(split);
+        let overlays_len: usize = self.overlays.iter().map(String::len).sum();
 
-        let fragments = self.overlays.concat();
-        match self.base.rfind("</svg>") {
-            Some(idx) => {
-                let mut out = String::with_capacity(self.base.len() + fragments.len());
-                out.push_str(&self.base[..idx]);
-                out.push_str(&fragments);
-                out.push_str(&self.base[idx..]);
-                out
-            }
-            None => {
-                let mut out = self.base;
-                out.push_str(&fragments);
-                out
-            }
+        let mut out = String::with_capacity(self.base.len() + overlays_len);
+        out.push_str(head);
+        for overlay in &self.overlays {
+            out.push_str(overlay);
         }
+        out.push_str(tail);
+        out
     }
 }
 

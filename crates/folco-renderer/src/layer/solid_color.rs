@@ -43,7 +43,7 @@ use palette::{Hsl, IntoColor, Srgb};
 /// # Emitted Properties
 ///
 /// When applied, the layer emits [`DominantColor`] from the target values.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct SolidColorConfig {
@@ -114,11 +114,11 @@ impl Layer<SolidColorConfig> {
         }
 
         let config = self.config().unwrap();
-        let surface = ctx
+        let surface = *ctx
             .get::<SurfaceColor>()
             .expect("SurfaceColor must be set in RenderContext");
 
-        ctx.image = apply_solid_color(&ctx.image, surface, config);
+        apply_solid_color(&mut ctx.image, &surface, config);
         ctx.set(DominantColor::new(
             config.target_r,
             config.target_g,
@@ -136,7 +136,7 @@ impl Layer<SolidColorConfig> {
 // Helper Functions
 // ============================================================================
 
-/// Applies GIMP-style HSL recoloring to an icon image.
+/// Recolors `icon` in place using GIMP-style HSL adjustment.
 ///
 /// Computes hue/saturation/lightness deltas from `surface_color` and
 /// `config.target_r/g/b`, then for each opaque pixel:
@@ -148,10 +148,10 @@ impl Layer<SolidColorConfig> {
 /// 5. Clamps S and L to \[0.0, 1.0\]
 /// 6. Converts back to sRGB
 pub(crate) fn apply_solid_color(
-    icon: &IconImage,
+    icon: &mut IconImage,
     surface: &SurfaceColor,
     config: &SolidColorConfig,
-) -> IconImage {
+) {
     // Compute HSL deltas from surface → target
     let surface_rgb = Srgb::new(
         surface.r as f32 / 255.0,
@@ -186,8 +186,7 @@ pub(crate) fn apply_solid_color(
     };
 
     // Apply per-pixel
-    let mut result = icon.data.clone();
-    for pixel in result.pixels_mut() {
+    for pixel in icon.data.pixels_mut() {
         let [r, g, b, a] = pixel.0;
         if a == 0 {
             continue;
@@ -208,6 +207,4 @@ pub(crate) fn apply_solid_color(
             a,
         ];
     }
-
-    IconImage::new(result, icon.scale, icon.content_bounds)
 }

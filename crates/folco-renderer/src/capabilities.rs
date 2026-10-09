@@ -218,10 +218,7 @@ impl IconCapabilities {
     /// A copy of `profile` with unrealizable intents removed.
     pub fn filter(&self, profile: &CustomizationProfile) -> CustomizationProfile {
         CustomizationProfile {
-            solid_color: self
-                .solid_color
-                .then(|| profile.solid_color.clone())
-                .flatten(),
+            solid_color: self.solid_color.then_some(profile.solid_color).flatten(),
             color_dot: self.color_dot.then_some(profile.color_dot).flatten(),
             decal: self.decal.then(|| profile.decal.clone()).flatten(),
             overlay: self.overlay.then(|| profile.overlay.clone()).flatten(),
@@ -336,7 +333,7 @@ mod tests {
 
         let mut folder =
             FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
-        folder.apply_profile(&FolderProfile::from(&wire));
+        folder.apply_profile(FolderProfile::from(&wire));
         assert_keeps_exactly(
             FolderIconCustomizer::capabilities(),
             &folder.export_profile(),
@@ -346,14 +343,14 @@ mod tests {
             r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
             surface,
         ));
-        svg.apply_profile(&FolderProfile::from(&wire));
+        svg.apply_profile(FolderProfile::from(&wire));
         assert_keeps_exactly(
             SvgFolderIconCustomizer::capabilities(),
             &svg.export_profile(),
         );
 
         let mut custom = CustomIconCustomizer::from_icon_set(IconSet::new());
-        custom.apply_profile(&CustomProfile::from(&wire));
+        custom.apply_profile(CustomProfile::from(wire));
         assert_keeps_exactly(
             CustomIconCustomizer::capabilities(),
             &custom.export_profile(),

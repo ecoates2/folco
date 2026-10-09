@@ -32,6 +32,7 @@ pub use overlay::{ImageOverlayConfig, OverlayAnchorMode, OverlayPosition};
 pub use solid_color::SolidColorConfig;
 pub use svg::SvgSource;
 
+use crate::error::RenderError;
 use crate::icon::IconImage;
 use image::RgbaImage;
 use std::any::{Any, TypeId};
@@ -320,6 +321,31 @@ impl<C: LayerConfig> Layer<C> {
     /// Stores a layer output in the cache with the current dependency version.
     fn store(&mut self, key: CacheKey, output: CachedOutput, deps: DependencyVersion) {
         self.cache.insert(key, (output, deps.0));
+    }
+
+    /// Returns the cached tile for `key`, rendering and storing it first on a miss.
+    ///
+    /// Returns `None` if the layer is inactive.
+    fn cached_tile(
+        &mut self,
+        key: CacheKey,
+        deps: DependencyVersion,
+        render: impl FnOnce(&C) -> Result<RgbaImage, RenderError>,
+    ) -> Result<Option<&RgbaImage>, RenderError> {
+        let Some(config) = &self.config else {
+            return Ok(None);
+        };
+
+        // Checked up front: returning the hit directly trips NLL's conditional-return limitation.
+        if !matches!(self.get_cached(key, deps), Some(CachedOutput::Tile(_))) {
+            let tile = render(config)?;
+            self.store(key, CachedOutput::Tile(tile), deps);
+        }
+
+        match self.get_cached(key, deps) {
+            Some(CachedOutput::Tile(tile)) => Ok(Some(tile)),
+            _ => unreachable!("a fresh tile was stored above"),
+        }
     }
 }
 

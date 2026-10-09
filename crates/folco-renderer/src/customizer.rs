@@ -132,13 +132,16 @@ impl<L: LayerSet> IconCustomizer<L> {
     /// Returns [`RenderError::NoBaseIcon`] if no base icon matches the size,
     /// or a render error if a layer fails.
     fn render(&mut self, logical_size: u32) -> Result<IconImage, RenderError> {
-        let base = self
-            .base
+        let Self {
+            base,
+            layers,
+            composite,
+        } = self;
+        let icon = base
             .icons()
             .find_by_logical_size(logical_size)
-            .ok_or(RenderError::NoBaseIcon { logical_size })?
-            .clone();
-        self.render_icon(&base)
+            .ok_or(RenderError::NoBaseIcon { logical_size })?;
+        Self::render_icon(layers, composite, base.surface_color(), icon)
     }
 
     /// Renders all sizes in the base icon set with customizations applied.
@@ -149,35 +152,48 @@ impl<L: LayerSet> IconCustomizer<L> {
     ///
     /// Returns a render error if any layer fails.
     fn render_all(&mut self) -> Result<IconSet, RenderError> {
-        let base_images: Vec<_> = self.base.icons().iter().cloned().collect();
-        let mut rendered = Vec::with_capacity(base_images.len());
-        for base in &base_images {
-            rendered.push(self.render_icon(base)?);
-        }
+        let Self {
+            base,
+            layers,
+            composite,
+        } = self;
+        let rendered = base
+            .icons()
+            .iter()
+            .map(|icon| Self::render_icon(layers, composite, base.surface_color(), icon))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(IconSet::from_images(rendered))
     }
 
     /// Renders a single icon through the layer set with composite caching.
-    fn render_icon(&mut self, base: &IconImage) -> Result<IconImage, RenderError> {
+    ///
+    /// Takes the customizer's fields separately so callers can keep borrowing
+    /// `base` while the layers and cache are mutated.
+    fn render_icon(
+        layers: &mut L,
+        composite: &mut CompositeLayer,
+        surface_color: Option<&SurfaceColor>,
+        base: &IconImage,
+    ) -> Result<IconImage, RenderError> {
         let key = CacheKey::from_icon(base);
-        let composite_deps = self.layers.combined_version();
+        let composite_deps = layers.combined_version();
 
         // Check composite cache first
-        if let Some(cached) = self.composite.get_cached(key, composite_deps) {
+        if let Some(cached) = composite.get_cached(key, composite_deps) {
             return Ok(cached.clone());
         }
 
         // Create render context; set surface color if folder-based
         let mut ctx = RenderContext::new(base.clone());
-        if let Some(sc) = self.base.surface_color() {
+        if let Some(sc) = surface_color {
             ctx.set(*sc);
         }
 
         // Execute the layer set
-        self.layers.execute(&mut ctx, key)?;
+        layers.execute(&mut ctx, key)?;
 
         // Cache the final result
-        self.composite.store(key, ctx.image.clone(), composite_deps);
+        composite.store(key, ctx.image.clone(), composite_deps);
         Ok(ctx.image)
     }
 

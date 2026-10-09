@@ -5,13 +5,13 @@
 //! icon cache.
 
 use crate::cache::{CacheConfig, IconCache};
-use crate::convert::{SystemFormat, convert_icon_set};
+use crate::convert::{SystemFormat, into_renderer_icon_set};
 use crate::error::{Error, Result};
 use crate::progress::{Progress, ProgressSender};
 
 use folco_renderer::{
     CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
-    FolderProfile, IconBaseKind, LayerKind, SurfaceColor, SvgFolderIconBase,
+    FolderProfile, IconBase, IconBaseKind, LayerKind, SurfaceColor, SvgFolderIconBase,
     SvgFolderIconCustomizer,
 };
 use folco_renderer::{ImageSource, Render};
@@ -143,7 +143,7 @@ impl CustomizationContextBuilder {
         let sys_set = cache.get_sys_icon_set()?;
 
         // Choose the customization strategy based on the icon medium.
-        let strategy = FolderStrategy::from_sys_icon_set(&sys_set);
+        let strategy = FolderStrategy::from_sys_icon_set(sys_set);
 
         // Create the folder settings provider
         let folder_provider = PlatformFolderSettingsProvider::new();
@@ -202,14 +202,14 @@ impl FolderStrategy {
     ///
     /// When the set carries an SVG variant, the vector pipeline is used and the
     /// raster images are disregarded; otherwise the raster pipeline is used.
-    fn from_sys_icon_set(sys_set: &SysIconSet) -> Self {
-        match &sys_set.svg {
+    fn from_sys_icon_set(sys_set: SysIconSet) -> Self {
+        match sys_set.svg {
             Some(svg) => {
-                let base = SvgFolderIconBase::new(svg.clone(), crate::sys::SURFACE_COLOR);
+                let base = SvgFolderIconBase::new(svg, crate::sys::SURFACE_COLOR);
                 FolderStrategy::Svg(SvgFolderIconCustomizer::from_folder(base))
             }
             None => {
-                let renderer_icons = convert_icon_set(sys_set);
+                let renderer_icons = into_renderer_icon_set(sys_set);
                 let base = FolderIconBase::new(renderer_icons, crate::sys::SURFACE_COLOR);
                 FolderStrategy::Raster(Box::new(FolderIconCustomizer::from_folder(base)))
             }
@@ -220,11 +220,11 @@ impl FolderStrategy {
     ///
     /// Converts the wire-format [`CustomizationProfile`] into a
     /// [`FolderProfile`] so the customizer receives the workflow-specific type.
-    fn apply_profile(&mut self, profile: &CustomizationProfile) {
-        let folder: FolderProfile = profile.into();
+    fn apply_profile(&mut self, profile: CustomizationProfile) {
+        let folder = FolderProfile::from(profile);
         match self {
-            FolderStrategy::Raster(c) => c.apply_profile(&folder),
-            FolderStrategy::Svg(c) => c.apply_profile(&folder),
+            FolderStrategy::Raster(c) => c.apply_profile(folder),
+            FolderStrategy::Svg(c) => c.apply_profile(folder),
         }
     }
 
@@ -259,23 +259,24 @@ impl FolderStrategy {
         match self {
             FolderStrategy::Raster(c) => {
                 let rendered = c.render_full_output()?;
-                Ok(rendered.to_sys())
+                Ok(rendered.into_sys())
             }
             FolderStrategy::Svg(c) => {
                 let svg = c.render_full_output()?;
-                Ok(svg.to_sys())
+                Ok(svg.into_sys())
             }
         }
     }
 
     /// Returns the raster base, or `None` when the active strategy is SVG-based.
-    fn folder_icon_base(&self) -> Option<FolderIconBase> {
+    fn folder_icon_base(&self) -> Option<&FolderIconBase> {
         match self {
-            FolderStrategy::Raster(c) => Some(FolderIconBase::new(
-                c.base_icons().clone(),
-                *c.surface_color()
-                    .expect("raster folder customizer always has a surface color"),
-            )),
+            FolderStrategy::Raster(c) => match c.base() {
+                IconBase::Folder(base) => Some(base),
+                IconBase::Custom(_) => {
+                    unreachable!("raster folder customizer always has a folder base")
+                }
+            },
             FolderStrategy::Svg(_) => None,
         }
     }
@@ -323,7 +324,7 @@ impl FolderStrategy {
 ///     .with_hue_rotation(HueRotationSettings { degrees: 180.0, enabled: true });
 ///
 /// let folders = vec![PathBuf::from("/path/to/folder")];
-/// ctx.customize_folders(&folders, &profile)?;
+/// ctx.customize_folders(&folders, profile)?;
 ///
 /// // Reset to default
 /// ctx.reset_folders(&folders)?;
@@ -376,7 +377,7 @@ impl CustomizationContext {
     ///
     /// Returns `None` when the platform provided a vector folder icon — use
     /// [`folder_icon_svg`](Self::folder_icon_svg) in that case.
-    pub fn folder_icon_base(&self) -> Option<FolderIconBase> {
+    pub fn folder_icon_base(&self) -> Option<&FolderIconBase> {
         self.strategy.folder_icon_base()
     }
 
@@ -401,7 +402,7 @@ impl CustomizationContext {
     /// the active medium can't realize are dropped; check
     /// [`unsupported_layers`](Self::unsupported_layers) first if that should be
     /// reported rather than ignored.
-    pub fn apply_profile(&mut self, profile: &CustomizationProfile) {
+    pub fn apply_profile(&mut self, profile: CustomizationProfile) {
         self.strategy.apply_profile(profile);
     }
 
@@ -440,7 +441,7 @@ impl CustomizationContext {
     pub fn customize_folders<P: AsRef<Path>>(
         &mut self,
         folders: &[P],
-        profile: &CustomizationProfile,
+        profile: CustomizationProfile,
     ) -> Vec<Result<()>> {
         // Apply the profile
         self.apply_profile(profile);
@@ -490,7 +491,7 @@ impl CustomizationContext {
     pub fn customize_folder<P: AsRef<Path>>(
         &mut self,
         folder: P,
-        profile: &CustomizationProfile,
+        profile: CustomizationProfile,
     ) -> Result<()> {
         self.customize_folders(&[folder], profile)
             .into_iter()
@@ -583,7 +584,7 @@ impl CustomizationContext {
     /// Clears the icon cache and refreshes from system resources.
     pub fn refresh_cache(&mut self) -> Result<()> {
         let sys_icons = self.cache.refresh()?;
-        self.strategy = FolderStrategy::from_sys_icon_set(&sys_icons);
+        self.strategy = FolderStrategy::from_sys_icon_set(sys_icons);
         Ok(())
     }
 
@@ -615,13 +616,13 @@ impl CustomizationContext {
     /// });
     ///
     /// // Run customization
-    /// ctx.customize_folders_async(folders, &profile, tx).await;
+    /// ctx.customize_folders_async(folders, profile, tx).await;
     /// handle.await?;
     /// ```
     pub async fn customize_folders_async<P: AsRef<std::path::Path>>(
         &mut self,
         folders: Vec<P>,
-        profile: &CustomizationProfile,
+        profile: CustomizationProfile,
         progress: ProgressSender,
     ) {
         let total = folders.len();
@@ -751,7 +752,7 @@ impl CustomizationContext {
         };
 
         // Convert to system format
-        let sys_icons = rendered.to_sys();
+        let sys_icons = rendered.into_sys();
 
         // Apply to each folder
         folders
@@ -829,7 +830,7 @@ impl CustomizationContext {
         };
 
         // Convert to system format
-        let sys_icons = rendered.to_sys();
+        let sys_icons = rendered.into_sys();
 
         let mut succeeded = 0usize;
         let mut failed = 0usize;

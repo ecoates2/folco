@@ -16,15 +16,15 @@ use crate::sys::get_folder_icon_content_bounds;
 
 /// Trait for types convertible to icon-sys
 pub trait SystemFormat {
-    fn to_sys(&self) -> SysIconSet;
+    fn into_sys(self) -> SysIconSet;
 }
 
 impl SystemFormat for RendererIconSet {
-    fn to_sys(&self) -> SysIconSet {
+    fn into_sys(self) -> SysIconSet {
         let images: Vec<icon_sys::IconImage> = self
-            .iter()
+            .into_iter()
             .map(|renderer_image| {
-                let dynamic = image::DynamicImage::ImageRgba8(renderer_image.data.clone());
+                let dynamic = image::DynamicImage::ImageRgba8(renderer_image.data);
                 icon_sys::IconImage { data: dynamic }
             })
             .collect();
@@ -33,10 +33,10 @@ impl SystemFormat for RendererIconSet {
 }
 
 impl SystemFormat for SvgRenderOutput {
-    fn to_sys(&self) -> SysIconSet {
+    fn into_sys(self) -> SysIconSet {
         SysIconSet {
             images: Vec::new(),
-            svg: Some(self.rendered_svg.clone()),
+            svg: Some(self.rendered_svg),
         }
     }
 }
@@ -66,22 +66,32 @@ impl SystemFormat for SvgRenderOutput {
 /// let renderer_icons = convert_icon_set(&sys_icons);
 /// ```
 pub fn convert_icon_set(sys_icon_set: &SysIconSet) -> RendererIconSet {
-    let images: Vec<RendererIconImage> = sys_icon_set
+    let images = sys_icon_set
         .images
         .iter()
-        .map(|sys_image| {
-            // Convert DynamicImage to RgbaImage
-            let rgba = sys_image.data.to_rgba8();
-
-            // Get platform-specific content bounds for this icon size
-            let content_bounds = get_folder_icon_content_bounds(rgba.width(), rgba.height());
-
-            // System icons use scale 1.0
-            RendererIconImage::new(rgba, 1.0, content_bounds)
-        })
+        .map(|sys_image| to_renderer_image(sys_image.data.to_rgba8()))
         .collect();
 
     RendererIconSet::from_images(images)
+}
+
+/// Consuming [`convert_icon_set`]: pixel buffers that are already RGBA8 are reused.
+pub(crate) fn into_renderer_icon_set(sys_icon_set: SysIconSet) -> RendererIconSet {
+    let images = sys_icon_set
+        .images
+        .into_iter()
+        .map(|sys_image| to_renderer_image(sys_image.data.into_rgba8()))
+        .collect();
+
+    RendererIconSet::from_images(images)
+}
+
+fn to_renderer_image(rgba: image::RgbaImage) -> RendererIconImage {
+    // Get platform-specific content bounds for this icon size
+    let content_bounds = get_folder_icon_content_bounds(rgba.width(), rgba.height());
+
+    // System icons use scale 1.0
+    RendererIconImage::new(rgba, 1.0, content_bounds)
 }
 
 #[cfg(test)]
@@ -117,7 +127,7 @@ mod tests {
         let renderer_set = RendererIconSet::from_images(vec![renderer_img]);
 
         // Convert to sys icon set
-        let sys_set = renderer_set.to_sys();
+        let sys_set = renderer_set.into_sys();
 
         assert_eq!(sys_set.images.len(), 1);
         let img = &sys_set.images[0];
@@ -131,7 +141,7 @@ mod tests {
         let renderer_img = RendererIconImage::new_full_content(rgba, 1.0);
         let renderer_set = RendererIconSet::from_images(vec![renderer_img]);
 
-        let sys_set = renderer_set.to_sys();
+        let sys_set = renderer_set.into_sys();
         assert_eq!(sys_set.images.len(), 1);
         assert!(sys_set.svg.is_none());
     }
@@ -141,7 +151,7 @@ mod tests {
         let output = SvgRenderOutput {
             rendered_svg: "<svg/>".to_string(),
         };
-        let sys_set = output.to_sys();
+        let sys_set = output.into_sys();
         assert_eq!(sys_set.images.len(), 0);
         assert_eq!(sys_set.svg.as_deref(), Some("<svg/>"));
     }
@@ -158,7 +168,7 @@ mod tests {
 
         // Convert to renderer and back
         let renderer_set = convert_icon_set(&original_sys_set);
-        let roundtrip_sys_set = renderer_set.to_sys();
+        let roundtrip_sys_set = renderer_set.into_sys();
 
         // Verify dimensions preserved
         assert_eq!(
@@ -177,7 +187,7 @@ mod tests {
         let sys_set = SvgRenderOutput {
             rendered_svg: svg.to_string(),
         }
-        .to_sys();
+        .into_sys();
 
         assert!(sys_set.images.is_empty());
         assert_eq!(sys_set.svg.as_deref(), Some(svg));
