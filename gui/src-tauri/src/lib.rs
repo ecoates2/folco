@@ -14,20 +14,34 @@ fn set_startup_theme(app: tauri::AppHandle, theme: StartupTheme) -> Result<(), S
     theme::write(&app, theme)
 }
 
-#[tauri::command]
-fn get_folder_icon_base(
-    state: tauri::State<AppState>,
-) -> Result<Option<FolderIconBaseDto>, String> {
-    state.get_folder_icon_base()
+/// Runs `f` against the app state on a blocking thread.
+///
+/// Sync commands run on the main thread, and these may wait on the context lock
+/// while `warm()` builds it — which would freeze the window.
+async fn with_state_blocking<T: Send + 'static>(
+    app: tauri::AppHandle,
+    f: impl FnOnce(&AppState) -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(move || f(&app.state::<AppState>()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn get_folder_icon_svg(
-    state: tauri::State<AppState>,
+async fn get_folder_icon_base(app: tauri::AppHandle) -> Result<Option<FolderIconBaseDto>, String> {
+    with_state_blocking(app, AppState::get_folder_icon_base).await
+}
+
+#[tauri::command]
+async fn get_folder_icon_svg(
+    app: tauri::AppHandle,
 ) -> Result<Option<SvgFolderIconBaseDto>, String> {
-    Ok(state
-        .get_folder_icon_svg()?
-        .map(|(svg, surface_color)| SvgFolderIconBaseDto { svg, surface_color }))
+    with_state_blocking(app, |state| {
+        Ok(state
+            .get_folder_icon_svg()?
+            .map(|(svg, surface_color)| SvgFolderIconBaseDto { svg, surface_color }))
+    })
+    .await
 }
 
 #[tauri::command]
