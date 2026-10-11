@@ -31,10 +31,6 @@ const NO_REJECTIONS: LayerRejections = {
 	overlay: undefined
 };
 
-// SVG icons are resolution-independent, so the preview ladder is ours to pick.
-// TODO: Potentially get rid of this. Since SVG looks the same at any size
-const SVG_PREVIEW_SIZES = [16, 24, 32, 48, 64, 128, 256];
-
 /** Logical (unscaled) sizes offered by the preview, deduped and ascending. */
 function logicalSizes(items: { width: number; scale: number }[]): number[] {
 	const sizes = items.map((item) => Math.round(item.width / item.scale));
@@ -120,7 +116,8 @@ class RendererStore {
 			const { CanvasRenderer } = wasm;
 
 			if (svgBase) {
-				this.#adopt(CanvasRenderer.fromSvgFolderIconBase(svgBase), SVG_PREVIEW_SIZES);
+				// Vector bases have no size ladder; the preview picks its own resolution.
+				this.#adopt(CanvasRenderer.fromSvgFolderIconBase(svgBase), []);
 			} else {
 				const base = await getFolderIconBase();
 				if (!base) {

@@ -3,6 +3,7 @@
 	import { cn } from '$lib/utils';
 	import * as Select from '$lib/components/ui/select';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { devicePixelRatio } from 'svelte/reactivity/window';
 
 	interface Props {
 		/** Fixed display size of the preview area in pixels. */
@@ -20,11 +21,16 @@
 	// effect flushes later, once `selectedSize` is set and the canvas is bound.
 	let hasPainted = $state(false);
 
+	// SVG fills the preview box at native device resolution so it stays crisp on HiDPI.
+	const renderSize = $derived(
+		renderer.isSvg ? Math.round(displaySize * (devicePixelRatio.current ?? 1)) : selectedSize
+	);
+
 	function render() {
 		if (!canvas || renderer.status !== 'ready') return;
 
 		try {
-			renderer.renderToCanvas(canvas, selectedSize);
+			renderer.renderToCanvas(canvas, renderSize);
 			hasPainted = true;
 		} catch (e) {
 			console.error('Render failed:', e);
@@ -36,7 +42,7 @@
 		// Track the version counter so any customization change triggers a re-render
 		const _version = renderer.version;
 
-		if (renderer.status === 'ready' && canvas && selectedSize > 0) {
+		if (renderer.status === 'ready' && canvas && renderSize > 0) {
 			render();
 		}
 	});
