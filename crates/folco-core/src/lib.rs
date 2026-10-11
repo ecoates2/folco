@@ -37,13 +37,14 @@ mod convert;
 mod error;
 pub mod folder_color;
 pub mod progress;
+mod raster_base;
+mod svg_base;
 mod sys;
 
 pub use cache::{CacheConfig, IconCache};
 pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder, UnsupportedLayer};
-#[cfg(target_os = "windows")]
-pub use convert::convert_icon_set;
 pub use error::{Error, Result};
+pub use raster_base::convert_icon_set;
 pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};
 
 // Re-export key types from folco-renderer for convenience

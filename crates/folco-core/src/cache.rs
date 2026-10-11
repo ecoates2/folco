@@ -4,12 +4,9 @@
 //! in the application's data directory to avoid repeatedly extracting them
 //! from system resources.
 
-#[cfg(target_os = "windows")]
-use crate::convert::into_renderer_icon_set;
 use crate::error::{Error, Result};
+use crate::raster_base;
 
-#[cfg(target_os = "windows")]
-use folco_renderer::IconSet as RendererIconSet;
 use icon_sys::IconSet as SysIconSet;
 use icon_sys::folder_settings::{DefaultFolderIconProvider, PlatformDefaultFolderIconProvider};
 
@@ -143,10 +140,17 @@ impl IconCache {
     ///
     /// This is the primary method for obtaining icons to use with `FolderIconCustomizer`.
     /// It handles caching automatically and converts to the renderer's format.
-    #[cfg(target_os = "windows")]
-    pub fn get_renderer_icon_set(&self) -> Result<RendererIconSet> {
+    ///
+    /// # Panics
+    ///
+    /// Panics on platforms without raster folder icon metadata (everything but
+    /// Windows); see [`convert_icon_set`](crate::convert_icon_set).
+    pub fn get_renderer_icon_set(&self) -> Result<folco_renderer::IconSet> {
         let sys_set = self.get_sys_icon_set()?;
-        Ok(into_renderer_icon_set(sys_set))
+        Ok(raster_base::into_renderer_icon_set(
+            sys_set,
+            &raster_base::platform_metadata(),
+        ))
     }
 
     /// Fetches the system folder icon and caches it.

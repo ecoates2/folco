@@ -1,7 +1,13 @@
 //! Linux-specific system icon metadata.
 
-use super::PlatformSizeSpec;
+use super::{PlatformSizeSpec, RasterFolderMetadata};
 use folco_renderer::IconSizeSpec;
+
+impl RasterFolderMetadata {
+    pub(super) fn platform_impl() -> Option<Self> {
+        None
+    }
+}
 
 impl PlatformSizeSpec {
     pub(super) fn platform_impl() -> Self {

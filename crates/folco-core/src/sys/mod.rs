@@ -1,13 +1,17 @@
 //! Platform-specific system icon metadata.
 //!
+//! This is the only module with platform-conditional code. Each platform file
+//! implements the platform-neutral types defined here.
+//!
 //! Raster folder icons need hand-measured metadata (surface color and content
-//! bounds), which only exists for the single stock Windows icon. Every other
-//! platform must supply a scalable SVG folder icon.
+//! bounds), which only exists for the single stock Windows icon and is exposed
+//! as [`RasterFolderMetadata`]. Every other platform must supply a scalable SVG
+//! folder icon.
 //!
 //! Also provides platform size specifications for generating multi-resolution
-//! icon sets.
+//! raster icon sets.
 
-use folco_renderer::IconSizeSpec;
+use folco_renderer::{IconSizeSpec, RectPx, SurfaceColor};
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "windows")]
@@ -19,15 +23,32 @@ pub mod macos;
 #[cfg(target_os = "linux")]
 pub mod linux;
 
-#[cfg(target_os = "windows")]
-pub use windows::{get_folder_icon_content_bounds, raster_folder_icon_base};
+// ============================================================================
+// RasterFolderMetadata
+// ============================================================================
 
-/// Rejects raster-only folder icons, which have no known metadata off Windows.
-#[cfg(not(target_os = "windows"))]
-pub fn raster_folder_icon_base(
-    _icons: icon_sys::IconSet,
-) -> crate::Result<folco_renderer::FolderIconBase> {
-    Err(crate::Error::MissingScalableFolderIcon)
+/// Hand-measured metadata for a platform's stock raster folder icon.
+///
+/// Raster customization needs to know where the folder surface sits in each
+/// image and what color it is. A platform either has this for its stock icon
+/// or must supply a scalable SVG folder icon instead.
+#[derive(Debug, Clone, Copy)]
+pub struct RasterFolderMetadata {
+    /// The color of the icon's primary content surface.
+    pub surface_color: SurfaceColor,
+    /// Returns the imprintable content region for an image of the given
+    /// `(width, height)`.
+    pub content_bounds: fn(u32, u32) -> RectPx,
+}
+
+impl RasterFolderMetadata {
+    /// Returns the metadata for this platform's stock folder icon.
+    ///
+    /// Returns `None` where the folder icon must be vector (every platform
+    /// but Windows).
+    pub fn current_platform() -> Option<Self> {
+        Self::platform_impl()
+    }
 }
 
 // ============================================================================

@@ -1,9 +1,7 @@
-//! Windows-specific system icon metadata.
+//! Windows-specific system icon metadata and size specifications.
 
-use crate::convert::into_renderer_icon_set;
-use crate::error::Result;
-use folco_renderer::{FolderIconBase, RectPx, SurfaceColor};
-use icon_sys::IconSet as SysIconSet;
+use super::RasterFolderMetadata;
+use folco_renderer::{RectPx, SurfaceColor};
 use icon_sys::icon::sys::windows::WindowsIconSize;
 
 /// The default Windows folder icon surface color: RGB(255, 217, 112).
@@ -12,9 +10,13 @@ use icon_sys::icon::sys::windows::WindowsIconSize;
 /// used as the reference point for computing color target deltas.
 pub const SURFACE_COLOR: SurfaceColor = SurfaceColor::new(255, 217, 112);
 
-/// Builds the raster folder base from the stock Windows folder icon.
-pub fn raster_folder_icon_base(icons: SysIconSet) -> Result<FolderIconBase> {
-    Ok(FolderIconBase::new(into_renderer_icon_set(icons), SURFACE_COLOR))
+impl RasterFolderMetadata {
+    pub(super) fn platform_impl() -> Option<Self> {
+        Some(Self {
+            surface_color: SURFACE_COLOR,
+            content_bounds: get_folder_icon_content_bounds,
+        })
+    }
 }
 
 /// Returns the content bounds for a Windows system folder icon.
@@ -110,5 +112,12 @@ mod tests {
             assert!(bounds.x + bounds.width <= dim);
             assert!(bounds.y + bounds.height <= dim);
         }
+    }
+
+    #[test]
+    fn test_platform_has_raster_metadata() {
+        let metadata = RasterFolderMetadata::current_platform().unwrap();
+        assert_eq!(metadata.surface_color, SURFACE_COLOR);
+        assert_eq!((metadata.content_bounds)(32, 32), RectPx::new(2, 8, 28, 17));
     }
 }

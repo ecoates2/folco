@@ -8,10 +8,12 @@ use crate::cache::{CacheConfig, IconCache};
 use crate::convert::SystemFormat;
 use crate::error::{Error, Result};
 use crate::progress::{Progress, ProgressSender};
+use crate::sys::RasterFolderMetadata;
+use crate::{raster_base, svg_base};
 
 use folco_renderer::{
     CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
-    FolderProfile, IconBase, IconBaseKind, LayerKind, SvgFolderIconBase, SvgFolderIconCustomizer,
+    FolderProfile, IconBase, IconBaseKind, LayerKind, SvgFolderIconCustomizer,
 };
 use folco_renderer::{ImageSource, Render};
 use icon_sys::IconSet as SysIconSet;
@@ -184,11 +186,11 @@ impl std::fmt::Display for UnsupportedLayer {
 
 /// The active folder customization strategy.
 ///
-/// Chosen once at build/refresh time based on what `icon-sys` hands us: if the
-/// platform provides a scalable SVG folder icon we use the vector pipeline and
-/// disregard raster PNGs; otherwise we use the raster pipeline. This enum is
-/// the single place that inspects the icon medium — the renderer stays
-/// platform-agnostic.
+/// Chosen once at build/refresh time by platform: platforms with raster
+/// metadata for their stock folder icon (Windows) use the raster pipeline,
+/// every other platform uses the vector pipeline over a scalable SVG icon.
+/// This enum is the single place that decides the icon medium — the renderer
+/// stays platform-agnostic.
 enum FolderStrategy {
     /// Pixel-based pipeline over system PNG icons.
     Raster(Box<FolderIconCustomizer>),
@@ -199,18 +201,26 @@ enum FolderStrategy {
 impl FolderStrategy {
     /// Builds the appropriate strategy from a system icon set.
     ///
-    /// When the set carries an SVG variant, the vector pipeline is used and the
-    /// raster images are disregarded; otherwise the raster pipeline is used,
-    /// which fails on platforms without known raster metadata.
+    /// Platforms with raster metadata for their stock folder icon (Windows)
+    /// use the raster pipeline. Every other platform must supply a scalable
+    /// SVG and uses the vector pipeline, disregarding raster images.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::MissingScalableFolderIcon`] on vector-only platforms if
+    /// the set has no SVG variant.
     fn from_sys_icon_set(sys_set: SysIconSet) -> Result<Self> {
-        match sys_set.svg {
-            Some(svg) => Ok(FolderStrategy::Svg(SvgFolderIconCustomizer::from_folder(
-                SvgFolderIconBase::new(svg),
-            ))),
-            None => {
-                let base = crate::sys::raster_folder_icon_base(sys_set)?;
+        match RasterFolderMetadata::current_platform() {
+            Some(metadata) => {
+                let base = raster_base::from_sys_icon_set(sys_set, &metadata);
                 Ok(FolderStrategy::Raster(Box::new(
                     FolderIconCustomizer::from_folder(base),
+                )))
+            }
+            None => {
+                let base = svg_base::from_sys_icon_set(sys_set)?;
+                Ok(FolderStrategy::Svg(SvgFolderIconCustomizer::from_folder(
+                    base,
                 )))
             }
         }
