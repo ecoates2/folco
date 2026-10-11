@@ -49,7 +49,7 @@ pub struct SerializableFolderIconBase {
     pub surface_color: SurfaceColor,
 }
 
-/// Serializable scalable folder icon: markup plus its surface color.
+/// Serializable scalable folder icon markup.
 ///
 /// The vector counterpart to [`SerializableFolderIconBase`]. No rasterization
 /// happens at this boundary — consumers rasterize on demand at whatever size
@@ -59,8 +59,6 @@ pub struct SerializableFolderIconBase {
 pub struct SerializableSvgFolderIconBase {
     /// Raw SVG markup for the base folder icon.
     pub svg: String,
-    /// The surface color of the base icon.
-    pub surface_color: SurfaceColor,
 }
 
 impl TryFrom<&IconImage> for SerializableIconImage {

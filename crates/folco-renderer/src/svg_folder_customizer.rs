@@ -20,7 +20,7 @@
 
 use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::error::RenderError;
-use crate::icon::{IconImage, SurfaceColor, SvgFolderIconBase};
+use crate::icon::{IconImage, SvgFolderIconBase};
 use crate::layer::{
     CacheKey, ColorDotConfig, CompositeLayer, DependencyVersion, ImageOverlayConfig,
 };
@@ -104,11 +104,10 @@ impl SvgLayerSet for SvgFolderLayers {
 /// # Example
 ///
 /// ```
-/// use folco_renderer::{SvgFolderIconBase, SvgFolderIconCustomizer, SurfaceColor};
+/// use folco_renderer::{SvgFolderIconBase, SvgFolderIconCustomizer};
 ///
 /// let base = SvgFolderIconBase::new(
 ///     r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
-///     SurfaceColor::new(255, 217, 112),
 /// );
 /// let mut customizer = SvgFolderIconCustomizer::from_folder(base);
 ///
@@ -139,11 +138,6 @@ impl SvgFolderIconCustomizer {
     /// Returns a reference to the SVG folder base.
     pub fn base(&self) -> &SvgFolderIconBase {
         &self.base
-    }
-
-    /// Returns the surface color reference.
-    pub fn surface_color(&self) -> &SurfaceColor {
-        &self.base.surface_color
     }
 
     /// Renders the artifact written to the system: a single scalable SVG string.
@@ -250,7 +244,7 @@ mod tests {
     const BASE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd970"/></svg>"##;
 
     fn test_base() -> SvgFolderIconBase {
-        SvgFolderIconBase::new(BASE_SVG, SurfaceColor::new(255, 217, 112))
+        SvgFolderIconBase::new(BASE_SVG)
     }
 
     #[test]
@@ -303,15 +297,6 @@ mod tests {
         let key = CacheKey::new(32, 32, 1.0);
         let deps = customizer.layers.combined_version();
         assert!(customizer.preview.get_cached(key, deps).is_none());
-    }
-
-    #[test]
-    fn exposes_surface_color() {
-        let customizer = SvgFolderIconCustomizer::from_folder(test_base());
-        assert_eq!(
-            *customizer.surface_color(),
-            SurfaceColor::new(255, 217, 112)
-        );
     }
 
     #[test]
@@ -371,7 +356,6 @@ mod tests {
         // customized markup and sampling the center of the dot.
         let base = SvgFolderIconBase::new(
             r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#cccccc"/></svg>"##,
-            SurfaceColor::new(255, 217, 112),
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
         customizer
@@ -430,7 +414,6 @@ mod tests {
         // De-risks the `<image>` PNG data-URI embedding + percentage placement.
         let base = SvgFolderIconBase::new(
             r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#cccccc"/></svg>"##,
-            SurfaceColor::new(255, 217, 112),
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
 
@@ -468,7 +451,6 @@ mod tests {
     fn render_preview_reflects_active_layers() {
         let base = SvgFolderIconBase::new(
             r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#cccccc"/></svg>"##,
-            SurfaceColor::new(255, 217, 112),
         );
         let mut customizer = SvgFolderIconCustomizer::from_folder(base);
         customizer

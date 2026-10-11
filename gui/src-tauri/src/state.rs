@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use folco_core::{CustomizationContext, CustomizationContextBuilder, SurfaceColor};
+use folco_core::{CustomizationContext, CustomizationContextBuilder};
 
 use crate::dto::FolderIconBaseDto;
 
@@ -78,11 +78,8 @@ impl AppState {
         })?
     }
 
-    /// Returns the scalable folder icon markup and surface color, if vector.
-    pub fn get_folder_icon_svg(&self) -> Result<Option<(String, SurfaceColor)>, String> {
-        self.with_ctx(|ctx| {
-            let surface_color = ctx.folder_surface_color();
-            ctx.folder_icon_svg().map(|svg| (svg, surface_color))
-        })
+    /// Returns the scalable folder icon markup, if vector.
+    pub fn get_folder_icon_svg(&self) -> Result<Option<String>, String> {
+        self.with_ctx(|ctx| ctx.folder_icon_svg())
     }
 }

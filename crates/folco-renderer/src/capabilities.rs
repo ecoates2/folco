@@ -143,10 +143,7 @@ impl IconBaseKind {
     /// Each entry pairs the layer with a human-readable reason, so callers don't
     /// need to look up the reason a second time. Empty means the profile applies
     /// in full.
-    pub fn unsupported_in(
-        self,
-        profile: &CustomizationProfile,
-    ) -> Vec<(LayerKind, &'static str)> {
+    pub fn unsupported_in(self, profile: &CustomizationProfile) -> Vec<(LayerKind, &'static str)> {
         let caps = self.capabilities();
         LayerKind::ALL
             .into_iter()
@@ -256,7 +253,11 @@ mod tests {
         let caps = IconBaseKind::RasterFolder.capabilities();
         assert!(LayerKind::ALL.iter().all(|&l| caps.supports(l)));
         // Capabilities has no unsupported layers; IconBaseKind::unsupported_in also empty.
-        assert!(IconBaseKind::RasterFolder.unsupported_in(&full_profile()).is_empty());
+        assert!(
+            IconBaseKind::RasterFolder
+                .unsupported_in(&full_profile())
+                .is_empty()
+        );
     }
 
     #[test]
@@ -267,7 +268,11 @@ mod tests {
                 .into_iter()
                 .map(|(layer, _)| layer)
                 .collect();
-            assert_eq!(unsupported, vec![LayerKind::SolidColor, LayerKind::Decal], "{kind:?}");
+            assert_eq!(
+                unsupported,
+                vec![LayerKind::SolidColor, LayerKind::Decal],
+                "{kind:?}"
+            );
         }
     }
 
@@ -341,7 +346,6 @@ mod tests {
 
         let mut svg = SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(
             r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
-            surface,
         ));
         svg.apply_profile(FolderProfile::from(&wire));
         assert_keeps_exactly(

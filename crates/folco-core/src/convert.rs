@@ -8,11 +8,17 @@
 //! - `icon-sys::IconSet` uses `image::DynamicImage` for flexibility with system APIs
 //! - `folco-renderer::IconSet` uses `image::RgbaImage` with additional metadata
 //!   (scale factor, content bounds) for rendering operations
+//!
+//! Converting system rasters into renderer images needs content bounds, which
+//! are only known for Windows, so that direction is Windows-only.
 
-use folco_renderer::{IconImage as RendererIconImage, IconSet as RendererIconSet, SvgRenderOutput};
+use folco_renderer::{IconSet as RendererIconSet, SvgRenderOutput};
 use icon_sys::IconSet as SysIconSet;
 
+#[cfg(target_os = "windows")]
 use crate::sys::get_folder_icon_content_bounds;
+#[cfg(target_os = "windows")]
+use folco_renderer::IconImage as RendererIconImage;
 
 /// Trait for types convertible to icon-sys
 pub trait SystemFormat {
@@ -65,6 +71,7 @@ impl SystemFormat for SvgRenderOutput {
 /// let sys_icons = provider.dump_default_folder_icon().unwrap();
 /// let renderer_icons = convert_icon_set(&sys_icons);
 /// ```
+#[cfg(target_os = "windows")]
 pub fn convert_icon_set(sys_icon_set: &SysIconSet) -> RendererIconSet {
     let images = sys_icon_set
         .images
@@ -76,6 +83,7 @@ pub fn convert_icon_set(sys_icon_set: &SysIconSet) -> RendererIconSet {
 }
 
 /// Consuming [`convert_icon_set`]: pixel buffers that are already RGBA8 are reused.
+#[cfg(target_os = "windows")]
 pub(crate) fn into_renderer_icon_set(sys_icon_set: SysIconSet) -> RendererIconSet {
     let images = sys_icon_set
         .images
@@ -86,6 +94,7 @@ pub(crate) fn into_renderer_icon_set(sys_icon_set: SysIconSet) -> RendererIconSe
     RendererIconSet::from_images(images)
 }
 
+#[cfg(target_os = "windows")]
 fn to_renderer_image(rgba: image::RgbaImage) -> RendererIconImage {
     // Get platform-specific content bounds for this icon size
     let content_bounds = get_folder_icon_content_bounds(rgba.width(), rgba.height());
@@ -97,13 +106,15 @@ fn to_renderer_image(rgba: image::RgbaImage) -> RendererIconImage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{DynamicImage, RgbaImage};
+    use folco_renderer::IconImage as RendererIconImage;
+    use image::RgbaImage;
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_convert_icon_set() {
         // Create a simple sys icon set
         let rgba = RgbaImage::from_pixel(32, 32, image::Rgba([255, 0, 0, 255]));
-        let dynamic = DynamicImage::ImageRgba8(rgba);
+        let dynamic = image::DynamicImage::ImageRgba8(rgba);
         let sys_set = SysIconSet {
             images: vec![icon_sys::IconImage { data: dynamic }],
             svg: None,
@@ -156,11 +167,12 @@ mod tests {
         assert_eq!(sys_set.svg.as_deref(), Some("<svg/>"));
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_roundtrip_conversion() {
         // Create original sys icon set
         let rgba = RgbaImage::from_pixel(48, 48, image::Rgba([0, 0, 255, 255]));
-        let dynamic = DynamicImage::ImageRgba8(rgba);
+        let dynamic = image::DynamicImage::ImageRgba8(rgba);
         let original_sys_set = SysIconSet {
             images: vec![icon_sys::IconImage { data: dynamic }],
             svg: None,

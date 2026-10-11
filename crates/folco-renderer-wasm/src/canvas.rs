@@ -306,10 +306,8 @@ impl CanvasRenderer {
         base: Ts<SerializableSvgFolderIconBase>,
     ) -> Result<CanvasRenderer, JsError> {
         let base_rust = base.to_rust()?;
-        let customizer = SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(
-            base_rust.svg,
-            base_rust.surface_color,
-        ));
+        let customizer =
+            SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(base_rust.svg));
         Ok(Self {
             active: ActiveCustomizer::SvgFolder(Box::new(customizer)),
         })

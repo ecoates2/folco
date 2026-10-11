@@ -39,7 +39,7 @@ async fn get_folder_icon_svg(
     with_state_blocking(app, |state| {
         Ok(state
             .get_folder_icon_svg()?
-            .map(|(svg, surface_color)| SvgFolderIconBaseDto { svg, surface_color }))
+            .map(|svg| SvgFolderIconBaseDto { svg }))
     })
     .await
 }

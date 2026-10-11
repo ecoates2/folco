@@ -1,42 +1,7 @@
 //! Linux-specific system icon metadata.
 
-use folco_renderer::RectPx;
-
-// Temporary stub to get stuff compiling
-pub const SURFACE_COLOR: SurfaceColor = SurfaceColor::new(127, 127, 127);
-
-/// Returns the content bounds for a Linux system folder icon.
-///
-/// Linux folder icons from icon themes may have specific content regions
-/// depending on the theme and icon size.
-///
-/// # Arguments
-///
-/// * `width` - The width of the icon image in pixels
-/// * `height` - The height of the icon image in pixels
-///
-/// # Returns
-///
-/// A `RectPx` describing the region containing the actual icon content.
-pub fn get_folder_icon_content_bounds(width: u32, height: u32) -> RectPx {
-    // TODO: Determine actual content bounds for Linux folder icons
-    // unimplemented!(
-    //     "Linux folder icon content bounds not yet implemented for {}x{}",
-    //     width,
-    //     height
-    // )
-    // EJC: This is the entire img for now
-    RectPx {
-        x: 0,
-        y: 0,
-        width,
-        height,
-    }
-}
-
 use super::PlatformSizeSpec;
 use folco_renderer::IconSizeSpec;
-use folco_renderer::SurfaceColor;
 
 impl PlatformSizeSpec {
     pub(super) fn platform_impl() -> Self {
@@ -53,9 +18,4 @@ impl PlatformSizeSpec {
             ],
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    // Tests will be added once bounds are implemented
 }

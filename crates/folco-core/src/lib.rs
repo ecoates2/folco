@@ -41,6 +41,7 @@ mod sys;
 
 pub use cache::{CacheConfig, IconCache};
 pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder, UnsupportedLayer};
+#[cfg(target_os = "windows")]
 pub use convert::convert_icon_set;
 pub use error::{Error, Result};
 pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};

@@ -1,6 +1,9 @@
 //! Windows-specific system icon metadata.
 
-use folco_renderer::{RectPx, SurfaceColor};
+use crate::convert::into_renderer_icon_set;
+use crate::error::Result;
+use folco_renderer::{FolderIconBase, RectPx, SurfaceColor};
+use icon_sys::IconSet as SysIconSet;
 use icon_sys::icon::sys::windows::WindowsIconSize;
 
 /// The default Windows folder icon surface color: RGB(255, 217, 112).
@@ -8,6 +11,11 @@ use icon_sys::icon::sys::windows::WindowsIconSize;
 /// This is the golden-yellow color of the standard Windows folder icon,
 /// used as the reference point for computing color target deltas.
 pub const SURFACE_COLOR: SurfaceColor = SurfaceColor::new(255, 217, 112);
+
+/// Builds the raster folder base from the stock Windows folder icon.
+pub fn raster_folder_icon_base(icons: SysIconSet) -> Result<FolderIconBase> {
+    Ok(FolderIconBase::new(into_renderer_icon_set(icons), SURFACE_COLOR))
+}
 
 /// Returns the content bounds for a Windows system folder icon.
 ///

@@ -52,4 +52,10 @@ pub enum Error {
     /// Icon rendering error from folco-renderer.
     #[error("rendering error: {0}")]
     Render(#[from] folco_renderer::RenderError),
+
+    /// The system folder icon is raster-only on a platform that needs SVG.
+    #[error(
+        "the system folder icon has no scalable (SVG) version; only SVG icon themes are supported on this platform"
+    )]
+    MissingScalableFolderIcon,
 }
