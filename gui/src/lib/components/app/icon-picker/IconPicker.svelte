@@ -11,7 +11,8 @@
 		iconTheme?: 'auto' | 'light' | 'dark';
 		height?: string;
 		class?: string;
-		oniconselected?: (event: CustomEvent) => void;
+		/** Fired with the SVG markup of the picked icon. */
+		onselect?: (svg: string) => void;
 	}
 
 	let {
@@ -24,8 +25,13 @@
 		iconTheme = 'auto',
 		height = '100%',
 		class: className,
-		oniconselected
+		onselect
 	}: Props = $props();
+
+	function handleIconSelected(e: Event) {
+		const svg = (e as CustomEvent<{ svg?: unknown }>).detail?.svg;
+		if (typeof svg === 'string' && svg) onselect?.(svg);
+	}
 </script>
 
 <iconify-picker
@@ -38,7 +44,7 @@
 	button-label={buttonLabel}
 	theme={iconTheme}
 	hide-search={hideSearch ? '' : undefined}
-	onicon-selected={oniconselected}
+	onicon-selected={handleIconSelected}
 ></iconify-picker>
 
 <style>

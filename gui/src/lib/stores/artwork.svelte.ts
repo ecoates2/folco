@@ -1,11 +1,13 @@
 import type { Emoji } from '@emoji-mart/data';
+import type { FolderColorMetadata } from 'folco-renderer-wasm';
 import type { EmojiPickerSkin, SelectedEmoji } from '$lib/components/ui/emoji-picker/types';
 import { renderer } from './renderer.svelte';
 
 /** A piece of artwork placed on the icon, tagged by where it came from. */
 export type Artwork =
 	| { kind: 'emoji'; emoji: string; data: Emoji; skin: number }
-	| { kind: 'icon'; svg: string };
+	| { kind: 'icon'; svg: string }
+	| { kind: 'colorDot'; color: FolderColorMetadata };
 
 /** The active artwork source, or `'none'`. */
 export type ArtworkKind = Artwork['kind'] | 'none';
@@ -24,7 +26,7 @@ class ArtworkStore {
 	/**
 	 * The active artwork source.
 	 *
-	 * Emoji and icons compete for a single overlay layer, so this is one value
+	 * Emoji, icons and the color dot are mutually exclusive, so this is one value
 	 * rather than a flag per source — the exclusion is structural.
 	 */
 	kind = $state<ArtworkKind>('none');
@@ -41,6 +43,10 @@ class ArtworkStore {
 	#emoji = $state<{ kind: 'emoji'; data: Emoji } | null>(null);
 	#skin = $state<number | null>(null);
 	#icon = $state<Extract<Artwork, { kind: 'icon' }> | null>(null);
+	#colorDot = $state<FolderColorMetadata | null>(null);
+
+	/** The picked color dot preset's id, or null if none was picked yet. */
+	readonly colorDotId = $derived(this.#colorDot?.id ?? null);
 
 	/** Whether an emoji was selected. */
 	#isEmoji = $derived(this.kind === 'emoji' && this.#emoji !== null && this.#skin !== null);
@@ -71,7 +77,9 @@ class ArtworkStore {
 			? { kind: 'emoji', emoji: this.#activeEmojiNative!, data: this.#activeEmoji!.data, skin: this.#activeEmoji!.skin }
 			: this.#isIcon
 				? this.#activeIcon
-				: null
+				: this.kind === 'colorDot' && this.#colorDot !== null
+					? { kind: 'colorDot', color: this.#colorDot }
+					: null
 	);
 
 	/**
@@ -112,6 +120,12 @@ class ArtworkStore {
 		this.#push();
 	}
 
+	selectColorDot(color: FolderColorMetadata) {
+		this.#colorDot = color;
+		this.kind = 'colorDot';
+		this.#push();
+	}
+
 	setPlacement(placement: Placement) {
 		this.placement = placement;
 		this.#push();
@@ -127,24 +141,29 @@ class ArtworkStore {
 		this.#push();
 	}
 
-	/** Writes the current selection into the renderer's decal and overlay layers. */
+	/** Writes the current selection into the renderer's decal, overlay and color dot layers. */
 	#push() {
 		if (renderer.status !== 'ready') return;
 
 		const art = this.selection;
 		const placement = this.effectivePlacement;
 
-		// Decal and overlay are separate layers, so both are written every time:
-		// setting only the one that gained the artwork would leave the other
-		// still configured, and still rendering.
+		// Each layer is written every time: setting only the one that gained the
+		// artwork would leave the others still configured, and still rendering.
 		renderer.setDecal(art?.kind === 'icon' && placement === 'decal' ? art.svg : null, DECAL_SCALE);
 
-		if (!art || placement !== 'overlay') {
-			renderer.setOverlay(null, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
-		} else if (art.kind === 'emoji') {
-			renderer.setOverlayEmoji(art.emoji, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
+		if (art?.kind === 'colorDot') {
+			renderer.setColorDot(art.color.r, art.color.g, art.color.b);
 		} else {
+			renderer.clearColorDot();
+		}
+
+		if (art?.kind === 'emoji') {
+			renderer.setOverlayEmoji(art.emoji, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
+		} else if (art?.kind === 'icon' && placement === 'overlay') {
 			renderer.setOverlay(art.svg, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
+		} else {
+			renderer.setOverlay(null, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
 		}
 	}
 }

@@ -1,6 +1,7 @@
 import { WORKFLOWS } from '$lib/workflows/definitions';
 import type { ResolvedSection, WorkflowId, WorkflowSpec } from '$lib/workflows/types';
 import { artwork } from './artwork.svelte';
+import { solidColor } from './solid-color.svelte';
 import { renderer } from './renderer.svelte';
 
 /** Pairs each declared section with what the resolved base actually allows. */
@@ -57,6 +58,7 @@ class WorkflowStore {
 	// Swapping the renderer resets its layers, so decorations are pushed again.
 	async #load(acquire: () => Promise<void>) {
 		await acquire();
+		solidColor.reapply();
 		artwork.reapply();
 	}
 }
