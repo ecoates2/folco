@@ -316,7 +316,7 @@ impl CanvasRenderer {
     /// Creates a renderer for a user-supplied raster image.
     ///
     /// The image is decoded and resized to each size spec up front, so pass the
-    /// platform's required sizes (from the backend's `get_platform_icon_sizes`)
+    /// platform's custom-image sizes (from the backend's `get_custom_image_sizes`)
     /// rather than inventing a ladder here.
     ///
     /// # Arguments

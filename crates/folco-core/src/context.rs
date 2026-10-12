@@ -695,12 +695,12 @@ impl CustomizationContext {
     // Custom Icon Support
     // ========================================================================
 
-    /// Returns the platform size specification for generating custom icon sets.
+    /// Returns the sizes a user-supplied image is rasterized to on this platform.
     ///
     /// Pass the returned specs to [`IconCustomizer::from_image()`] or
     /// [`IconSet::from_image_source()`] to generate platform-compatible sizes.
-    pub fn platform_size_spec(&self) -> crate::sys::PlatformSizeSpec {
-        crate::sys::PlatformSizeSpec::current_platform()
+    pub fn custom_image_size_spec(&self) -> crate::sys::PlatformSizeSpec {
+        crate::sys::PlatformSizeSpec::custom_image()
     }
 
     /// Creates a [`CustomIconCustomizer`] from a user-provided image.
@@ -716,7 +716,7 @@ impl CustomizationContext {
         &self,
         source: &ImageSource,
     ) -> Result<CustomIconCustomizer> {
-        let specs = self.platform_size_spec();
+        let specs = self.custom_image_size_spec();
         Ok(CustomIconCustomizer::from_image(source, specs.sizes())?)
     }
 

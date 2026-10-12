@@ -10,7 +10,11 @@ impl RasterFolderMetadata {
 }
 
 impl PlatformSizeSpec {
-    pub(super) fn platform_impl() -> Self {
+    pub(super) fn custom_image_impl() -> Self {
+        Self::system_folder_icon_impl()
+    }
+
+    pub(super) fn system_folder_icon_impl() -> Self {
         Self {
             sizes: vec![
                 IconSizeSpec::square(16, 1.0),

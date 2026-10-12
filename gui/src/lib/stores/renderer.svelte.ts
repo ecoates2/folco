@@ -9,7 +9,7 @@ import type {
 import {
 	getFolderIconBase,
 	getFolderIconSvg,
-	getPlatformIconSizes
+	getCustomImageSizes
 } from '$lib/services/tauri-commands';
 
 export type RendererStatus = 'uninitialized' | 'loading' | 'ready' | 'error';
@@ -83,8 +83,8 @@ class RendererStore {
 	/** All available folder color presets, populated once WASM is ready. */
 	availableColors = $state<FolderColorMetadata[]>([]);
 
-	/** Platform size ladder, fetched once — it can't change while we're running. */
-	#platformSizes: IconSizeSpec[] | null = null;
+	/** Custom-image size ladder, fetched once — it can't change while we're running. */
+	#customSizes: IconSizeSpec[] | null = null;
 
 	/**
 	 * Monotonically increasing version counter, bumped on every customization
@@ -145,7 +145,7 @@ class RendererStore {
 	}
 
 	/**
-	 * Builds a custom-icon renderer against the platform's size ladder.
+	 * Builds a custom-icon renderer against the platform's custom-image size ladder.
 	 *
 	 * Unlike {@linkcode loadFolderIcon}, this needs a source from the user —
 	 * picking a new image after one is already loaded is the normal path.
@@ -157,7 +157,7 @@ class RendererStore {
 		if (!this.#hasBackend()) return;
 
 		try {
-			const [wasm, specs] = await Promise.all([ensureWasm(), this.#platformIconSizes()]);
+			const [wasm, specs] = await Promise.all([ensureWasm(), this.#customImageSizes()]);
 
 			if (this.availableColors.length === 0) {
 				this.availableColors = wasm.getAvailableColors();
@@ -169,9 +169,9 @@ class RendererStore {
 		}
 	}
 
-	async #platformIconSizes(): Promise<IconSizeSpec[]> {
-		this.#platformSizes ??= await getPlatformIconSizes();
-		return this.#platformSizes;
+	async #customImageSizes(): Promise<IconSizeSpec[]> {
+		this.#customSizes ??= await getCustomImageSizes();
+		return this.#customSizes;
 	}
 
 	/** Records a missing backend as an error; returns false when unavailable. */

@@ -8,8 +8,8 @@
 //! as [`RasterFolderMetadata`]. Every other platform must supply a scalable SVG
 //! folder icon.
 //!
-//! Also provides platform size specifications for generating multi-resolution
-//! raster icon sets.
+//! Also provides two platform size ladders: the sizes in the system's own
+//! folder icon, and the sizes a user-supplied image is rasterized to.
 
 use folco_renderer::{IconSizeSpec, RectPx, SurfaceColor};
 use serde::{Deserialize, Serialize};
@@ -55,29 +55,23 @@ impl RasterFolderMetadata {
 // PlatformSizeSpec
 // ============================================================================
 
-/// Platform-specific icon size specifications.
+/// A platform icon size ladder.
 ///
-/// The icon sizes required to emit a **raster** icon set for the host OS.
+/// Two distinct ladders exist per platform, and they need not agree:
 ///
-/// This describes an output requirement, not what the system's own folder icon
-/// looks like. It applies whenever folco must produce pixels — most visibly
-/// when turning a user-supplied image into an icon, where there is no inherent
-/// size ladder to inherit.
-///
-/// A platform whose folder icon is vector still has a meaningful ladder here:
-/// the vector *folder* pipeline emits a single scalable file and never consults
-/// it, but a custom image on that same platform still has to be rasterized.
+/// - [`system_folder_icon`](Self::system_folder_icon): the sizes the OS's
+///   stock folder icon ships in.
+/// - [`custom_image`](Self::custom_image): the sizes a user-supplied image is
+///   rasterized to before being written. A custom image has no inherent ladder,
+///   so this is driven by what the platform's write path consumes.
 ///
 /// # Example
 ///
 /// ```
 /// use folco_core::PlatformSizeSpec;
 ///
-/// let spec = PlatformSizeSpec::current_platform();
-/// println!("Raster output needs {} icon sizes", spec.sizes().len());
-///
-/// // Pass to folco-renderer for generating an icon set
-/// // let icon_set = IconSet::from_image_source(&source, spec.sizes())?;
+/// let spec = PlatformSizeSpec::custom_image();
+/// println!("Custom images are rasterized to {} sizes", spec.sizes().len());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformSizeSpec {
@@ -95,22 +89,22 @@ impl PlatformSizeSpec {
         &self.sizes
     }
 
-    /// Returns the size specifications for the current platform.
+    /// The sizes the host OS's stock folder icon ships in.
     ///
     /// - **Windows**: 16, 20, 24, 32, 40, 48, 64, 256 (all @1x)
     /// - **macOS**: 16, 32, 128, 256, 512 (@1x and @2x)
     /// - **Linux**: 16, 22, 24, 32, 48, 64, 128, 256 (all @1x)
-    pub fn current_platform() -> Self {
-        Self::platform_impl()
+    pub fn system_folder_icon() -> Self {
+        Self::system_folder_icon_impl()
     }
-}
 
-/// Returns the icon size specifications for the current platform.
-///
-/// This is a convenience function equivalent to
-/// [`PlatformSizeSpec::current_platform()`].
-pub fn get_platform_icon_sizes() -> PlatformSizeSpec {
-    PlatformSizeSpec::current_platform()
+    /// The sizes a user-supplied image is rasterized to for the host OS.
+    ///
+    /// - **Windows**, **macOS**: the [system folder icon](Self::system_folder_icon) ladder
+    /// - **Linux**: 512 only; the file manager scales the single written file
+    pub fn custom_image() -> Self {
+        Self::custom_image_impl()
+    }
 }
 
 #[cfg(test)]
@@ -118,15 +112,18 @@ mod platform_size_spec_tests {
     use super::*;
 
     #[test]
-    fn current_platform_returns_sizes() {
-        let spec = PlatformSizeSpec::current_platform();
-        assert!(!spec.sizes().is_empty());
+    fn ladders_are_non_empty() {
+        assert!(!PlatformSizeSpec::system_folder_icon().sizes().is_empty());
+        assert!(!PlatformSizeSpec::custom_image().sizes().is_empty());
     }
 
     #[test]
     fn all_sizes_are_positive() {
-        let spec = PlatformSizeSpec::current_platform();
-        for size in spec.sizes() {
+        let specs = [
+            PlatformSizeSpec::system_folder_icon(),
+            PlatformSizeSpec::custom_image(),
+        ];
+        for size in specs.iter().flat_map(PlatformSizeSpec::sizes) {
             assert!(size.width > 0);
             assert!(size.height > 0);
             assert!(size.scale > 0.0);

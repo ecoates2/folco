@@ -50,8 +50,8 @@ async fn get_folder_icon_svg(
 }
 
 #[tauri::command]
-fn get_platform_icon_sizes() -> PlatformSizeSpecDto {
-    folco_core::get_platform_icon_sizes()
+fn get_custom_image_sizes() -> PlatformSizeSpecDto {
+    PlatformSizeSpecDto::custom_image()
 }
 
 /// Runs a folder operation on the app state, forwarding its progress events to
@@ -123,7 +123,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_folder_icon_base,
             get_folder_icon_svg,
-            get_platform_icon_sizes,
+            get_custom_image_sizes,
             customize_folders,
             reset_folders,
             experimental_enabled,

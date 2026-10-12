@@ -46,7 +46,7 @@ pub use cache::{CacheConfig, IconCache};
 pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder, UnsupportedLayer};
 pub use error::{Error, Result};
 pub use raster_base::convert_icon_set;
-pub use sys::{PlatformSizeSpec, get_platform_icon_sizes};
+pub use sys::PlatformSizeSpec;
 
 // Re-export key types from folco-renderer for convenience
 // This allows consumers to use profiles without importing the renderer crate directly

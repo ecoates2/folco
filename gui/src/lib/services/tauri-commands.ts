@@ -30,14 +30,14 @@ export function getFolderIconSvg(): Promise<SerializableSvgFolderIconBase | null
 }
 
 /**
- * The icon sizes the host platform expects.
+ * The sizes a user-supplied image is rasterized to on the host platform.
  *
  * A user-supplied image has no inherent size ladder, so this is the only source
  * of truth for one. Platform knowledge lives in the backend; never hardcode
  * sizes here.
  */
-export async function getPlatformIconSizes(): Promise<IconSizeSpec[]> {
-	const spec = await invoke<PlatformSizeSpec>('get_platform_icon_sizes');
+export async function getCustomImageSizes(): Promise<IconSizeSpec[]> {
+	const spec = await invoke<PlatformSizeSpec>('get_custom_image_sizes');
 	return spec.sizes;
 }
 
