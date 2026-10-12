@@ -1,10 +1,13 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use folco_core::progress::ProgressSender;
-use folco_core::{CustomizationContext, CustomizationContextBuilder, CustomizationProfile};
+use folco_core::{
+    CustomizationContext, CustomizationContextBuilder, CustomizationProfile, ImageFile,
+    ImageSource,
+};
 
-use crate::dto::FolderIconBaseDto;
+use crate::dto::{CustomImageDto, FolderIconBaseDto, ImageKindDto};
 
 /// Wrapper to make `CustomizationContext` usable in Tauri managed state.
 ///
@@ -28,6 +31,26 @@ struct SendableContext(CustomizationContext);
 unsafe impl Send for SendableContext {}
 unsafe impl Sync for SendableContext {}
 
+/// The user's custom base image, as last loaded.
+///
+/// The backend owns the image; the frontend previews a copy of these exact bytes
+/// and quotes `revision` back, so an operation can't write a different image than
+/// the one on screen.
+#[derive(Default)]
+struct CustomImageSlot {
+    revision: u64,
+    file: Option<ImageFile>,
+}
+
+impl CustomImageSlot {
+    fn get(&self, revision: u64) -> Result<&ImageFile, String> {
+        match &self.file {
+            Some(file) if revision == self.revision => Ok(file),
+            _ => Err("The custom image changed since it was previewed; pick it again.".into()),
+        }
+    }
+}
+
 /// Tauri managed state wrapping the `CustomizationContext`.
 ///
 /// The context is built on first use rather than at startup: building it can hit
@@ -35,12 +58,14 @@ unsafe impl Sync for SendableContext {}
 /// eagerly delays window creation by that whole cost.
 pub struct AppState {
     ctx: Mutex<Option<SendableContext>>,
+    custom_image: Mutex<CustomImageSlot>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
             ctx: Mutex::new(None),
+            custom_image: Mutex::default(),
         }
     }
 
@@ -130,5 +155,58 @@ impl AppState {
         self.with_ctx(|ctx| {
             tauri::async_runtime::block_on(ctx.reset_folders_async(folders, progress));
         })
+    }
+
+    /// Reads `path` and makes it the custom image, superseding any earlier one.
+    pub fn load_custom_image(&self, path: &Path) -> Result<CustomImageDto, String> {
+        let file = ImageFile::read(path).map_err(|e| e.to_string())?;
+        let kind = match file {
+            ImageFile::Svg(_) => ImageKindDto::Svg,
+            ImageFile::Raster(_) => ImageKindDto::Raster,
+        };
+        let file_name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string());
+
+        let mut slot = self.custom_image.lock().map_err(|e| e.to_string())?;
+        slot.revision += 1;
+        slot.file = Some(file);
+
+        Ok(CustomImageDto {
+            revision: slot.revision,
+            kind,
+            file_name,
+        })
+    }
+
+    /// The contents of custom image `revision`, for the frontend's preview.
+    pub fn custom_image_bytes(&self, revision: u64) -> Result<Vec<u8>, String> {
+        let slot = self.custom_image.lock().map_err(|e| e.to_string())?;
+        Ok(slot.get(revision)?.bytes().to_vec())
+    }
+
+    /// Writes custom image `revision`, decorated per `profile`, to every folder.
+    ///
+    /// Blocks like [`customize_folders`](Self::customize_folders).
+    pub fn customize_folders_with_image(
+        &self,
+        folders: Vec<PathBuf>,
+        revision: u64,
+        profile: CustomizationProfile,
+        progress: ProgressSender,
+    ) -> Result<(), String> {
+        // Cloned so the slot isn't held for the whole write.
+        let source: ImageSource = {
+            let slot = self.custom_image.lock().map_err(|e| e.to_string())?;
+            slot.get(revision)?.clone().into()
+        };
+
+        self.with_ctx(|ctx| {
+            tauri::async_runtime::block_on(
+                ctx.customize_folders_with_image_async(folders, &source, profile, progress),
+            )
+            .map_err(|e| e.to_string())
+        })?
     }
 }

@@ -4,11 +4,13 @@ mod theme;
 
 use std::path::PathBuf;
 
-use dto::{FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto, SvgFolderIconBaseDto};
+use dto::{
+    CustomImageDto, FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto, SvgFolderIconBaseDto,
+};
 use folco_core::CustomizationProfile;
 use folco_core::progress::{progress_channel, ProgressSender};
 use state::AppState;
-use tauri::ipc::Channel;
+use tauri::ipc::{Channel, Response};
 use tauri::Manager;
 use theme::StartupTheme;
 
@@ -107,6 +109,40 @@ async fn reset_folders(
     run_with_progress(app, on_progress, move |state, tx| state.reset_folders(folders, tx)).await
 }
 
+/// Reads an image file into app state as the custom base image.
+#[tauri::command]
+async fn load_custom_image(app: tauri::AppHandle, path: PathBuf) -> Result<CustomImageDto, String> {
+    with_state_blocking(app, move |state| state.load_custom_image(&path)).await
+}
+
+/// Raw bytes of custom image `revision`, so the preview renders exactly what
+/// the backend will write.
+#[tauri::command]
+async fn get_custom_image_bytes(app: tauri::AppHandle, revision: u64) -> Result<Response, String> {
+    with_state_blocking(app, move |state| state.custom_image_bytes(revision))
+        .await
+        .map(Response::new)
+}
+
+/// Uses custom image `image_revision` as the folder icon, decorated per the
+/// profile, streaming progress like [`customize_folders`].
+#[tauri::command]
+async fn customize_folders_with_image(
+    app: tauri::AppHandle,
+    folders: Vec<PathBuf>,
+    image_revision: u64,
+    profile_json: String,
+    on_progress: Channel<ProgressDto>,
+) -> Result<(), String> {
+    let profile = CustomizationProfile::from_json(&profile_json)
+        .map_err(|e| format!("Invalid customization profile: {e}"))?;
+
+    run_with_progress(app, on_progress, move |state, tx| {
+        state.customize_folders_with_image(folders, image_revision, profile, tx)
+    })
+    .await
+}
+
 #[tauri::command]
 fn experimental_enabled() -> bool {
     folco_core::experimental::enabled_from_env()
@@ -125,6 +161,9 @@ pub fn run() {
             get_folder_icon_svg,
             get_custom_image_sizes,
             customize_folders,
+            customize_folders_with_image,
+            load_custom_image,
+            get_custom_image_bytes,
             reset_folders,
             experimental_enabled,
             set_startup_theme

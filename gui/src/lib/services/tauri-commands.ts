@@ -80,3 +80,39 @@ export function resetFolders(
 	const channel = new Channel<CustomizeProgress>(onProgress);
 	return invoke('reset_folders', { folders, onProgress: channel });
 }
+
+/** The custom image the backend holds. `revision` names this exact copy. */
+export interface CustomImage {
+	revision: number;
+	kind: 'svg' | 'raster';
+	fileName: string;
+}
+
+/** Has the backend read `path` and hold it as the custom image, replacing any earlier one. */
+export function loadCustomImage(path: string): Promise<CustomImage> {
+	return invoke('load_custom_image', { path });
+}
+
+/** The bytes of custom image `revision`; rejects if a newer image has replaced it. */
+export async function getCustomImageBytes(revision: number): Promise<Uint8Array> {
+	return new Uint8Array(await invoke<ArrayBuffer>('get_custom_image_bytes', { revision }));
+}
+
+/**
+ * Uses custom image `imageRevision` as the folder icon, decorated per the
+ * profile. Rejects if a newer image has replaced it.
+ */
+export function customizeFoldersWithImage(
+	folders: string[],
+	imageRevision: number,
+	profileJson: string,
+	onProgress: (event: CustomizeProgress) => void
+): Promise<void> {
+	const channel = new Channel<CustomizeProgress>(onProgress);
+	return invoke('customize_folders_with_image', {
+		folders,
+		imageRevision,
+		profileJson,
+		onProgress: channel
+	});
+}

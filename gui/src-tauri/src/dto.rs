@@ -24,3 +24,20 @@ pub use folco_core::PlatformSizeSpec as PlatformSizeSpecDto;
 
 /// A folder customization progress event streamed to the frontend.
 pub use folco_core::progress::Progress as ProgressDto;
+
+/// How the frontend should interpret custom image bytes.
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageKindDto {
+    Svg,
+    Raster,
+}
+
+/// The custom image the backend now holds. GUI-only, so defined here.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomImageDto {
+    pub revision: u64,
+    pub kind: ImageKindDto,
+    pub file_name: String,
+}

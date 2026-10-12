@@ -43,16 +43,10 @@ class WorkflowStore {
 		if (id === 'folder') await this.#load(() => renderer.loadFolderIcon());
 	}
 
-	/** Adopts a user-supplied raster image as the base. */
-	async useImage(imageData: Uint8Array) {
+	/** Adopts a user-picked image file as the base. */
+	async useImageFile(path: string) {
 		this.id = 'custom-image';
-		await this.#load(() => renderer.loadCustomImage(imageData));
-	}
-
-	/** Adopts user-supplied SVG markup as the base. */
-	async useSvg(svg: string) {
-		this.id = 'custom-image';
-		await this.#load(() => renderer.loadCustomSvg(svg));
+		await this.#load(() => renderer.loadCustomImageFile(path));
 	}
 
 	// Swapping the renderer resets its layers, so decorations are pushed again.

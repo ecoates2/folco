@@ -1,5 +1,6 @@
 import {
 	customizeFolders,
+	customizeFoldersWithImage,
 	resetFolders,
 	type CustomizeProgress
 } from '$lib/services/tauri-commands';
@@ -8,6 +9,7 @@ import { directories } from './directories.svelte';
 import { errorDialog, type FolderFailure } from './error-dialog.svelte';
 import { renderer } from './renderer.svelte';
 import { solidColor } from './solid-color.svelte';
+import { workflow } from './workflow.svelte';
 
 export type FolderOperation = 'apply' | 'reset';
 export type OperationStatus = 'idle' | 'running' | 'done';
@@ -36,9 +38,10 @@ class FolderOperationsStore {
 	/** Folders that failed individually while the rest went through. */
 	failures = $state<FolderFailure[]>([]);
 
-	/** Whether any option the current icon can realize is switched on and picked. */
+	/** Whether applying would change anything: a custom image, or a realizable option. */
 	readonly hasCustomization = $derived(
-		(solidColor.enabled && solidColor.selectedId !== null && renderer.supportsSolidColor) ||
+		renderer.customImage !== null ||
+			(solidColor.enabled && solidColor.selectedId !== null && renderer.supportsSolidColor) ||
 			artwork.selection !== null
 	);
 
@@ -53,7 +56,8 @@ class FolderOperationsStore {
 	readonly applyBlockedReason = $derived.by(() => {
 		if (this.resetBlockedReason) return this.resetBlockedReason;
 		if (renderer.status !== 'ready') return 'The icon has not loaded yet';
-		if (renderer.isCustom) return 'Applying custom images is not supported yet';
+		// The folder preview lingers until an image is picked; applying it here would surprise.
+		if (workflow.id === 'custom-image' && !renderer.customImage) return 'Choose an image first';
 		if (!this.hasCustomization) return 'Enable at least one customization option';
 		return null;
 	});
@@ -61,9 +65,13 @@ class FolderOperationsStore {
 	/** Exports the renderer's profile and writes it to every listed folder. */
 	apply() {
 		if (this.applyBlockedReason) return;
-		return this.#run('apply', (folders, onProgress) =>
-			customizeFolders(folders, renderer.exportProfileJson(), onProgress)
-		);
+		const image = renderer.customImage;
+		return this.#run('apply', (folders, onProgress) => {
+			const profileJson = renderer.exportProfileJson();
+			return image
+				? customizeFoldersWithImage(folders, image.revision, profileJson, onProgress)
+				: customizeFolders(folders, profileJson, onProgress);
+		});
 	}
 
 	/** Restores the system default icon on every listed folder. */

@@ -1,46 +1,36 @@
 <script lang="ts">
+	import { open } from '@tauri-apps/plugin-dialog';
+	import { Button } from '$lib/components/ui/button';
+	import { errorDialog } from '$lib/stores/error-dialog.svelte';
+	import { renderer } from '$lib/stores/renderer.svelte';
 	import { workflow } from '$lib/stores/workflow.svelte';
 
-	let fileName = $state<string | null>(null);
-	let error = $state<string | null>(null);
+	// Mirrors folco_core::ImageFile::supported_extensions; the backend rejects anything else.
+	const EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tiff', 'tif'];
 
-	async function handleChange(event: Event) {
-		const file = (event.target as HTMLInputElement).files?.[0];
-		if (!file) return;
-
-		error = null;
+	async function pick() {
 		try {
-			// SVG stays markup so it rasterizes cleanly at every platform size;
-			// anything else is handed over as encoded bytes.
-			if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-				await workflow.useSvg(await file.text());
-			} else {
-				await workflow.useImage(new Uint8Array(await file.arrayBuffer()));
-			}
-			fileName = file.name;
+			const path = await open({
+				title: 'Choose Image',
+				multiple: false,
+				directory: false,
+				filters: [{ name: 'Images', extensions: EXTENSIONS }]
+			});
+			if (path) await workflow.useImageFile(path);
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			errorDialog.showError("Couldn't open the image", e);
 		}
 	}
 </script>
 
 <div class="flex flex-col gap-2">
-	<label
-		class="inline-flex w-fit cursor-pointer items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-	>
-		Choose image…
-		<input type="file" accept="image/*,.svg" class="hidden" onchange={handleChange} />
-	</label>
+	<Button variant="outline" class="w-fit" onclick={pick}>Choose image…</Button>
 
-	{#if fileName}
-		<p class="text-sm text-muted-foreground">Using {fileName}</p>
+	{#if renderer.customImage}
+		<p class="text-sm text-muted-foreground">Using {renderer.customImage.fileName}</p>
 	{:else}
 		<p class="text-sm text-muted-foreground">
 			Pick a PNG, JPEG, WebP or SVG to use as the folder icon.
 		</p>
-	{/if}
-
-	{#if error}
-		<p class="text-sm text-destructive">{error}</p>
 	{/if}
 </div>

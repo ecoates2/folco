@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
-    CustomProfile, CustomizationContextBuilder, CustomizationProfile, DecalConfig,
-    ImageOverlayConfig, ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
+    CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageFile, ImageOverlayConfig,
+    ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -184,25 +184,14 @@ fn looks_like_emoji(s: &str) -> bool {
     })
 }
 
-/// Image file extensions recognised as raster overlays.
-const RASTER_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif"];
-
-/// Returns true if a file extension is a supported raster image format.
-fn is_raster_extension(ext: &std::ffi::OsStr) -> bool {
-    RASTER_EXTENSIONS
-        .iter()
-        .any(|r| ext.eq_ignore_ascii_case(r))
-}
-
 /// Resolve an overlay source string to an [`ImageSource`].
 ///
 /// Accepted inputs (checked in order):
 ///
 /// 1. Raw SVG markup (starts with `<`)
-/// 2. File path with `.svg` extension → read as SVG text
-/// 3. File path with a raster extension (PNG, JPG, WEBP, …) → read as bytes
-/// 4. Emoji character (contains emoji codepoints)
-/// 5. Fallback: treated as an emoji name (e.g. "duck", "star", "heart")
+/// 2. Existing SVG or raster image file (see [`ImageFile`])
+/// 3. Emoji character (contains emoji codepoints)
+/// 4. Fallback: treated as an emoji name (e.g. "duck", "star", "heart")
 fn resolve_overlay_source(input: &str) -> Result<ImageSource> {
     let trimmed = input.trim();
 
@@ -211,21 +200,9 @@ fn resolve_overlay_source(input: &str) -> Result<ImageSource> {
         return Ok(ImageSource::from(SvgSource::Raw(trimmed.to_string())));
     }
 
-    // File path
     let path = Path::new(trimmed);
-    if let Some(ext) = path.extension() {
-        if ext.eq_ignore_ascii_case("svg") && path.exists() {
-            let svg = std::fs::read_to_string(path)
-                .with_context(|| format!("Failed to read overlay SVG file: {}", path.display()))?;
-            return Ok(ImageSource::from(SvgSource::Raw(svg)));
-        }
-
-        if is_raster_extension(ext) && path.exists() {
-            let bytes = std::fs::read(path).with_context(|| {
-                format!("Failed to read overlay image file: {}", path.display())
-            })?;
-            return Ok(ImageSource::raster(bytes));
-        }
+    if ImageFile::is_supported(path) && path.exists() {
+        return Ok(ImageFile::read(path)?.into());
     }
 
     // Emoji character (contains actual emoji codepoints)
@@ -512,12 +489,6 @@ async fn customize_custom_icon(
         .build()
         .context("Failed to initialize customization context")?;
 
-    let mut customizer = ctx
-        .create_custom_icon_customizer(&image_source)
-        .context("Failed to create custom icon customizer")?;
-
-    customizer.apply_profile(CustomProfile::from(profile));
-
     let (tx, mut rx) = progress_channel(32);
 
     let total = directories.len() as u64;
@@ -574,8 +545,9 @@ async fn customize_custom_icon(
     });
 
     // Run customization
-    ctx.customize_folders_custom_async(directories, &mut customizer, tx)
-        .await;
+    ctx.customize_folders_with_image_async(directories, &image_source, profile, tx)
+        .await
+        .context("Failed to create custom icon customizer")?;
 
     // Wait for progress handler to finish
     progress_handle.await?;

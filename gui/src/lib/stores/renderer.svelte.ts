@@ -7,9 +7,12 @@ import type {
 	LayerRejections
 } from 'folco-renderer-wasm';
 import {
+	getCustomImageBytes,
+	getCustomImageSizes,
 	getFolderIconBase,
 	getFolderIconSvg,
-	getCustomImageSizes
+	loadCustomImage,
+	type CustomImage
 } from '$lib/services/tauri-commands';
 
 export type RendererStatus = 'uninitialized' | 'loading' | 'ready' | 'error';
@@ -71,6 +74,9 @@ class RendererStore {
 	/** Whether the base icon came from the user rather than the system. */
 	isCustom = $state(false);
 
+	/** The backend's custom image this preview was built from, when `isCustom`. */
+	customImage = $state<CustomImage | null>(null);
+
 	/** Which layers the resolved base can realize. */
 	capabilities = $state<IconCapabilities>(ALL_CAPABILITIES);
 
@@ -131,39 +137,36 @@ class RendererStore {
 	}
 
 	/**
-	 * Replaces the base with a user-supplied raster image.
+	 * Replaces the base with a user-picked image file.
 	 *
-	 * Accepts any encoded format the backend can decode (PNG, JPEG, WebP, ...).
+	 * The backend reads and keeps the file; the preview is built from the bytes it
+	 * hands back, so it always shows what Apply will write.
 	 */
-	async loadCustomImage(imageData: Uint8Array) {
-		await this.#loadCustom((wasm, specs) => wasm.CanvasRenderer.fromCustomImage(imageData, specs));
-	}
-
-	/** Replaces the base with user-supplied SVG markup, rasterized to platform sizes. */
-	async loadCustomSvg(svg: string) {
-		await this.#loadCustom((wasm, specs) => wasm.CanvasRenderer.fromCustomSvg(svg, specs));
-	}
-
-	/**
-	 * Builds a custom-icon renderer against the platform's custom-image size ladder.
-	 *
-	 * Unlike {@linkcode loadFolderIcon}, this needs a source from the user —
-	 * picking a new image after one is already loaded is the normal path.
-	 */
-	async #loadCustom(build: (wasm: WasmModule, specs: IconSizeSpec[]) => CanvasRenderer) {
+	async loadCustomImageFile(path: string) {
 		this.status = 'loading';
 		this.error = null;
 
 		if (!this.#hasBackend()) return;
 
 		try {
-			const [wasm, specs] = await Promise.all([ensureWasm(), this.#customImageSizes()]);
+			const [wasm, specs, image] = await Promise.all([
+				ensureWasm(),
+				this.#customImageSizes(),
+				loadCustomImage(path)
+			]);
+			const bytes = await getCustomImageBytes(image.revision);
 
 			if (this.availableColors.length === 0) {
 				this.availableColors = wasm.getAvailableColors();
 			}
 
-			this.#adopt(build(wasm, specs), logicalSizes(specs));
+			const { CanvasRenderer } = wasm;
+			const built =
+				image.kind === 'svg'
+					? CanvasRenderer.fromCustomSvg(new TextDecoder().decode(bytes), specs)
+					: CanvasRenderer.fromCustomImage(bytes, specs);
+
+			this.#adopt(built, logicalSizes(specs), image);
 		} catch (e) {
 			this.#fail(e, 'Failed to load custom image');
 		}
@@ -183,9 +186,10 @@ class RendererStore {
 	}
 
 	/** Installs a renderer and refreshes the capability flags it reports. */
-	#adopt(renderer: CanvasRenderer, availableSizes: number[]) {
+	#adopt(renderer: CanvasRenderer, availableSizes: number[], customImage: CustomImage | null = null) {
 		this.renderer?.free();
 		this.renderer = renderer;
+		this.customImage = customImage;
 		this.availableSizes = availableSizes;
 		this.isSvg = renderer.isSvg();
 		this.isCustom = renderer.isCustom();
@@ -336,6 +340,7 @@ class RendererStore {
 		this.status = 'uninitialized';
 		this.error = null;
 		this.isCustom = false;
+		this.customImage = null;
 		this.capabilities = ALL_CAPABILITIES;
 		this.rejections = NO_REJECTIONS;
 	}

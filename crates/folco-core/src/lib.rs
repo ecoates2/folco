@@ -37,6 +37,7 @@ mod convert;
 mod error;
 pub mod experimental;
 pub mod folder_color;
+mod image_file;
 pub mod progress;
 mod raster_base;
 mod svg_base;
@@ -45,6 +46,7 @@ mod sys;
 pub use cache::{CacheConfig, IconCache};
 pub use context::{AppInfo, CustomizationContext, CustomizationContextBuilder, UnsupportedLayer};
 pub use error::{Error, Result};
+pub use image_file::ImageFile;
 pub use raster_base::convert_icon_set;
 pub use sys::PlatformSizeSpec;
 

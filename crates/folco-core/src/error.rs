@@ -58,4 +58,15 @@ pub enum Error {
         "the system folder icon has no scalable (SVG) version; only SVG icon themes are supported on this platform"
     )]
     MissingScalableFolderIcon,
+
+    /// The file's extension isn't a supported image format.
+    #[error("unsupported image file '{0}': expected SVG, PNG, JPEG, WebP, BMP, GIF or TIFF")]
+    UnsupportedImageFile(PathBuf),
+
+    /// An image file couldn't be read.
+    #[error("failed to read image file '{path}': {source}")]
+    ReadImageFile {
+        path: PathBuf,
+        source: std::io::Error,
+    },
 }

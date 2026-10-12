@@ -12,8 +12,9 @@ use crate::sys::RasterFolderMetadata;
 use crate::{raster_base, svg_base};
 
 use folco_renderer::{
-    CustomIconCustomizer, CustomizationProfile, FolderIconBase, FolderIconCustomizer,
-    FolderProfile, IconBase, IconBaseKind, LayerKind, SvgFolderIconCustomizer,
+    CustomIconCustomizer, CustomProfile, CustomizationProfile, FolderIconBase,
+    FolderIconCustomizer, FolderProfile, IconBase, IconBaseKind, LayerKind,
+    SvgFolderIconCustomizer,
 };
 use folco_renderer::{ImageSource, Render};
 use icon_sys::IconSet as SysIconSet;
@@ -870,6 +871,28 @@ impl CustomizationContext {
         let _ = progress
             .send(Progress::Completed { succeeded, failed })
             .await;
+    }
+
+    /// Uses `source` as the folder icon, decorated per `profile`, on every folder.
+    ///
+    /// Surface-relative intents (`solid_color`, `decal`) are ignored: a custom
+    /// image has no surface color.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error, before any folder is touched, if `source` can't be decoded.
+    pub async fn customize_folders_with_image_async<P: AsRef<Path>>(
+        &self,
+        folders: Vec<P>,
+        source: &ImageSource,
+        profile: CustomizationProfile,
+        progress: ProgressSender,
+    ) -> Result<()> {
+        let mut customizer = self.create_custom_icon_customizer(source)?;
+        customizer.apply_profile(CustomProfile::from(profile));
+        self.customize_folders_custom_async(folders, &mut customizer, progress)
+            .await;
+        Ok(())
     }
 }
 
