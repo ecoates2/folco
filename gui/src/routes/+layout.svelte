@@ -2,6 +2,8 @@
   import "../app.css";
   import { theme } from "$lib/stores/theme.svelte";
   import { features } from "$lib/stores/features.svelte";
+  import { errorDialog } from "$lib/stores/error-dialog.svelte";
+  import { ErrorDialog } from "$lib/components/app/error-dialog";
   import { onMount } from "svelte";
 
   let { children } = $props();
@@ -33,3 +35,5 @@
 </script>
  
 {@render children?.()}
+
+<ErrorDialog report={errorDialog.current} onDismiss={() => errorDialog.dismiss()} />

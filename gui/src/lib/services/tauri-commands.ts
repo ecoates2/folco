@@ -71,3 +71,12 @@ export function customizeFolders(
 	const channel = new Channel<CustomizeProgress>(onProgress);
 	return invoke('customize_folders', { folders, profileJson, onProgress: channel });
 }
+
+/** Restores the system default icon on each folder. Progress events as {@linkcode customizeFolders}. */
+export function resetFolders(
+	folders: string[],
+	onProgress: (event: CustomizeProgress) => void
+): Promise<void> {
+	const channel = new Channel<CustomizeProgress>(onProgress);
+	return invoke('reset_folders', { folders, onProgress: channel });
+}

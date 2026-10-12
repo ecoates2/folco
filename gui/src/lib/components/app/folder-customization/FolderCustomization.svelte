@@ -6,7 +6,7 @@
 	import { features } from '$lib/stores/features.svelte';
 	import { workflow } from '$lib/stores/workflow.svelte';
 	import { directories } from '$lib/stores/directories.svelte';
-	import { apply } from '$lib/stores/apply.svelte';
+	import { folderOperations, type FolderOperation } from '$lib/stores/folder-operations.svelte';
 	import { WORKFLOWS } from '$lib/workflows/definitions';
 	import type { WorkflowId } from '$lib/workflows/types';
 	import { cn } from '$lib/utils';
@@ -34,7 +34,31 @@
 	onMount(() => workflow.activate('folder'));
 
 	const WORKFLOW_IDS = Object.keys(WORKFLOWS) as WorkflowId[];
+
+	const OPERATION_LABELS: Record<FolderOperation, { idle: string; running: string; done: string }> = {
+		apply: { idle: 'Apply', running: 'Applying', done: 'applied' },
+		reset: { idle: 'Reset', running: 'Resetting', done: 'reset' }
+	};
 </script>
+
+{#snippet operationButton(
+	operation: FolderOperation,
+	blockedReason: string | null,
+	variant: 'default' | 'outline',
+	onclick: () => void
+)}
+	<!-- Disabled buttons swallow pointer events, so the tooltip lives on a wrapper. -->
+	<span title={blockedReason ?? undefined}>
+		<Button {variant} {onclick} disabled={blockedReason !== null}>
+			{#if folderOperations.status === 'running' && folderOperations.operation === operation}
+				<Loader2Icon class="size-4 animate-spin" />
+				{OPERATION_LABELS[operation].running} {folderOperations.processed}/{folderOperations.total}
+			{:else}
+				{OPERATION_LABELS[operation].idle}
+			{/if}
+		</Button>
+	</span>
+{/snippet}
 
 <div class={cn(className)}>
 	<div class="mb-6 flex items-center justify-between">
@@ -178,26 +202,20 @@
 	/>
 
 	<div class="mt-6 flex items-center gap-3">
-		<!-- Disabled buttons swallow pointer events, so the tooltip lives on a wrapper. -->
-		<span title={apply.blockedReason ?? undefined}>
-			<Button onclick={() => apply.run()} disabled={apply.blockedReason !== null}>
-				{#if apply.status === 'running'}
-					<Loader2Icon class="size-4 animate-spin" />
-					Applying {apply.processed}/{apply.total}
-				{:else}
-					Apply
-				{/if}
-			</Button>
-		</span>
+		{@render operationButton('apply', folderOperations.applyBlockedReason, 'default', () =>
+			folderOperations.apply()
+		)}
+		{@render operationButton('reset', folderOperations.resetBlockedReason, 'outline', () =>
+			folderOperations.reset()
+		)}
 
-		{#if apply.status === 'done'}
-			{#if apply.error}
-				<span class="text-sm text-destructive">{apply.error}</span>
-			{:else}
-				<span class="text-sm text-muted-foreground">
-					{apply.succeeded} applied{apply.failures.length ? `, ${apply.failures.length} failed` : ''}
-				</span>
-			{/if}
+		{#if folderOperations.status === 'done' && !folderOperations.error}
+			<span class="text-sm text-muted-foreground">
+				{folderOperations.succeeded}
+				{OPERATION_LABELS[folderOperations.operation].done}{folderOperations.failures.length
+					? `, ${folderOperations.failures.length} failed`
+					: ''}
+			</span>
 		{/if}
 	</div>
 </div>

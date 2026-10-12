@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use dto::{FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto, SvgFolderIconBaseDto};
 use folco_core::CustomizationProfile;
-use folco_core::progress::progress_channel;
+use folco_core::progress::{progress_channel, ProgressSender};
 use state::AppState;
 use tauri::ipc::Channel;
 use tauri::Manager;
@@ -54,6 +54,27 @@ fn get_platform_icon_sizes() -> PlatformSizeSpecDto {
     folco_core::get_platform_icon_sizes()
 }
 
+/// Runs a folder operation on the app state, forwarding its progress events to
+/// `on_progress` until the operation drops its sender.
+async fn run_with_progress(
+    app: tauri::AppHandle,
+    on_progress: Channel<ProgressDto>,
+    op: impl FnOnce(&AppState, ProgressSender) -> Result<(), String> + Send + 'static,
+) -> Result<(), String> {
+    let (tx, mut rx) = progress_channel(32);
+    let forward = tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            if on_progress.send(event).is_err() {
+                break;
+            }
+        }
+    });
+
+    let result = with_state_blocking(app, move |state| op(state, tx)).await;
+    forward.await.map_err(|e| e.to_string())?;
+    result
+}
+
 /// Applies a `CustomizationProfile` (JSON) to the system folder icon and writes it
 /// to every folder, streaming per-folder progress over `on_progress`.
 ///
@@ -69,19 +90,21 @@ async fn customize_folders(
     let profile = CustomizationProfile::from_json(&profile_json)
         .map_err(|e| format!("Invalid customization profile: {e}"))?;
 
-    let (tx, mut rx) = progress_channel(32);
-    let forward = tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            if on_progress.send(event).is_err() {
-                break;
-            }
-        }
-    });
+    run_with_progress(app, on_progress, move |state, tx| {
+        state.customize_folders(folders, profile, tx)
+    })
+    .await
+}
 
-    let result =
-        with_state_blocking(app, move |state| state.customize_folders(folders, profile, tx)).await;
-    forward.await.map_err(|e| e.to_string())?;
-    result
+/// Restores the system default icon on every folder, streaming progress like
+/// [`customize_folders`].
+#[tauri::command]
+async fn reset_folders(
+    app: tauri::AppHandle,
+    folders: Vec<PathBuf>,
+    on_progress: Channel<ProgressDto>,
+) -> Result<(), String> {
+    run_with_progress(app, on_progress, move |state, tx| state.reset_folders(folders, tx)).await
 }
 
 #[tauri::command]
@@ -102,6 +125,7 @@ pub fn run() {
             get_folder_icon_svg,
             get_platform_icon_sizes,
             customize_folders,
+            reset_folders,
             experimental_enabled,
             set_startup_theme
         ])

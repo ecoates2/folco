@@ -119,4 +119,16 @@ impl AppState {
             Ok(())
         })?
     }
+
+    /// Restores the default icon on every folder, blocking like
+    /// [`customize_folders`](Self::customize_folders).
+    pub fn reset_folders(
+        &self,
+        folders: Vec<PathBuf>,
+        progress: ProgressSender,
+    ) -> Result<(), String> {
+        self.with_ctx(|ctx| {
+            tauri::async_runtime::block_on(ctx.reset_folders_async(folders, progress));
+        })
+    }
 }
