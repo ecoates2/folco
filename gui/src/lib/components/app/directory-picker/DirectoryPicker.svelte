@@ -4,6 +4,7 @@
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+	import { stat } from '@tauri-apps/plugin-fs';
 	import { onMount } from 'svelte';
 
 	interface Props {
@@ -41,10 +42,7 @@
 					isDragging = false;
 				} else if (event.payload.type === 'drop') {
 					isDragging = false;
-					const paths = event.payload.paths;
-					if (paths.length > 0 && onDropPaths) {
-						onDropPaths(paths);
-					}
+					void addDroppedDirectories(event.payload.paths);
 				}
 			});
 		} catch {
@@ -55,6 +53,15 @@
 			unlisten?.then((fn) => fn()).catch(() => {});
 		};
 	});
+
+	// The fs plugin scopes dropped paths itself, so `fs:allow-stat` needs no static scope.
+	async function addDroppedDirectories(paths: string[]) {
+		const isDir = await Promise.all(
+			paths.map((p) => stat(p).then((info) => info.isDirectory, () => false))
+		);
+		const dirs = paths.filter((_, i) => isDir[i]);
+		if (dirs.length > 0) onDropPaths?.(dirs);
+	}
 
 	function handleItemClick(index: number) {
 		selectedIndex = index;
@@ -85,7 +92,7 @@
 		tabindex="0"
 		aria-label="Selected directories"
 		class={cn(
-			'min-h-40 rounded-md border-2 border-dashed bg-background p-2 transition-colors',
+			'max-h-64 min-h-40 overflow-y-auto rounded-md border-2 border-dashed bg-background p-2 transition-colors',
 			isDragging
 				? 'border-primary bg-primary/5'
 				: 'border-input hover:border-muted-foreground/50',

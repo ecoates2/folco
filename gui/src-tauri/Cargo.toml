@@ -28,4 +28,5 @@ serde_json.workspace = true
 folco-core = { path = "../../crates/folco-core" }
 folco-transfer = { path = "../../crates/folco-transfer" }
 tauri-plugin-updater = "2"
+tauri-plugin-fs = "2"
 
