@@ -5,8 +5,14 @@
 
 use std::path::PathBuf;
 
+use serde::Serialize;
+
 /// Progress event for folder customization operations.
-#[derive(Debug, Clone)]
+///
+/// Serializes as `{ "kind": "folderFailed", "index": 0, ... }` so GUIs can
+/// forward events across an IPC boundary unchanged.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Progress {
     /// Operation has started.
     Started {

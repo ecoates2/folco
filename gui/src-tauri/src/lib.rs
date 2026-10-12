@@ -2,8 +2,13 @@ mod dto;
 mod state;
 mod theme;
 
-use dto::{FolderIconBaseDto, PlatformSizeSpecDto, SvgFolderIconBaseDto};
+use std::path::PathBuf;
+
+use dto::{FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto, SvgFolderIconBaseDto};
+use folco_core::CustomizationProfile;
+use folco_core::progress::progress_channel;
 use state::AppState;
+use tauri::ipc::Channel;
 use tauri::Manager;
 use theme::StartupTheme;
 
@@ -49,6 +54,36 @@ fn get_platform_icon_sizes() -> PlatformSizeSpecDto {
     folco_core::get_platform_icon_sizes()
 }
 
+/// Applies a `CustomizationProfile` (JSON) to the system folder icon and writes it
+/// to every folder, streaming per-folder progress over `on_progress`.
+///
+/// Resolves once all folders are processed. Per-folder failures arrive as
+/// `folderFailed` events, not as an `Err`.
+#[tauri::command]
+async fn customize_folders(
+    app: tauri::AppHandle,
+    folders: Vec<PathBuf>,
+    profile_json: String,
+    on_progress: Channel<ProgressDto>,
+) -> Result<(), String> {
+    let profile = CustomizationProfile::from_json(&profile_json)
+        .map_err(|e| format!("Invalid customization profile: {e}"))?;
+
+    let (tx, mut rx) = progress_channel(32);
+    let forward = tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            if on_progress.send(event).is_err() {
+                break;
+            }
+        }
+    });
+
+    let result =
+        with_state_blocking(app, move |state| state.customize_folders(folders, profile, tx)).await;
+    forward.await.map_err(|e| e.to_string())?;
+    result
+}
+
 #[tauri::command]
 fn experimental_enabled() -> bool {
     folco_core::experimental::enabled_from_env()
@@ -65,6 +100,7 @@ pub fn run() {
             get_folder_icon_base,
             get_folder_icon_svg,
             get_platform_icon_sizes,
+            customize_folders,
             experimental_enabled,
             set_startup_theme
         ])

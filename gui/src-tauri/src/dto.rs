@@ -21,3 +21,6 @@ pub use folco_transfer::SerializableSvgFolderIconBase as SvgFolderIconBaseDto;
 
 /// The set of icon sizes required by the host platform.
 pub use folco_core::PlatformSizeSpec as PlatformSizeSpecDto;
+
+/// A folder customization progress event streamed to the frontend.
+pub use folco_core::progress::Progress as ProgressDto;

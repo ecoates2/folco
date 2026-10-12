@@ -6,6 +6,7 @@
 	import { features } from '$lib/stores/features.svelte';
 	import { workflow } from '$lib/stores/workflow.svelte';
 	import { directories } from '$lib/stores/directories.svelte';
+	import { apply } from '$lib/stores/apply.svelte';
 	import { WORKFLOWS } from '$lib/workflows/definitions';
 	import type { WorkflowId } from '$lib/workflows/types';
 	import { cn } from '$lib/utils';
@@ -20,6 +21,9 @@
 
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import * as EmojiPicker from '$lib/components/ui/emoji-picker';
+	import { Button } from '$lib/components/ui/button';
+	// Not ui/spinner: its null-forwarding renders an invisible icon.
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 
 	interface Props {
 		class?: string;
@@ -172,4 +176,28 @@
 		onDropPaths={(paths) => directories.add(paths)}
 		class="max-w-md"
 	/>
+
+	<div class="mt-6 flex items-center gap-3">
+		<!-- Disabled buttons swallow pointer events, so the tooltip lives on a wrapper. -->
+		<span title={apply.blockedReason ?? undefined}>
+			<Button onclick={() => apply.run()} disabled={apply.blockedReason !== null}>
+				{#if apply.status === 'running'}
+					<Loader2Icon class="size-4 animate-spin" />
+					Applying {apply.processed}/{apply.total}
+				{:else}
+					Apply
+				{/if}
+			</Button>
+		</span>
+
+		{#if apply.status === 'done'}
+			{#if apply.error}
+				<span class="text-sm text-destructive">{apply.error}</span>
+			{:else}
+				<span class="text-sm text-muted-foreground">
+					{apply.succeeded} applied{apply.failures.length ? `, ${apply.failures.length} failed` : ''}
+				</span>
+			{/if}
+		{/if}
+	</div>
 </div>
