@@ -36,11 +36,12 @@ class WorkflowStore {
 	 * Switches workflows and runs that workflow's acquisition step.
 	 *
 	 * Folder mode can fetch its base immediately; custom mode has nothing to
-	 * load until the user supplies an image, so it only changes the UI.
+	 * show until the user supplies an image, so the previous base is dropped.
 	 */
 	async activate(id: WorkflowId) {
 		this.id = id;
 		if (id === 'folder') await this.#load(() => renderer.loadFolderIcon());
+		else renderer.destroy();
 	}
 
 	/** Adopts a user-picked image file as the base. */

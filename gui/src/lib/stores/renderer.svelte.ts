@@ -349,6 +349,8 @@ class RendererStore {
 		this.renderer = null;
 		this.status = 'uninitialized';
 		this.error = null;
+		this.availableSizes = [];
+		this.isSvg = false;
 		this.isCustom = false;
 		this.customImage = null;
 		this.capabilities = ALL_CAPABILITIES;

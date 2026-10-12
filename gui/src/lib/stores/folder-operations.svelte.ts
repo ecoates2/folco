@@ -55,9 +55,8 @@ class FolderOperationsStore {
 	/** Why Apply can't run right now, or `null` when it can. */
 	readonly applyBlockedReason = $derived.by(() => {
 		if (this.resetBlockedReason) return this.resetBlockedReason;
-		if (renderer.status !== 'ready') return 'The icon has not loaded yet';
-		// The folder preview lingers until an image is picked; applying it here would surprise.
 		if (workflow.id === 'custom-image' && !renderer.customImage) return 'Choose an image first';
+		if (renderer.status !== 'ready') return 'The icon has not loaded yet';
 		if (!this.hasCustomization) return 'Enable at least one customization option';
 		return null;
 	});

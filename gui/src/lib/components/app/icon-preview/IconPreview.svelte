@@ -19,7 +19,9 @@
 
 	// `renderer.status === 'ready'` only means the data arrived; pixels land a few
 	// effect flushes later, once `selectedSize` is set and the canvas is bound.
-	let hasPainted = $state(false);
+	// Tied to the renderer instance so a cleared or replaced base hides stale pixels.
+	let paintedFor = $state<object | null>(null);
+	const hasPainted = $derived(paintedFor !== null && paintedFor === renderer.renderer);
 
 	// SVG fills the preview box at native device resolution so it stays crisp on HiDPI.
 	const renderSize = $derived(
@@ -31,7 +33,7 @@
 
 		try {
 			renderer.renderToCanvas(canvas, renderSize);
-			hasPainted = true;
+			paintedFor = renderer.renderer;
 		} catch (e) {
 			console.error('Render failed:', e);
 		}
@@ -47,10 +49,10 @@
 		}
 	});
 
-	// Default to the largest available size
+	// Default to the largest size whenever the current pick isn't offered.
 	$effect(() => {
 		const sizes = renderer.availableSizes;
-		if (sizes.length > 0 && selectedSize === 0) {
+		if (sizes.length > 0 && !sizes.includes(selectedSize)) {
 			selectedSize = sizes[sizes.length - 1];
 		}
 	});
@@ -92,7 +94,7 @@
 			<div class="absolute inset-0 flex items-center justify-center">
 				{#if renderer.status === 'error'}
 					<p class="text-muted-foreground px-4 text-center text-sm">Preview unavailable</p>
-				{:else}
+				{:else if renderer.status !== 'uninitialized'}
 				<!-- TODO: Revisit broken spinner rendering: renders in DOM but is invisible -->
 					<Spinner class="text-muted-foreground size-8" />
 				{/if}
