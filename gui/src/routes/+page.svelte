@@ -4,6 +4,7 @@
   import { artwork } from '$lib/stores/artwork.svelte';
   import { features } from '$lib/stores/features.svelte';
   import { workflow } from '$lib/stores/workflow.svelte';
+  import { directories } from '$lib/stores/directories.svelte';
   import { WORKFLOWS } from '$lib/workflows/definitions';
   import type { WorkflowId } from '$lib/workflows/types';
 
@@ -16,8 +17,6 @@
   import { ThemeSelector } from '$lib/components/app/theme-selector';
 
   import * as RadioGroup from '$lib/components/ui/radio-group';
-
-  import { open } from '@tauri-apps/plugin-dialog';
 
   import * as EmojiPicker from '$lib/components/ui/emoji-picker';
 
@@ -32,39 +31,6 @@
   function handleIconSelect(e: Event) {
     const detail = (e as CustomEvent).detail;
     if (detail?.svg) artwork.selectIcon(detail.svg);
-  }
-
-  // ── Directory handlers ───────────────────────────────────────────
-
-  let directories = $state<string[]>([]);
-  let selectedIndex = $state<number | null>(null);
-
-  async function handleAdd() {
-    const selected = await open({
-      directory: true,
-      multiple: true,
-      title: 'Select Folder(s)'
-    });
-
-    if (selected) {
-      const paths = Array.isArray(selected) ? selected : [selected];
-      directories = [...directories, ...paths.filter(p => !directories.includes(p))];
-    }
-  }
-
-  function handleRemove(index: number) {
-    directories = directories.filter((_, i) => i !== index);
-    selectedIndex = null;
-  }
-
-  function handleClearAll() {
-    directories = [];
-    selectedIndex = null;
-  }
-
-  function handleDropPaths(paths: string[]) {
-    const newPaths = paths.filter(p => !directories.includes(p));
-    directories = [...directories, ...newPaths];
   }
 </script>
 
@@ -95,8 +61,8 @@
         label={section.label}
         disabled={!section.available}
         disabledReason={section.reason}
-        enabled={section.id === 'source-image' ||
-          (section.id === 'solid-color' && solidColorActive) ||
+        toggleable={section.id !== 'source-image'}
+        enabled={(section.id === 'solid-color' && solidColorActive) ||
           (section.id === 'color-dot' && colorDotActive) ||
           (section.id === 'emoji' && artwork.kind === 'emoji') ||
           (section.id === 'icon' && artwork.kind === 'icon')}
@@ -198,24 +164,14 @@
   <IconPreview class="mb-6" />
 
   <DirectoryPicker
-    bind:directories
-    bind:selectedIndex
-    onAdd={handleAdd}
-    onRemove={handleRemove}
-    onClearAll={handleClearAll}
-    onDropPaths={handleDropPaths}
+    bind:directories={directories.paths}
+    bind:selectedIndex={directories.selectedIndex}
+    onAdd={() => directories.browse()}
+    onRemove={(i) => directories.remove(i)}
+    onClearAll={() => directories.clear()}
+    onDropPaths={(paths) => directories.add(paths)}
     class="max-w-md"
   />
-
-  <!-- Debug output -->
-  <div class="mt-6 rounded-md border border-border bg-muted/50 p-4">
-    <p class="text-sm text-muted-foreground">
-      Selected directories: {directories.length}
-    </p>
-    <p class="text-sm text-muted-foreground">
-      Selected index: {selectedIndex ?? 'none'}
-    </p>
-  </div>
 </main>
 
 <style lang="postcss">

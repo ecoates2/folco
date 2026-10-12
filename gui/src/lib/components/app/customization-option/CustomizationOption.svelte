@@ -11,6 +11,8 @@
 		disabled?: boolean;
 		/** Explains why the option is unavailable, shown when disabled. */
 		disabledReason?: string;
+		/** When false, the section has no switch and its content is always shown. */
+		toggleable?: boolean;
 		/** Fired when the toggle changes. */
 		onToggle?: (enabled: boolean) => void;
 		/** The customization UI to render inside the section. */
@@ -23,6 +25,7 @@
 		enabled = $bindable(false),
 		disabled = false,
 		disabledReason,
+		toggleable = true,
 		onToggle,
 		children,
 		class: className
@@ -44,6 +47,11 @@
 </script>
 
 <section class={cn('rounded-lg border border-border bg-card', disabled && 'opacity-50', className)}>
+	{#if !toggleable}
+	<div class="px-4 py-3">
+		<span class="text-sm font-medium text-card-foreground">{label}</span>
+	</div>
+	{:else}
 	<button
 		type="button"
 		{disabled}
@@ -72,8 +80,9 @@
 			></span>
 		</span>
 	</button>
+	{/if}
 
-	<div class="border-t border-border px-4 py-3" class:hidden={!enabled || disabled}>
+	<div class="border-t border-border px-4 py-3" class:hidden={toggleable && (!enabled || disabled)}>
 		{@render children()}
 	</div>
 </section>
