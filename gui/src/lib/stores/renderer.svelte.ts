@@ -161,12 +161,22 @@ class RendererStore {
 			}
 
 			const { CanvasRenderer } = wasm;
-			const built =
-				image.kind === 'svg'
-					? CanvasRenderer.fromCustomSvg(new TextDecoder().decode(bytes), specs)
-					: CanvasRenderer.fromCustomImage(bytes, specs);
+			if (image.format === 'raster') {
+				this.#adopt(CanvasRenderer.fromCustomImage(bytes, specs), logicalSizes(specs), image);
+				return;
+			}
 
-			this.#adopt(built, logicalSizes(specs), image);
+			const svg = new TextDecoder().decode(bytes);
+			if (image.medium === 'vector') {
+				// Vector bases have no size ladder; the preview picks its own resolution.
+				this.#adopt(CanvasRenderer.fromCustomSvg(svg), [], image);
+			} else {
+				this.#adopt(
+					CanvasRenderer.fromCustomSvgRasterized(svg, specs),
+					logicalSizes(specs),
+					image
+				);
+			}
 		} catch (e) {
 			this.#fail(e, 'Failed to load custom image');
 		}

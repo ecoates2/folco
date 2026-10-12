@@ -122,7 +122,7 @@ impl CustomIconCustomizer {
 
     /// What this customizer operates on.
     pub const fn base_kind() -> IconBaseKind {
-        IconBaseKind::CustomImage
+        IconBaseKind::RasterCustomImage
     }
 
     /// The layers a user-supplied image can realize.

@@ -43,8 +43,8 @@ use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
     FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconCapabilities, IconImage,
     IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode,
-    OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgFolderIconBase,
-    SvgFolderIconCustomizer,
+    OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer,
+    SvgFolderIconBase, SvgFolderIconCustomizer,
 };
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
@@ -104,10 +104,10 @@ fn draw_rgba_to_canvas(canvas: &HtmlCanvasElement, image: image::RgbaImage) -> R
 
 /// The customizer backing this renderer, chosen at construction.
 ///
-/// Folder icons take whichever medium the platform provides; custom icons are
-/// always pixels, because the user supplied them. `Folder` and `Custom` are
-/// both raster — they differ in whether a surface color exists to shift
-/// against, which is what gates the solid-color and decal layers.
+/// Origin (system folder or user image) crossed with medium (raster or
+/// vector). `Folder` and `Custom` are both raster — they differ in whether a
+/// surface color exists to shift against, which is what gates the solid-color
+/// and decal layers.
 enum ActiveCustomizer {
     /// Pixel pipeline over the system's PNG folder icons.
     Folder(Box<FolderIconCustomizer>),
@@ -115,6 +115,8 @@ enum ActiveCustomizer {
     SvgFolder(Box<SvgFolderIconCustomizer>),
     /// Pixel pipeline over a user-supplied image.
     Custom(Box<CustomIconCustomizer>),
+    /// Vector pipeline over a user-supplied SVG.
+    SvgCustom(Box<SvgCustomIconCustomizer>),
 }
 
 /// A live-preview icon renderer targeting an HTML canvas element.
@@ -168,6 +170,9 @@ impl CanvasRenderer {
             ActiveCustomizer::Custom(c) => {
                 c.layers.overlay.set_config(config);
             }
+            ActiveCustomizer::SvgCustom(c) => {
+                c.layers.overlay.set_config(config);
+            }
         }
     }
 
@@ -176,6 +181,7 @@ impl CanvasRenderer {
             ActiveCustomizer::Folder(c) => c.render_raster_preview(size),
             ActiveCustomizer::SvgFolder(c) => c.render_raster_preview(size),
             ActiveCustomizer::Custom(c) => c.render_raster_preview(size),
+            ActiveCustomizer::SvgCustom(c) => c.render_raster_preview(size),
         }
         .map_err(|e| JsError::new(&e.to_string()))
     }
@@ -192,6 +198,7 @@ impl CanvasRenderer {
             ActiveCustomizer::Folder(_) => FolderIconCustomizer::base_kind(),
             ActiveCustomizer::SvgFolder(_) => SvgFolderIconCustomizer::base_kind(),
             ActiveCustomizer::Custom(_) => CustomIconCustomizer::base_kind(),
+            ActiveCustomizer::SvgCustom(_) => SvgCustomIconCustomizer::base_kind(),
         }
     }
 }
@@ -331,18 +338,34 @@ impl CanvasRenderer {
         Self::from_custom_source(ImageSource::raster(image_data), size_specs)
     }
 
-    /// Creates a renderer for a user-supplied SVG image.
+    /// Creates a renderer that keeps a user-supplied SVG as scalable markup.
     ///
-    /// The markup is rasterized to each size spec up front. The result is a
-    /// raster icon: this is a vector *source*, not the vector pipeline that
-    /// [`from_svg_folder_icon_base`](Self::from_svg_folder_icon_base) uses.
+    /// Use where the platform writes SVG icons (the backend reports this as the
+    /// custom image's medium); elsewhere use
+    /// [`from_custom_svg_rasterized`](Self::from_custom_svg_rasterized).
+    ///
+    /// # Arguments
+    ///
+    /// * `svg` - Raw SVG markup
+    #[wasm_bindgen(js_name = "fromCustomSvg")]
+    pub fn from_custom_svg(svg: String) -> Result<CanvasRenderer, JsError> {
+        let customizer = SvgCustomIconCustomizer::from_svg(svg)
+            .map_err(|e| JsError::new(&format!("Failed to build custom icon: {e}")))?;
+        Ok(Self {
+            active: ActiveCustomizer::SvgCustom(Box::new(customizer)),
+        })
+    }
+
+    /// Creates a renderer that rasterizes a user-supplied SVG to each size spec.
+    ///
+    /// For platforms that write raster icons; the result is a raster custom icon.
     ///
     /// # Arguments
     ///
     /// * `svg` - Raw SVG markup
     /// * `size_specs` - Array of `IconSizeSpec` objects; must be non-empty
-    #[wasm_bindgen(js_name = "fromCustomSvg")]
-    pub fn from_custom_svg(
+    #[wasm_bindgen(js_name = "fromCustomSvgRasterized")]
+    pub fn from_custom_svg_rasterized(
         svg: String,
         #[wasm_bindgen(unchecked_param_type = "IconSizeSpec[]")] size_specs: JsValue,
     ) -> Result<CanvasRenderer, JsError> {
@@ -389,13 +412,13 @@ impl CanvasRenderer {
     /// Returns `true` if the active customizer uses the vector pipeline.
     #[wasm_bindgen(js_name = "isSvg")]
     pub fn is_svg(&self) -> bool {
-        self.base_kind() == IconBaseKind::VectorFolder
+        self.base_kind().is_vector()
     }
 
     /// Returns `true` if the base icon came from the user rather than the system.
     #[wasm_bindgen(js_name = "isCustom")]
     pub fn is_custom(&self) -> bool {
-        self.base_kind() == IconBaseKind::CustomImage
+        self.base_kind().is_custom()
     }
 
     // ---- Layer Configuration ----
@@ -448,6 +471,9 @@ impl CanvasRenderer {
             ActiveCustomizer::Custom(c) => {
                 c.layers.color_dot.set_config(config);
             }
+            ActiveCustomizer::SvgCustom(c) => {
+                c.layers.color_dot.set_config(config);
+            }
         }
     }
 
@@ -462,6 +488,9 @@ impl CanvasRenderer {
                 c.layers.color_dot.set_config(None);
             }
             ActiveCustomizer::Custom(c) => {
+                c.layers.color_dot.set_config(None);
+            }
+            ActiveCustomizer::SvgCustom(c) => {
                 c.layers.color_dot.set_config(None);
             }
         }
@@ -585,7 +614,7 @@ impl CanvasRenderer {
             ActiveCustomizer::Folder(c) => Self::base_dimensions(c.base_icons(), size)?,
             ActiveCustomizer::Custom(c) => Self::base_dimensions(c.base_icons(), size)?,
             // Vector icons are resolution-independent, so any size is valid.
-            ActiveCustomizer::SvgFolder(_) => (size, size),
+            ActiveCustomizer::SvgFolder(_) | ActiveCustomizer::SvgCustom(_) => (size, size),
         };
 
         let arr = js_sys::Array::new();
@@ -606,6 +635,10 @@ impl CanvasRenderer {
                 .render_full_output()
                 .map(|svg_render_output| Some(svg_render_output.rendered_svg))
                 .map_err(|e| JsError::new(&e.to_string())),
+            ActiveCustomizer::SvgCustom(c) => c
+                .render_full_output()
+                .map(|svg_render_output| Some(svg_render_output.rendered_svg))
+                .map_err(|e| JsError::new(&e.to_string())),
         }
     }
 
@@ -618,6 +651,7 @@ impl CanvasRenderer {
             ActiveCustomizer::Folder(c) => c.export_profile(),
             ActiveCustomizer::SvgFolder(c) => c.export_profile(),
             ActiveCustomizer::Custom(c) => c.export_profile(),
+            ActiveCustomizer::SvgCustom(c) => c.export_profile(),
         };
         profile
             .to_json()
@@ -636,6 +670,7 @@ impl CanvasRenderer {
             ActiveCustomizer::Folder(c) => c.apply_profile(FolderProfile::from(wire)),
             ActiveCustomizer::SvgFolder(c) => c.apply_profile(FolderProfile::from(wire)),
             ActiveCustomizer::Custom(c) => c.apply_profile(CustomProfile::from(wire)),
+            ActiveCustomizer::SvgCustom(c) => c.apply_profile(CustomProfile::from(wire)),
         }
         Ok(())
     }
@@ -657,6 +692,10 @@ impl CanvasRenderer {
                 c.layers.color_dot.set_config(None);
                 c.layers.overlay.set_config(None);
             }
+            ActiveCustomizer::SvgCustom(c) => {
+                c.layers.color_dot.set_config(None);
+                c.layers.overlay.set_config(None);
+            }
         }
     }
 
@@ -667,6 +706,7 @@ impl CanvasRenderer {
             ActiveCustomizer::Folder(c) => c.clear_cache(),
             ActiveCustomizer::SvgFolder(c) => c.clear_cache(),
             ActiveCustomizer::Custom(c) => c.clear_cache(),
+            ActiveCustomizer::SvgCustom(c) => c.clear_cache(),
         }
     }
 }

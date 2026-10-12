@@ -5,8 +5,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
-    CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageFile, ImageOverlayConfig,
-    ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
+    CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageFile, ImageFormat,
+    ImageOverlayConfig, ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
+    WriteCapabilities,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -343,6 +344,16 @@ async fn main() -> Result<()> {
                 let image_source = resolve_overlay_source(source)
                     .context("Failed to resolve --custom-icon source")?;
 
+                let format = ImageFormat::of_source(&image_source);
+                let caps = WriteCapabilities::current_platform();
+                if caps.custom_image_medium(format).is_none() {
+                    bail!(
+                        "--custom-icon: {format} images can't be used as folder icons on this system \
+                         (supported file types: {})",
+                        caps.custom_image_extensions().join(", ")
+                    );
+                }
+
                 let profile = if let Some(json) = custom_icon_profile {
                     CustomizationProfile::from_json(&json)
                         .context("Failed to parse CustomizationProfile JSON")?
@@ -547,7 +558,7 @@ async fn customize_custom_icon(
     // Run customization
     ctx.customize_folders_with_image_async(directories, &image_source, profile, tx)
         .await
-        .context("Failed to create custom icon customizer")?;
+        .context("Failed to apply custom icon")?;
 
     // Wait for progress handler to finish
     progress_handle.await?;

@@ -7,14 +7,15 @@
 use crate::cache::{CacheConfig, IconCache};
 use crate::convert::SystemFormat;
 use crate::error::{Error, Result};
+use crate::image_file::ImageFormat;
 use crate::progress::{Progress, ProgressSender};
-use crate::sys::RasterFolderMetadata;
+use crate::sys::{OutputMedium, RasterFolderMetadata, WriteCapabilities};
 use crate::{raster_base, svg_base};
 
 use folco_renderer::{
     CustomIconCustomizer, CustomProfile, CustomizationProfile, FolderIconBase,
     FolderIconCustomizer, FolderProfile, IconBase, IconBaseKind, LayerKind,
-    SvgFolderIconCustomizer,
+    SvgCustomIconCustomizer, SvgFolderIconCustomizer,
 };
 use folco_renderer::{ImageSource, Render};
 use icon_sys::IconSet as SysIconSet;
@@ -296,7 +297,7 @@ impl FolderStrategy {
     fn base_svg(&self) -> Option<String> {
         match self {
             FolderStrategy::Raster(_) => None,
-            FolderStrategy::Svg(c) => Some(c.base().svg.clone()),
+            FolderStrategy::Svg(c) => Some(c.base_svg().to_owned()),
         }
     }
 }
@@ -621,80 +622,44 @@ impl CustomizationContext {
         profile: CustomizationProfile,
         progress: ProgressSender,
     ) {
-        let total = folders.len();
-
-        // Send started event
-        let _ = progress.send(Progress::Started { total }).await;
-
-        // Apply the profile and render
-        let _ = progress.send(Progress::Rendering).await;
         self.apply_profile(profile);
-        let sys_icons = match self.strategy.render_output() {
-            Ok(icons) => icons,
-            Err(e) => {
-                let _ = progress
-                    .send(Progress::RenderFailed {
-                        error: e.to_string(),
-                    })
-                    .await;
-                let _ = progress
-                    .send(Progress::Completed {
-                        succeeded: 0,
-                        failed: total,
-                    })
-                    .await;
-                return;
-            }
-        };
-
-        let mut succeeded = 0usize;
-        let mut failed = 0usize;
-
-        // Process each folder
-        for (index, folder) in folders.iter().enumerate() {
-            let path = folder.as_ref().to_path_buf();
-
-            // Send processing event
-            let _ = progress
-                .send(Progress::Processing {
-                    current: index,
-                    path: path.clone(),
-                })
-                .await;
-
-            // Apply the icon
-            match self
-                .folder_provider
-                .set_icon_for_folder(folder.as_ref(), &sys_icons)
-            {
-                Ok(()) => {
-                    succeeded += 1;
-                    let _ = progress
-                        .send(Progress::FolderComplete { index, path })
-                        .await;
-                }
-                Err(e) => {
-                    failed += 1;
-                    let _ = progress
-                        .send(Progress::FolderFailed {
-                            index,
-                            path,
-                            error: e.to_string(),
-                        })
-                        .await;
-                }
-            }
-        }
-
-        // Send completed event
-        let _ = progress
-            .send(Progress::Completed { succeeded, failed })
-            .await;
+        let strategy = &mut self.strategy;
+        render_and_write(
+            &self.folder_provider,
+            folders,
+            || strategy.render_output(),
+            progress,
+        )
+        .await;
     }
 
     // ========================================================================
     // Custom Icon Support
     // ========================================================================
+
+    /// The medium this platform writes folder icons in.
+    pub fn output_medium(&self) -> OutputMedium {
+        match self.strategy {
+            FolderStrategy::Raster(_) => OutputMedium::Raster,
+            FolderStrategy::Svg(_) => OutputMedium::Vector,
+        }
+    }
+
+    /// The medium `source` is customized and written in when used as a custom image.
+    ///
+    /// Decided by the platform's [`WriteCapabilities`]: SVG stays vector where
+    /// possible and is rasterized to [`custom_image_size_spec`](Self::custom_image_size_spec)
+    /// otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedCustomImage`] if the platform can't write it in any medium.
+    pub fn custom_image_medium(&self, source: &ImageSource) -> Result<OutputMedium> {
+        let format = ImageFormat::of_source(source);
+        WriteCapabilities::current_platform()
+            .custom_image_medium(format)
+            .ok_or(Error::UnsupportedCustomImage(format))
+    }
 
     /// Returns the sizes a user-supplied image is rasterized to on this platform.
     ///
@@ -800,87 +765,25 @@ impl CustomizationContext {
         customizer: &mut CustomIconCustomizer,
         progress: ProgressSender,
     ) {
-        let total = folders.len();
-
-        // Send started event
-        let _ = progress.send(Progress::Started { total }).await;
-
-        // Render the custom icons
-        let _ = progress.send(Progress::Rendering).await;
-        let rendered = match customizer.render_full_output() {
-            Ok(icons) => icons,
-            Err(e) => {
-                let _ = progress
-                    .send(Progress::RenderFailed {
-                        error: e.to_string(),
-                    })
-                    .await;
-                let _ = progress
-                    .send(Progress::Completed {
-                        succeeded: 0,
-                        failed: total,
-                    })
-                    .await;
-                return;
-            }
-        };
-
-        // Convert to system format
-        let sys_icons = rendered.into_sys();
-
-        let mut succeeded = 0usize;
-        let mut failed = 0usize;
-
-        // Process each folder
-        for (index, folder) in folders.iter().enumerate() {
-            let path = folder.as_ref().to_path_buf();
-
-            // Send processing event
-            let _ = progress
-                .send(Progress::Processing {
-                    current: index,
-                    path: path.clone(),
-                })
-                .await;
-
-            // Apply the icon
-            match self
-                .folder_provider
-                .set_icon_for_folder(folder.as_ref(), &sys_icons)
-            {
-                Ok(()) => {
-                    succeeded += 1;
-                    let _ = progress
-                        .send(Progress::FolderComplete { index, path })
-                        .await;
-                }
-                Err(e) => {
-                    failed += 1;
-                    let _ = progress
-                        .send(Progress::FolderFailed {
-                            index,
-                            path,
-                            error: e.to_string(),
-                        })
-                        .await;
-                }
-            }
-        }
-
-        // Send completed event
-        let _ = progress
-            .send(Progress::Completed { succeeded, failed })
-            .await;
+        render_and_write(
+            &self.folder_provider,
+            folders,
+            || Ok(customizer.render_full_output()?.into_sys()),
+            progress,
+        )
+        .await;
     }
 
     /// Uses `source` as the folder icon, decorated per `profile`, on every folder.
     ///
-    /// Surface-relative intents (`solid_color`, `decal`) are ignored: a custom
-    /// image has no surface color.
+    /// Written in [`custom_image_medium`](Self::custom_image_medium): SVG stays
+    /// SVG where the platform allows it. Surface-relative intents (`solid_color`,
+    /// `decal`) are ignored: a custom image has no surface color.
     ///
     /// # Errors
     ///
-    /// Returns an error, before any folder is touched, if `source` can't be decoded.
+    /// Returns an error, before any folder is touched, if `source` can't be
+    /// written on this platform or can't be decoded.
     pub async fn customize_folders_with_image_async<P: AsRef<Path>>(
         &self,
         folders: Vec<P>,
@@ -888,12 +791,94 @@ impl CustomizationContext {
         profile: CustomizationProfile,
         progress: ProgressSender,
     ) -> Result<()> {
+        let medium = self.custom_image_medium(source)?;
+        let profile = CustomProfile::from(profile);
+
+        if let (OutputMedium::Vector, ImageSource::Svg(svg)) = (medium, source) {
+            let mut customizer = SvgCustomIconCustomizer::from_svg(svg.resolve()?)?;
+            customizer.apply_profile(profile);
+            render_and_write(
+                &self.folder_provider,
+                folders,
+                || Ok(customizer.render_full_output()?.into_sys()),
+                progress,
+            )
+            .await;
+            return Ok(());
+        }
+
         let mut customizer = self.create_custom_icon_customizer(source)?;
-        customizer.apply_profile(CustomProfile::from(profile));
+        customizer.apply_profile(profile);
         self.customize_folders_custom_async(folders, &mut customizer, progress)
             .await;
         Ok(())
     }
+}
+
+/// Renders once, then writes the result to each folder, reporting progress.
+async fn render_and_write<P: AsRef<Path>>(
+    provider: &PlatformFolderSettingsProvider,
+    folders: Vec<P>,
+    render: impl FnOnce() -> Result<SysIconSet>,
+    progress: ProgressSender,
+) {
+    let total = folders.len();
+    let _ = progress.send(Progress::Started { total }).await;
+
+    let _ = progress.send(Progress::Rendering).await;
+    let sys_icons = match render() {
+        Ok(icons) => icons,
+        Err(e) => {
+            let _ = progress
+                .send(Progress::RenderFailed {
+                    error: e.to_string(),
+                })
+                .await;
+            let _ = progress
+                .send(Progress::Completed {
+                    succeeded: 0,
+                    failed: total,
+                })
+                .await;
+            return;
+        }
+    };
+
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (index, folder) in folders.iter().enumerate() {
+        let path = folder.as_ref().to_path_buf();
+        let _ = progress
+            .send(Progress::Processing {
+                current: index,
+                path: path.clone(),
+            })
+            .await;
+
+        match provider.set_icon_for_folder(folder.as_ref(), &sys_icons) {
+            Ok(()) => {
+                succeeded += 1;
+                let _ = progress
+                    .send(Progress::FolderComplete { index, path })
+                    .await;
+            }
+            Err(e) => {
+                failed += 1;
+                let _ = progress
+                    .send(Progress::FolderFailed {
+                        index,
+                        path,
+                        error: e.to_string(),
+                    })
+                    .await;
+            }
+        }
+    }
+
+    let _ = progress
+        .send(Progress::Completed { succeeded, failed })
+        .await;
 }
 
 #[cfg(test)]

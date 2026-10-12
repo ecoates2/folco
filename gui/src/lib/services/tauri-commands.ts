@@ -84,13 +84,27 @@ export function resetFolders(
 /** The custom image the backend holds. `revision` names this exact copy. */
 export interface CustomImage {
 	revision: number;
-	kind: 'svg' | 'raster';
+	/** How to decode the bytes. */
+	format: 'svg' | 'raster';
+	/** The pipeline the backend will write it through; the preview must match. */
+	medium: 'vector' | 'raster';
 	fileName: string;
 }
 
 /** Has the backend read `path` and hold it as the custom image, replacing any earlier one. */
 export function loadCustomImage(path: string): Promise<CustomImage> {
 	return invoke('load_custom_image', { path });
+}
+
+/** What custom images the host platform can write. Fixed for the app's lifetime. */
+export interface CustomImageSupport {
+	write: { raster: boolean; vector: boolean };
+	/** Lowercase file extensions, without the dot. */
+	extensions: string[];
+}
+
+export function getCustomImageSupport(): Promise<CustomImageSupport> {
+	return invoke('get_custom_image_support');
 }
 
 /** The bytes of custom image `revision`; rejects if a newer image has replaced it. */

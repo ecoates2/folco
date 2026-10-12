@@ -91,53 +91,37 @@ impl SvgLayerSet for SvgFolderLayers {
 }
 
 // ============================================================================
-// SvgFolderIconCustomizer
+// SvgIconCustomizer
 // ============================================================================
 
-/// SVG folder icon customizer — vector-medium sibling of
-/// [`FolderIconCustomizer`](crate::FolderIconCustomizer).
+/// Vector-medium customizer over scalable base markup; `L` picks the layer set.
 ///
-/// Construct via [`SvgFolderIconCustomizer::from_folder()`]. Configure layers
-/// through the [`layers`](Self::layers) field, then call
-/// [`render`](Self::render) to produce a scalable SVG string.
-///
-/// # Example
-///
-/// ```
-/// use folco_renderer::{SvgFolderIconBase, SvgFolderIconCustomizer};
-///
-/// let base = SvgFolderIconBase::new(
-///     r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
-/// );
-/// let mut customizer = SvgFolderIconCustomizer::from_folder(base);
-///
-/// // With no layers configured, rendering returns the base markup unchanged.
-/// let svg = customizer.render_output().unwrap();
-/// assert!(svg.contains("<svg"));
-/// ```
-pub struct SvgFolderIconCustomizer {
-    base: SvgFolderIconBase,
+/// The vector counterpart to [`IconCustomizer`](crate::IconCustomizer): the
+/// rendering engine is shared, while each origin gets its own layer set and
+/// profile type, via [`SvgFolderIconCustomizer`] and
+/// [`SvgCustomIconCustomizer`](crate::SvgCustomIconCustomizer).
+pub struct SvgIconCustomizer<L> {
+    base_svg: String,
 
     /// The SVG layer set. Access layers directly to configure them.
-    pub layers: SvgFolderLayers,
+    pub layers: L,
 
     /// Rasterized previews, keyed by size and invalidated by layer changes.
     preview: CompositeLayer,
 }
 
-impl SvgFolderIconCustomizer {
-    /// Creates a customizer for a scalable system folder icon.
-    pub fn from_folder(base: SvgFolderIconBase) -> Self {
+impl<L: SvgLayerSet> SvgIconCustomizer<L> {
+    pub(crate) fn with_layers(base_svg: String, layers: L) -> Self {
         Self {
-            base,
-            layers: SvgFolderLayers::default(),
+            base_svg,
+            layers,
             preview: CompositeLayer::default(),
         }
     }
 
-    /// Returns a reference to the SVG folder base.
-    pub fn base(&self) -> &SvgFolderIconBase {
-        &self.base
+    /// The base markup layers are drawn over.
+    pub fn base_svg(&self) -> &str {
+        &self.base_svg
     }
 
     /// Renders the artifact written to the system: a single scalable SVG string.
@@ -148,7 +132,7 @@ impl SvgFolderIconCustomizer {
     ///
     /// Returns a render error if a layer fails.
     fn render_output(&mut self) -> Result<SvgRenderOutput, RenderError> {
-        let mut canvas = SvgCanvas::new(&self.base.svg);
+        let mut canvas = SvgCanvas::new(&self.base_svg);
         self.layers.execute(&mut canvas)?;
         Ok(SvgRenderOutput {
             rendered_svg: canvas.into_svg(),
@@ -182,6 +166,56 @@ impl SvgFolderIconCustomizer {
         Ok(image)
     }
 
+    /// Clears all layer caches.
+    pub fn clear_cache(&mut self) {
+        self.layers.invalidate_all();
+        self.preview.invalidate();
+    }
+}
+
+impl<L: SvgLayerSet> Render for SvgIconCustomizer<L> {
+    type Output = SvgRenderOutput;
+    fn render_full_output(&mut self) -> Result<Self::Output, RenderError> {
+        self.render_output()
+    }
+    fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
+        self.render_raster_preview(size)
+    }
+}
+
+// ============================================================================
+// SvgFolderIconCustomizer
+// ============================================================================
+
+/// SVG folder icon customizer — vector-medium sibling of
+/// [`FolderIconCustomizer`](crate::FolderIconCustomizer).
+///
+/// Construct via [`SvgFolderIconCustomizer::from_folder()`]. Configure layers
+/// through the [`layers`](SvgIconCustomizer::layers) field, then render to
+/// produce a scalable SVG string.
+///
+/// # Example
+///
+/// ```
+/// use folco_renderer::{Render, SvgFolderIconBase, SvgFolderIconCustomizer};
+///
+/// let base = SvgFolderIconBase::new(
+///     r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
+/// );
+/// let mut customizer = SvgFolderIconCustomizer::from_folder(base);
+///
+/// // With no layers configured, rendering returns the base markup unchanged.
+/// let svg = customizer.render_full_output().unwrap();
+/// assert!(svg.rendered_svg.contains("<svg"));
+/// ```
+pub type SvgFolderIconCustomizer = SvgIconCustomizer<SvgFolderLayers>;
+
+impl SvgFolderIconCustomizer {
+    /// Creates a customizer for a scalable system folder icon.
+    pub fn from_folder(base: SvgFolderIconBase) -> Self {
+        Self::with_layers(base.svg, SvgFolderLayers::default())
+    }
+
     /// Applies a [`FolderProfile`]'s settings to the SVG layers.
     ///
     /// The profile is authoritative: layers it omits are cleared.
@@ -210,22 +244,6 @@ impl SvgFolderIconCustomizer {
             decal: None,
             overlay: self.layers.overlay.config().cloned(),
         }
-    }
-
-    /// Clears all layer caches.
-    pub fn clear_cache(&mut self) {
-        self.layers.invalidate_all();
-        self.preview.invalidate();
-    }
-}
-
-impl Render for SvgFolderIconCustomizer {
-    type Output = SvgRenderOutput;
-    fn render_full_output(&mut self) -> Result<Self::Output, RenderError> {
-        self.render_output()
-    }
-    fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
-        self.render_raster_preview(size)
     }
 }
 

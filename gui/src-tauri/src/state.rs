@@ -3,11 +3,11 @@ use std::sync::Mutex;
 
 use folco_core::progress::ProgressSender;
 use folco_core::{
-    CustomizationContext, CustomizationContextBuilder, CustomizationProfile, ImageFile,
-    ImageSource,
+    CustomizationContext, CustomizationContextBuilder, CustomizationProfile, Error, ImageFile,
+    ImageFormat, ImageSource, WriteCapabilities,
 };
 
-use crate::dto::{CustomImageDto, FolderIconBaseDto, ImageKindDto};
+use crate::dto::{CustomImageDto, FolderIconBaseDto};
 
 /// Wrapper to make `CustomizationContext` usable in Tauri managed state.
 ///
@@ -158,12 +158,16 @@ impl AppState {
     }
 
     /// Reads `path` and makes it the custom image, superseding any earlier one.
+    ///
+    /// Rejects, without reading, images this platform can't write.
     pub fn load_custom_image(&self, path: &Path) -> Result<CustomImageDto, String> {
+        let format = ImageFormat::of_path(path)
+            .ok_or_else(|| Error::UnsupportedImageFile(path.to_path_buf()).to_string())?;
+        let medium = WriteCapabilities::current_platform()
+            .custom_image_medium(format)
+            .ok_or_else(|| Error::UnsupportedCustomImage(format).to_string())?;
+
         let file = ImageFile::read(path).map_err(|e| e.to_string())?;
-        let kind = match file {
-            ImageFile::Svg(_) => ImageKindDto::Svg,
-            ImageFile::Raster(_) => ImageKindDto::Raster,
-        };
         let file_name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -175,7 +179,8 @@ impl AppState {
 
         Ok(CustomImageDto {
             revision: slot.revision,
-            kind,
+            format,
+            medium,
             file_name,
         })
     }

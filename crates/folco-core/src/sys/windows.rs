@@ -1,8 +1,18 @@
 //! Windows-specific system icon metadata and size specifications.
 
-use super::RasterFolderMetadata;
+use super::{RasterFolderMetadata, WriteCapabilities};
 use folco_renderer::{RectPx, SurfaceColor};
 use icon_sys::icon::sys::windows::WindowsIconSize;
+
+impl WriteCapabilities {
+    // Folder icons are .ico files, which hold only bitmaps.
+    pub(super) fn platform_impl() -> Self {
+        Self {
+            raster: true,
+            vector: false,
+        }
+    }
+}
 
 /// The default Windows folder icon surface color: RGB(255, 217, 112).
 ///

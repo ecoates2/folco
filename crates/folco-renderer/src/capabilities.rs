@@ -73,11 +73,23 @@ pub enum IconBaseKind {
     RasterFolder,
     /// The system folder icon, delivered as scalable markup.
     VectorFolder,
-    /// An image the user supplied.
-    CustomImage,
+    /// A raster image the user supplied, or an SVG rasterized for a raster platform.
+    RasterCustomImage,
+    /// An SVG the user supplied, kept as scalable markup.
+    VectorCustomImage,
 }
 
 impl IconBaseKind {
+    /// Whether this base is customized as scalable markup rather than pixels.
+    pub fn is_vector(self) -> bool {
+        matches!(self, Self::VectorFolder | Self::VectorCustomImage)
+    }
+
+    /// Whether this base came from the user rather than the system.
+    pub fn is_custom(self) -> bool {
+        matches!(self, Self::RasterCustomImage | Self::VectorCustomImage)
+    }
+
     /// The layers this base can realize.
     pub fn capabilities(self) -> IconCapabilities {
         // Solid color and decal both shift pixels against a known surface
@@ -108,13 +120,19 @@ impl IconBaseKind {
                     "this system's folder icon is a scalable SVG, and decals are imprinted per-pixel"
                 }
             },
-            Self::CustomImage => match layer {
+            Self::RasterCustomImage => match layer {
                 LayerKind::SolidColor => {
                     "a custom image has no known surface color to recolor away from"
                 }
                 _ => {
                     "decals are tinted against a folder's surface color, which a custom image has none of"
                 }
+            },
+            Self::VectorCustomImage => match layer {
+                LayerKind::SolidColor => {
+                    "a custom SVG image is scalable markup, which has no pixels to recolor"
+                }
+                _ => "a custom SVG image is scalable markup, and decals are imprinted per-pixel",
             },
             // Realizes every layer, so `supports` already returned None above.
             Self::RasterFolder => {
@@ -262,7 +280,11 @@ mod tests {
 
     #[test]
     fn surface_relative_layers_need_a_raster_folder() {
-        for kind in [IconBaseKind::VectorFolder, IconBaseKind::CustomImage] {
+        for kind in [
+            IconBaseKind::VectorFolder,
+            IconBaseKind::RasterCustomImage,
+            IconBaseKind::VectorCustomImage,
+        ] {
             let unsupported: Vec<LayerKind> = kind
                 .unsupported_in(&full_profile())
                 .into_iter()
@@ -289,7 +311,7 @@ mod tests {
 
     #[test]
     fn filter_drops_exactly_the_unsupported_layers() {
-        let filtered = IconBaseKind::CustomImage
+        let filtered = IconBaseKind::RasterCustomImage
             .capabilities()
             .filter(&full_profile());
 
@@ -304,7 +326,8 @@ mod tests {
         for kind in [
             IconBaseKind::RasterFolder,
             IconBaseKind::VectorFolder,
-            IconBaseKind::CustomImage,
+            IconBaseKind::RasterCustomImage,
+            IconBaseKind::VectorCustomImage,
         ] {
             let caps = kind.capabilities();
             for layer in LayerKind::ALL {
@@ -324,7 +347,7 @@ mod tests {
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor, SvgFolderIconBase};
         use crate::{
             CustomIconCustomizer, CustomProfile, CustomizationProfile, FolderIconCustomizer,
-            FolderProfile, SvgFolderIconCustomizer,
+            FolderProfile, SvgCustomIconCustomizer, SvgFolderIconCustomizer,
         };
 
         fn assert_keeps_exactly(caps: IconCapabilities, exported: &CustomizationProfile) {
@@ -354,10 +377,20 @@ mod tests {
         );
 
         let mut custom = CustomIconCustomizer::from_icon_set(IconSet::new());
-        custom.apply_profile(CustomProfile::from(wire));
+        custom.apply_profile(CustomProfile::from(&wire));
         assert_keeps_exactly(
             CustomIconCustomizer::capabilities(),
             &custom.export_profile(),
+        );
+
+        let mut svg_custom = SvgCustomIconCustomizer::from_svg(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
+        )
+        .unwrap();
+        svg_custom.apply_profile(CustomProfile::from(wire));
+        assert_keeps_exactly(
+            SvgCustomIconCustomizer::capabilities(),
+            &svg_custom.export_profile(),
         );
     }
 }

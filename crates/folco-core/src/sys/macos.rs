@@ -1,7 +1,17 @@
 //! macOS-specific system icon metadata.
 
-use super::{PlatformSizeSpec, RasterFolderMetadata};
+use super::{PlatformSizeSpec, RasterFolderMetadata, WriteCapabilities};
 use folco_renderer::IconSizeSpec;
+
+impl WriteCapabilities {
+    // Folder icons are .icns resources, which hold only bitmaps.
+    pub(super) fn platform_impl() -> Self {
+        Self {
+            raster: true,
+            vector: false,
+        }
+    }
+}
 
 impl RasterFolderMetadata {
     pub(super) fn platform_impl() -> Option<Self> {

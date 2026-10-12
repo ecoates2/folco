@@ -14,6 +14,8 @@
 use folco_renderer::{IconSizeSpec, RectPx, SurfaceColor};
 use serde::{Deserialize, Serialize};
 
+use crate::image_file::{ImageFile, ImageFormat};
+
 #[cfg(target_os = "windows")]
 pub mod windows;
 
@@ -22,6 +24,65 @@ pub mod macos;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+
+// ============================================================================
+// WriteCapabilities
+// ============================================================================
+
+/// The form a folder icon is written to the system in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputMedium {
+    /// A set of PNG sizes.
+    Raster,
+    /// A single scalable SVG.
+    Vector,
+}
+
+/// Which media this platform's folder icon write path accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct WriteCapabilities {
+    pub raster: bool,
+    pub vector: bool,
+}
+
+impl WriteCapabilities {
+    /// What the host platform can write.
+    pub fn current_platform() -> Self {
+        Self::platform_impl()
+    }
+
+    /// Whether `medium` can be written.
+    pub fn supports(self, medium: OutputMedium) -> bool {
+        match medium {
+            OutputMedium::Raster => self.raster,
+            OutputMedium::Vector => self.vector,
+        }
+    }
+
+    /// The medium a custom image of `format` is written in, or `None` if it can't be.
+    ///
+    /// SVG stays vector where possible and is rasterized otherwise; raster
+    /// can't be vectorized, so it needs raster support.
+    pub fn custom_image_medium(self, format: ImageFormat) -> Option<OutputMedium> {
+        match format {
+            ImageFormat::Svg if self.vector => Some(OutputMedium::Vector),
+            _ if self.raster => Some(OutputMedium::Raster),
+            _ => None,
+        }
+    }
+
+    /// Extensions of custom image files this platform can write, lowercase.
+    pub fn custom_image_extensions(self) -> Vec<&'static str> {
+        ImageFile::supported_extensions()
+            .filter(|ext| {
+                ImageFormat::from_extension(ext)
+                    .and_then(|format| self.custom_image_medium(format))
+                    .is_some()
+            })
+            .collect()
+    }
+}
 
 // ============================================================================
 // RasterFolderMetadata
@@ -104,6 +165,40 @@ impl PlatformSizeSpec {
     /// - **Linux**: 512 only; the file manager scales the single written file
     pub fn custom_image() -> Self {
         Self::custom_image_impl()
+    }
+}
+
+#[cfg(test)]
+mod write_capabilities_tests {
+    use super::*;
+
+    const RASTER_ONLY: WriteCapabilities = WriteCapabilities {
+        raster: true,
+        vector: false,
+    };
+    const VECTOR_ONLY: WriteCapabilities = WriteCapabilities {
+        raster: false,
+        vector: true,
+    };
+
+    #[test]
+    fn platform_writes_something() {
+        let caps = WriteCapabilities::current_platform();
+        assert!(caps.raster || caps.vector);
+    }
+
+    #[test]
+    fn svg_is_rasterized_where_vector_is_unsupported() {
+        assert_eq!(
+            RASTER_ONLY.custom_image_medium(ImageFormat::Svg),
+            Some(OutputMedium::Raster)
+        );
+    }
+
+    #[test]
+    fn raster_is_rejected_where_raster_is_unsupported() {
+        assert_eq!(VECTOR_ONLY.custom_image_medium(ImageFormat::Raster), None);
+        assert_eq!(VECTOR_ONLY.custom_image_extensions(), vec!["svg"]);
     }
 }
 

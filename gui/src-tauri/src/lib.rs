@@ -5,10 +5,11 @@ mod theme;
 use std::path::PathBuf;
 
 use dto::{
-    CustomImageDto, FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto, SvgFolderIconBaseDto,
+    CustomImageDto, CustomImageSupportDto, FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto,
+    SvgFolderIconBaseDto,
 };
-use folco_core::CustomizationProfile;
 use folco_core::progress::{progress_channel, ProgressSender};
+use folco_core::{CustomizationProfile, WriteCapabilities};
 use state::AppState;
 use tauri::ipc::{Channel, Response};
 use tauri::Manager;
@@ -54,6 +55,15 @@ async fn get_folder_icon_svg(
 #[tauri::command]
 fn get_custom_image_sizes() -> PlatformSizeSpecDto {
     PlatformSizeSpecDto::custom_image()
+}
+
+#[tauri::command]
+fn get_custom_image_support() -> CustomImageSupportDto {
+    let write = WriteCapabilities::current_platform();
+    CustomImageSupportDto {
+        write,
+        extensions: write.custom_image_extensions(),
+    }
 }
 
 /// Runs a folder operation on the app state, forwarding its progress events to
@@ -160,6 +170,7 @@ pub fn run() {
             get_folder_icon_base,
             get_folder_icon_svg,
             get_custom_image_sizes,
+            get_custom_image_support,
             customize_folders,
             customize_folders_with_image,
             load_custom_image,

@@ -2,6 +2,7 @@
   import "../app.css";
   import { theme } from "$lib/stores/theme.svelte";
   import { features } from "$lib/stores/features.svelte";
+  import { platform } from "$lib/stores/platform.svelte";
   import { errorDialog } from "$lib/stores/error-dialog.svelte";
   import { ErrorDialog } from "$lib/components/app/error-dialog";
   import { onMount } from "svelte";
@@ -26,6 +27,7 @@
   onMount(() => {
     theme.init();
     features.init();
+    platform.init();
     dismissBootLoader();
 
     return () => {

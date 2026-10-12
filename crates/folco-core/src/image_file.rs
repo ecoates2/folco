@@ -3,11 +3,52 @@
 use std::path::Path;
 
 use folco_renderer::{ImageSource, SvgSource};
+use serde::Serialize;
 
 use crate::error::{Error, Result};
 
 /// Raster formats accepted as image files, by extension.
 const RASTER_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif"];
+
+/// Whether an image is scalable markup or pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageFormat {
+    Svg,
+    Raster,
+}
+
+impl ImageFormat {
+    /// The format of an extension [`ImageFile::read`] accepts, case-insensitively.
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        if ext.eq_ignore_ascii_case("svg") {
+            Some(Self::Svg)
+        } else if RASTER_EXTENSIONS.iter().any(|r| ext.eq_ignore_ascii_case(r)) {
+            Some(Self::Raster)
+        } else {
+            None
+        }
+    }
+
+    /// The format of `path`, by extension.
+    pub fn of_path(path: &Path) -> Option<Self> {
+        Self::from_extension(path.extension()?.to_str()?)
+    }
+
+    /// The format of an image source; emoji count as SVG.
+    pub fn of_source(source: &ImageSource) -> Self {
+        if source.is_svg() { Self::Svg } else { Self::Raster }
+    }
+}
+
+impl std::fmt::Display for ImageFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Svg => "SVG",
+            Self::Raster => "raster",
+        })
+    }
+}
 
 /// An image file read from disk, classified by extension.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,9 +67,7 @@ impl ImageFile {
 
     /// Whether `path` has an extension [`read`](Self::read) accepts.
     pub fn is_supported(path: &Path) -> bool {
-        path.extension().is_some_and(|ext| {
-            Self::supported_extensions().any(|supported| ext.eq_ignore_ascii_case(supported))
-        })
+        ImageFormat::of_path(path).is_some()
     }
 
     /// Reads `path` as SVG markup or raster bytes, based on its extension.
@@ -38,22 +77,25 @@ impl ImageFile {
     /// Returns [`Error::UnsupportedImageFile`] for unknown extensions and
     /// [`Error::ReadImageFile`] if the file can't be read.
     pub fn read(path: &Path) -> Result<Self> {
-        if !Self::is_supported(path) {
-            return Err(Error::UnsupportedImageFile(path.to_path_buf()));
-        }
+        let format = ImageFormat::of_path(path)
+            .ok_or_else(|| Error::UnsupportedImageFile(path.to_path_buf()))?;
 
         let read_err = |source| Error::ReadImageFile {
             path: path.to_path_buf(),
             source,
         };
-        let is_svg = path
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"));
 
-        if is_svg {
-            std::fs::read_to_string(path).map(Self::Svg).map_err(read_err)
-        } else {
-            std::fs::read(path).map(Self::Raster).map_err(read_err)
+        match format {
+            ImageFormat::Svg => std::fs::read_to_string(path).map(Self::Svg).map_err(read_err),
+            ImageFormat::Raster => std::fs::read(path).map(Self::Raster).map_err(read_err),
+        }
+    }
+
+    /// Whether the file is SVG markup or raster bytes.
+    pub fn format(&self) -> ImageFormat {
+        match self {
+            Self::Svg(_) => ImageFormat::Svg,
+            Self::Raster(_) => ImageFormat::Raster,
         }
     }
 

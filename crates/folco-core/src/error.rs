@@ -69,4 +69,8 @@ pub enum Error {
         path: PathBuf,
         source: std::io::Error,
     },
+
+    /// This platform can't write a folder icon from an image of this format.
+    #[error("{0} images can't be used as folder icons on this system")]
+    UnsupportedCustomImage(crate::image_file::ImageFormat),
 }

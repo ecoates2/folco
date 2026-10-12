@@ -55,6 +55,7 @@ pub mod layer;
 pub mod medium;
 pub mod output;
 mod profile;
+mod svg_custom_customizer;
 mod svg_folder_customizer;
 pub mod svg_layer;
 
@@ -75,7 +76,8 @@ pub use layer::{
 pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
 pub use output::Render;
 pub use profile::{CustomProfile, CustomizationProfile, FolderProfile};
+pub use svg_custom_customizer::{SvgCustomIconCustomizer, SvgCustomLayers};
 pub use svg_folder_customizer::{
-    SvgFolderIconCustomizer, SvgFolderLayers, SvgLayerSet, SvgRenderOutput,
+    SvgFolderIconCustomizer, SvgFolderLayers, SvgIconCustomizer, SvgLayerSet, SvgRenderOutput,
 };
 pub use svg_layer::SvgLayer;
