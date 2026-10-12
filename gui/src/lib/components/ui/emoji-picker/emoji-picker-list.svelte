@@ -3,8 +3,8 @@
 	import { Command as CommandPrimitive } from 'bits-ui';
 	import data, { type EmojiMartData } from '@emoji-mart/data';
 	import * as casing from '$lib/utils/casing';
-	import type { EmojiPickerListProps } from './types';
-	import { makeValue, parseValue, useEmojiPickerList } from './emoji-picker.svelte.js';
+	import type { EmojiPickerListProps } from '$lib/components/ui/emoji-picker/types';
+	import { makeValue, parseValue, useEmojiPickerList } from '$lib/components/ui/emoji-picker/emoji-picker.svelte.js';
 	import { cn } from '$lib/utils.js';
 
 	let {
@@ -52,7 +52,7 @@
 						{@const { name, skin } = parseValue(item)}
 						{@const emoji = emojiData.emojis[name].skins[skin].native}
 						<Command.Item
-							class="flex aspect-square size-9 place-items-center justify-center text-lg"
+							class="flex aspect-square size-9 place-items-center justify-center text-lg [&_svg]:hidden!"
 							value="{item}:recent"
 							onSelect={() => {
 								pickerState.select(item);
@@ -81,7 +81,7 @@
 						{@const emojiSkin = emoji.skins.length > 1 ? pickerState.skinIndex : 0}
 						{@const key = makeValue(item, emojiSkin)}
 						<Command.Item
-							class="flex aspect-square size-9 place-items-center justify-center text-lg"
+							class="flex aspect-square size-9 place-items-center justify-center text-lg [&_svg]:hidden!"
 							value={item}
 							onSelect={() => {
 								pickerState.select(key);

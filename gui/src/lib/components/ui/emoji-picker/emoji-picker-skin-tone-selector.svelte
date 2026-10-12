@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { box } from 'svelte-toolbelt';
-	import { useEmojiPickerSkinToneSelector } from './emoji-picker.svelte.js';
-	import type { EmojiPickerSkinProps } from './types.js';
-	import { Button, type ButtonElementProps } from '$lib/components/ui/button';
+	import { useEmojiPickerSkinToneSelector } from '$lib/components/ui/emoji-picker/emoji-picker.svelte.js';
+	import type { EmojiPickerSkinProps } from '$lib/components/ui/emoji-picker/types.js';
+	import Button, { type ButtonProps } from '$lib/components/button.svelte';
 	import { cn } from '$lib/utils.js';
 
 	let {
@@ -20,11 +20,11 @@
 </script>
 
 <Button
-	{...rest}
+	{...rest /* eslint-disable-line @typescript-eslint/no-explicit-any */ as any}
 	{variant}
 	{size}
 	class={cn('size-8', className)}
-	onclick={(e: Parameters<NonNullable<ButtonElementProps['onclick']>>[0]) => {
+	onclick={(e: Parameters<NonNullable<ButtonProps['onclick']>>[0]) => {
 		onclick?.(e);
 		skinState.cycleSkinTone();
 	}}

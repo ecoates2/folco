@@ -38,7 +38,7 @@
 		"clsx": "^2.1.1",
 		"jsrepo": "^3.8.1",
 		"paneforge": "^1.0.2",
-		"runed": "^0.36.0",
+		"runed": "^0.37.1",
 		"svelte": "^5.57.2",
 		"svelte-check": "^4.7.6",
 		"svelte-toolbelt": "^0.10.6",

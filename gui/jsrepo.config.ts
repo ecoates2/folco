@@ -10,6 +10,7 @@ export default defineConfig({
 		hook: '$lib/hooks',
 		action: '$lib/actions',
 		util: '$lib/utils',
-		lib: '$lib'
+		lib: '$lib',
+		component: '$lib/components'
 	},
 });
