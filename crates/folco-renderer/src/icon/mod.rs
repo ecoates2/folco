@@ -175,9 +175,9 @@ impl IconSet {
 
     /// Creates an icon set by rendering/resizing an [`ImageSource`] to each spec.
     ///
-    /// Each [`IconSizeSpec`] produces one [`IconImage`] with `content_bounds`
-    /// set to the full image area (since custom images have no platform-specific
-    /// content insets).
+    /// Each [`IconSizeSpec`] produces one square [`IconImage`] whose side is the
+    /// spec's larger dimension. Non-square sources are scaled to fit and centered
+    /// on a transparent canvas, with `content_bounds` set to the placed image.
     ///
     /// # Errors
     ///
@@ -189,8 +189,9 @@ impl IconSet {
         let images = specs
             .iter()
             .map(|spec| {
-                let rgba = source.render_at_size(spec.max_dimension())?;
-                Ok(IconImage::new_full_content(rgba, spec.scale))
+                let side = spec.max_dimension();
+                let rgba = source.render_at_size(side)?;
+                Ok(center_in_square(rgba, side, spec.scale))
             })
             .collect::<Result<Vec<_>, RenderError>>()?;
         Ok(Self::from_images(images))
@@ -244,6 +245,23 @@ impl<'a> IntoIterator for &'a IconSet {
     fn into_iter(self) -> Self::IntoIter {
         self.images.iter()
     }
+}
+
+/// Centers `image` on a transparent `side × side` canvas.
+fn center_in_square(image: RgbaImage, side: u32, scale: f32) -> IconImage {
+    if image.dimensions() == (side, side) {
+        return IconImage::new_full_content(image, scale);
+    }
+
+    // SVG rendering rounds up, so a dimension can exceed `side` by a pixel.
+    let width = image.width().min(side);
+    let height = image.height().min(side);
+    let x = (side - width) / 2;
+    let y = (side - height) / 2;
+
+    let mut canvas = RgbaImage::new(side, side);
+    image::imageops::replace(&mut canvas, &image, i64::from(x), i64::from(y));
+    IconImage::new(canvas, scale, RectPx::new(x, y, width, height))
 }
 
 // ============================================================================
@@ -302,5 +320,32 @@ mod tests {
         assert!(spec.is_square());
         assert_eq!(spec.max_dimension(), 64);
         assert_eq!(spec.scale, 2.0);
+    }
+
+    #[test]
+    fn from_image_source_centers_wide_image_in_square() {
+        let wide = ImageSource::from_rgba_image(&RgbaImage::from_pixel(
+            200,
+            100,
+            image::Rgba([255, 0, 0, 255]),
+        ))
+        .unwrap();
+
+        let set = IconSet::from_image_source(&wide, &[IconSizeSpec::square(64, 1.0)]).unwrap();
+        let img = &set.images[0];
+
+        assert_eq!(img.dimensions(), SizePx::new(64, 64));
+        assert_eq!(img.content_bounds, RectPx::new(0, 16, 64, 32));
+        assert_eq!(img.data.get_pixel(32, 0).0[3], 0);
+        assert_eq!(img.data.get_pixel(32, 32).0, [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn from_image_source_keeps_square_image_full_content() {
+        let square = ImageSource::from_rgba_image(&RgbaImage::new(100, 100)).unwrap();
+
+        let set = IconSet::from_image_source(&square, &[IconSizeSpec::square(32, 1.0)]).unwrap();
+
+        assert_eq!(set.images[0].content_bounds, RectPx::from_size(32, 32));
     }
 }

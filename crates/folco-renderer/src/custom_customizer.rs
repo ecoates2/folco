@@ -93,8 +93,8 @@ pub type CustomIconCustomizer = IconCustomizer<CustomLayers>;
 impl CustomIconCustomizer {
     /// Creates a customizer from a user-provided image source.
     ///
-    /// Each [`IconSizeSpec`] produces one base image with full-image content
-    /// bounds.
+    /// Each [`IconSizeSpec`] produces one square base image; non-square sources
+    /// are fit and centered, with content bounds covering the placed image.
     ///
     /// # Errors
     ///
