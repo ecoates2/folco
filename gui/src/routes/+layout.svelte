@@ -1,6 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import { theme } from "$lib/stores/theme.svelte";
+  import { features } from "$lib/stores/features.svelte";
   import { onMount } from "svelte";
 
   let { children } = $props();
@@ -22,6 +23,7 @@
 
   onMount(() => {
     theme.init();
+    features.init();
     dismissBootLoader();
 
     return () => {

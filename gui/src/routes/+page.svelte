@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { renderer } from '$lib/stores/renderer.svelte';
   import { artwork } from '$lib/stores/artwork.svelte';
+  import { features } from '$lib/stores/features.svelte';
   import { workflow } from '$lib/stores/workflow.svelte';
   import { WORKFLOWS } from '$lib/workflows/definitions';
   import type { WorkflowId } from '$lib/workflows/types';
@@ -117,20 +118,22 @@
             onchange={(color) => renderer.setColorDot(color.r, color.g, color.b)}
           />
         {:else if section.id === 'emoji'}
-          <RadioGroup.Root
-            value={artwork.anchorMode}
-            onValueChange={(v) => { if (v === 'inset' || v === 'centered') artwork.setAnchorMode(v); }}
-            class="mb-3 flex flex-row gap-4"
-          >
-            <div class="flex items-center gap-2">
-              <RadioGroup.Item value="inset" id="emoji-anchor-inset" />
-              <label for="emoji-anchor-inset" class="cursor-pointer text-sm font-medium text-foreground">Inset</label>
-            </div>
-            <div class="flex items-center gap-2">
-              <RadioGroup.Item value="centered" id="emoji-anchor-centered" />
-              <label for="emoji-anchor-centered" class="cursor-pointer text-sm font-medium text-foreground">Centered</label>
-            </div>
-          </RadioGroup.Root>
+          {#if features.experimental}
+            <RadioGroup.Root
+              value={artwork.anchorMode}
+              onValueChange={(v) => { if (v === 'inset' || v === 'centered') artwork.setAnchorMode(v); }}
+              class="mb-3 flex flex-row gap-4"
+            >
+              <div class="flex items-center gap-2">
+                <RadioGroup.Item value="inset" id="emoji-anchor-inset" />
+                <label for="emoji-anchor-inset" class="cursor-pointer text-sm font-medium text-foreground">Inset</label>
+              </div>
+              <div class="flex items-center gap-2">
+                <RadioGroup.Item value="centered" id="emoji-anchor-centered" />
+                <label for="emoji-anchor-centered" class="cursor-pointer text-sm font-medium text-foreground">Centered</label>
+              </div>
+            </RadioGroup.Root>
+          {/if}
           <EmojiPicker.Root
             onSelect={(emoji) => artwork.selectEmoji(emoji)}
             onSkinChange={(skin) => artwork.setEmojiSkin(skin)}
@@ -164,7 +167,7 @@
               <label for="icon-mode-overlay" class="cursor-pointer text-sm font-medium text-foreground">Overlay</label>
             </div>
           </RadioGroup.Root>
-          {#if artwork.effectivePlacement === 'overlay'}
+          {#if features.experimental && artwork.effectivePlacement === 'overlay'}
             <RadioGroup.Root
               value={artwork.anchorMode}
               onValueChange={(v) => { if (v === 'inset' || v === 'centered') artwork.setAnchorMode(v); }}

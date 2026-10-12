@@ -19,6 +19,10 @@ struct Cli {
     #[arg(long, short, global = true)]
     verbose: bool,
 
+    /// Enable experimental options (also enabled by FOLCO_EXPERIMENTAL=1)
+    #[arg(long, global = true)]
+    experimental: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -96,9 +100,9 @@ enum Commands {
         #[arg(long, value_name = "POSITION", default_value = "center")]
         overlay_position: PositionArg,
 
-        /// Overlay anchor mode
-        #[arg(long, value_name = "MODE", default_value = "inset")]
-        overlay_anchor_mode: AnchorModeArg,
+        /// Overlay anchor mode [experimental; default: inset]
+        #[arg(long, value_name = "MODE", hide = true)]
+        overlay_anchor_mode: Option<AnchorModeArg>,
 
         /// Overlay scale factor (0.0-1.0)
         #[arg(long, value_name = "SCALE", default_value = "0.70")]
@@ -284,6 +288,7 @@ fn create_progress_bar(total: u64) -> ProgressBar {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let experimental = cli.experimental || folco_core::experimental::enabled_from_env();
 
     match cli.command {
         Commands::Customize {
@@ -301,6 +306,14 @@ async fn main() -> Result<()> {
             overlay_anchor_mode,
             overlay_scale,
         } => {
+            if overlay_anchor_mode.is_some() && !experimental {
+                bail!(
+                    "--overlay-anchor-mode is experimental; pass --experimental or set {}=1",
+                    folco_core::experimental::ENV_VAR
+                );
+            }
+            let overlay_anchor_mode = overlay_anchor_mode.unwrap_or_default();
+
             if folder {
                 // ── Folder mode ────────────────────────────────────
                 let profile = if let Some(json) = folder_customization_profile {

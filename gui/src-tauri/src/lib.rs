@@ -49,6 +49,11 @@ fn get_platform_icon_sizes() -> PlatformSizeSpecDto {
     folco_core::get_platform_icon_sizes()
 }
 
+#[tauri::command]
+fn experimental_enabled() -> bool {
+    folco_core::experimental::enabled_from_env()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -60,6 +65,7 @@ pub fn run() {
             get_folder_icon_base,
             get_folder_icon_svg,
             get_platform_icon_sizes,
+            experimental_enabled,
             set_startup_theme
         ])
         .setup(|app| {

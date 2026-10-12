@@ -35,6 +35,7 @@ mod cache;
 mod context;
 mod convert;
 mod error;
+pub mod experimental;
 pub mod folder_color;
 pub mod progress;
 mod raster_base;

@@ -40,3 +40,8 @@ export async function getPlatformIconSizes(): Promise<IconSizeSpec[]> {
 	const spec = await invoke<PlatformSizeSpec>('get_platform_icon_sizes');
 	return spec.sizes;
 }
+
+/** Whether `FOLCO_EXPERIMENTAL` was set when the app launched. */
+export function isExperimentalEnabled(): Promise<boolean> {
+	return invoke('experimental_enabled');
+}
