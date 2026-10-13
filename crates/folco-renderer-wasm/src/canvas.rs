@@ -449,18 +449,32 @@ impl CanvasRenderer {
         }
     }
 
-    /// Sets the color-dot badge drawn in the icon's bottom-right corner.
+    /// Sets the color-dot badge drawn on top of the icon.
     ///
-    /// Supported by every medium.
+    /// Supported by every medium. Placement works exactly like
+    /// [`set_overlay`](Self::set_overlay).
     ///
     /// # Arguments
     ///
     /// * `r` - Red channel (0–255)
     /// * `g` - Green channel (0–255)
     /// * `b` - Blue channel (0–255)
+    /// * `position` - Position string: "top-left", "top-right", "bottom-left", "bottom-right", "center"
+    /// * `anchor_mode` - Anchor mode string: "inset" or "centered"
+    /// * `scale` - Scale factor relative to icon bounds (0.0-1.0)
     #[wasm_bindgen(js_name = "setColorDot")]
-    pub fn set_color_dot(&mut self, r: u8, g: u8, b: u8) {
-        let config = Some(ColorDotConfig::new(r, g, b));
+    pub fn set_color_dot(
+        &mut self,
+        r: u8,
+        g: u8,
+        b: u8,
+        position: &str,
+        anchor_mode: &str,
+        scale: f32,
+    ) -> Result<(), JsError> {
+        let pos = parse_overlay_position(position)?;
+        let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
+        let config = Some(ColorDotConfig::new(r, g, b).with_placement(pos, anchor_mode, scale));
         match &mut self.active {
             ActiveCustomizer::Folder(c) => {
                 c.layers.color_dot.set_config(config);
@@ -475,6 +489,7 @@ impl CanvasRenderer {
                 c.layers.color_dot.set_config(config);
             }
         }
+        Ok(())
     }
 
     /// Clears the color-dot configuration, deactivating the layer.

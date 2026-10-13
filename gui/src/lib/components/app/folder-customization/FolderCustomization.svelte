@@ -107,6 +107,22 @@
 						onchange={(color) => solidColor.select(color)}
 					/>
 				{:else if section.id === 'color-dot'}
+					{#if features.experimental}
+						<RadioGroup.Root
+							value={artwork.anchorMode}
+							onValueChange={(v) => { if (v === 'inset' || v === 'centered') artwork.setAnchorMode(v); }}
+							class="mb-3 flex flex-row gap-4"
+						>
+							<div class="flex items-center gap-2">
+								<RadioGroup.Item value="inset" id="color-dot-anchor-inset" />
+								<label for="color-dot-anchor-inset" class="cursor-pointer text-sm font-medium text-foreground">Inset</label>
+							</div>
+							<div class="flex items-center gap-2">
+								<RadioGroup.Item value="centered" id="color-dot-anchor-centered" />
+								<label for="color-dot-anchor-centered" class="cursor-pointer text-sm font-medium text-foreground">Centered</label>
+							</div>
+						</RadioGroup.Root>
+					{/if}
 					<ColorPicker
 						value={artwork.colorDotId}
 						onchange={(color) => artwork.selectColorDot(color)}

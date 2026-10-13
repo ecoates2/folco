@@ -71,9 +71,21 @@ enum Commands {
         color: Option<FolderColor>,
 
         // === Color Dot Options (both modes) ===
-        /// Add a colored dot badge in the icon's bottom-right corner
+        /// Add a colored dot badge (bottom-right by default)
         #[arg(long, value_enum, value_name = "COLOR")]
         color_dot: Option<FolderColor>,
+
+        /// Color dot position
+        #[arg(long, value_name = "POSITION", default_value = "bottom-right")]
+        color_dot_position: PositionArg,
+
+        /// Color dot anchor mode [experimental; default: inset]
+        #[arg(long, value_name = "MODE", hide = true)]
+        color_dot_anchor_mode: Option<AnchorModeArg>,
+
+        /// Color dot scale factor (0.0-1.0)
+        #[arg(long, value_name = "SCALE", default_value = "0.40")]
+        color_dot_scale: f32,
 
         // === Decal Options (folder-mode only) ===
         /// Decal source: an SVG file path or raw SVG markup.
@@ -277,6 +289,9 @@ async fn main() -> Result<()> {
             custom_icon_profile,
             color,
             color_dot,
+            color_dot_position,
+            color_dot_anchor_mode,
+            color_dot_scale,
             decal,
             decal_scale,
             overlay,
@@ -284,13 +299,25 @@ async fn main() -> Result<()> {
             overlay_anchor_mode,
             overlay_scale,
         } => {
-            if overlay_anchor_mode.is_some() && !experimental {
-                bail!(
-                    "--overlay-anchor-mode is experimental; pass --experimental or set {}=1",
-                    folco_core::experimental::ENV_VAR
-                );
+            for (flag, set) in [
+                ("--overlay-anchor-mode", overlay_anchor_mode.is_some()),
+                ("--color-dot-anchor-mode", color_dot_anchor_mode.is_some()),
+            ] {
+                if set && !experimental {
+                    bail!(
+                        "{flag} is experimental; pass --experimental or set {}=1",
+                        folco_core::experimental::ENV_VAR
+                    );
+                }
             }
             let overlay_anchor_mode = overlay_anchor_mode.unwrap_or_default();
+            let color_dot_config = |color: FolderColor| {
+                color.to_color_dot_config().with_placement(
+                    color_dot_position.clone().into(),
+                    color_dot_anchor_mode.clone().unwrap_or_default().into(),
+                    color_dot_scale,
+                )
+            };
 
             if folder {
                 // ── Folder mode ────────────────────────────────────
@@ -305,7 +332,7 @@ async fn main() -> Result<()> {
                     }
 
                     if let Some(color) = color_dot {
-                        p = p.with_color_dot(color.to_color_dot_config());
+                        p = p.with_color_dot(color_dot_config(color));
                     }
 
                     if let Some(ref source) = decal {
@@ -361,7 +388,7 @@ async fn main() -> Result<()> {
                     let mut p = CustomizationProfile::new();
 
                     if let Some(color) = color_dot {
-                        p = p.with_color_dot(color.to_color_dot_config());
+                        p = p.with_color_dot(color_dot_config(color));
                     }
 
                     if let Some(ref source) = overlay {

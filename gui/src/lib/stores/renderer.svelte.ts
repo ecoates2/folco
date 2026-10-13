@@ -253,11 +253,18 @@ class RendererStore {
 	}
 
 	/**
-	 * Sets the color-dot badge in the icon's bottom-right corner.
+	 * Sets the color-dot badge. Placement works exactly like `setOverlay`.
 	 */
-	setColorDot(r: number, g: number, b: number) {
+	setColorDot(
+		r: number,
+		g: number,
+		b: number,
+		position: string,
+		anchorMode: string,
+		scale: number
+	) {
 		this.#assertRenderer();
-		this.renderer!.setColorDot(r, g, b);
+		this.renderer!.setColorDot(r, g, b, position, anchorMode, scale);
 		this.version++;
 	}
 

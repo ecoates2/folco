@@ -18,8 +18,10 @@ export type Placement = 'decal' | 'overlay';
 /** How an overlay attaches to its anchor point. */
 export type AnchorMode = 'inset' | 'centered';
 
-const OVERLAY_POSITION = 'bottom-right';
-const OVERLAY_SCALE = 0.5;
+const OVERLAY_POSITION = 'center';
+const OVERLAY_SCALE = 0.7;
+const COLOR_DOT_POSITION = 'center';
+const COLOR_DOT_SCALE = 0.7;
 const DECAL_SCALE = 0.7;
 
 class ArtworkStore {
@@ -153,7 +155,14 @@ class ArtworkStore {
 		renderer.setDecal(art?.kind === 'icon' && placement === 'decal' ? art.svg : null, DECAL_SCALE);
 
 		if (art?.kind === 'colorDot') {
-			renderer.setColorDot(art.color.r, art.color.g, art.color.b);
+			renderer.setColorDot(
+				art.color.r,
+				art.color.g,
+				art.color.b,
+				COLOR_DOT_POSITION,
+				this.anchorMode,
+				COLOR_DOT_SCALE
+			);
 		} else {
 			renderer.clearColorDot();
 		}

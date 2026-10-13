@@ -64,7 +64,9 @@ fn source_data_uri(source: &ImageSource) -> Result<String, RenderError> {
 /// `scale` is the overlay's edge length as a fraction of the icon. `Inset`
 /// keeps the overlay fully within bounds; `Centered` centers it on the chosen
 /// corner so it can hang off the edge (via negative offsets).
-fn placement(
+///
+/// Shared with the color dot so both layers place identically.
+pub(super) fn placement(
     position: OverlayPosition,
     anchor_mode: OverlayAnchorMode,
     scale: f32,

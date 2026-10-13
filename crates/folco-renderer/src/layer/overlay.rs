@@ -218,7 +218,9 @@ fn render_overlay(
 }
 
 /// Calculates the (x, y) position for the overlay based on position setting and bounds.
-fn calculate_position(
+///
+/// Shared with the color dot so both layers place identically.
+pub(crate) fn calculate_position(
     position: OverlayPosition,
     anchor_mode: OverlayAnchorMode,
     bounds: &crate::icon::RectPx,

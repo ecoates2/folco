@@ -6,8 +6,9 @@
 //! (viewBox).
 
 use super::SvgLayer;
+use super::overlay::placement;
 use crate::layer::ColorDotConfig;
-use crate::layer::color_dot::{DOT_MARGIN, DOT_SCALE, DOT_VIEWBOX, color_dot_circle};
+use crate::layer::color_dot::{DOT_VIEWBOX, color_dot_circle};
 
 impl SvgLayer<ColorDotConfig> {
     /// Renders the color dot as an SVG fragment, or `None` if inactive.
@@ -23,12 +24,11 @@ impl SvgLayer<ColorDotConfig> {
     }
 }
 
-/// Builds the nested-`<svg>` fragment for a color dot in the bottom-right.
+/// Builds the nested-`<svg>` fragment for a color dot at its configured placement.
 fn color_dot_fragment(config: &ColorDotConfig) -> String {
-    let size = DOT_SCALE * 100.0;
-    let offset = (1.0 - DOT_SCALE - DOT_MARGIN) * 100.0;
+    let (x, y, size) = placement(config.position, config.anchor_mode, config.scale);
     format!(
-        "<svg x=\"{offset}%\" y=\"{offset}%\" width=\"{size}%\" height=\"{size}%\" \
+        "<svg x=\"{x:.4}%\" y=\"{y:.4}%\" width=\"{size:.4}%\" height=\"{size:.4}%\" \
 viewBox=\"{DOT_VIEWBOX}\" preserveAspectRatio=\"xMidYMid meet\">{}</svg>",
         color_dot_circle(config)
     )
@@ -37,6 +37,7 @@ viewBox=\"{DOT_VIEWBOX}\" preserveAspectRatio=\"xMidYMid meet\">{}</svg>",
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layer::{OverlayAnchorMode, OverlayPosition};
 
     #[test]
     fn inactive_layer_renders_nothing() {
@@ -58,12 +59,27 @@ mod tests {
     }
 
     #[test]
-    fn fragment_is_inset_from_the_bottom_right_corner() {
+    fn default_fragment_sits_in_the_bottom_right_corner() {
         let mut layer: SvgLayer<ColorDotConfig> = SvgLayer::default();
         layer.set_config(Some(ColorDotConfig::new(0, 0, 0)));
         let fragment = layer.render_fragment().unwrap();
 
-        assert!(fragment.contains("x=\"55%\""));
-        assert!(fragment.contains("width=\"40%\""));
+        assert!(fragment.contains("x=\"60.0000%\""));
+        assert!(fragment.contains("width=\"40.0000%\""));
+    }
+
+    #[test]
+    fn fragment_follows_configured_placement() {
+        let mut layer: SvgLayer<ColorDotConfig> = SvgLayer::default();
+        layer.set_config(Some(ColorDotConfig::new(0, 0, 0).with_placement(
+            OverlayPosition::TopLeft,
+            OverlayAnchorMode::Centered,
+            0.2,
+        )));
+        let fragment = layer.render_fragment().unwrap();
+
+        assert!(fragment.contains("x=\"-10.0000%\""));
+        assert!(fragment.contains("y=\"-10.0000%\""));
+        assert!(fragment.contains("width=\"20.0000%\""));
     }
 }
