@@ -20,7 +20,8 @@ struct Cli {
     #[arg(long, short, global = true)]
     verbose: bool,
 
-    /// Enable experimental options (also enabled by FOLCO_EXPERIMENTAL=1)
+    /// Enable experimental options (also enabled by FOLCO_EXPERIMENTAL=1).
+    /// Currently, this includes changing overlay/color dot size/position/corner anchoring settings
     #[arg(long, global = true)]
     experimental: bool,
 
@@ -42,13 +43,13 @@ enum Commands {
         directories: Vec<PathBuf>,
 
         // === Mode Selection ===
-        /// Customize using the system folder icon as the base image
+        /// Customize a folder's appearance using the system or active DE theme's folder icon as the base image
         #[arg(long)]
         folder: bool,
 
-        /// Customize using a custom image as the base icon.
-        /// Accepts an SVG file path, raw SVG markup, raster image path,
-        /// emoji character, or emoji name.
+        /// Customize a folder's appearance using a custom image as the base icon.
+        /// Accepts an SVG file path, raw SVG markup, or raster image path.
+        /// Emoji characters/emoji names are also supported, but untested
         #[arg(long, value_name = "SOURCE")]
         custom_icon: Option<String>,
 
@@ -61,21 +62,22 @@ enum Commands {
         // === Custom-icon JSON profile ===
         /// JSON-serialized CustomizationProfile for custom-icon mode
         /// (alternative to individual --overlay options). The solidColor and
-        /// decal entries are ignored: custom images have no surface color.
+        /// decal entries are ignored
         #[arg(long, value_name = "JSON", requires = "custom_icon")]
         custom_icon_profile: Option<String>,
 
         // === Solid Color Options (folder-mode only) ===
-        /// Recolor the whole folder icon to this color
+        /// Recolor the whole folder icon to this color by performing an HSL shift against computed averages.
+        /// Only supported on Windows
         #[arg(long, value_enum, value_name = "COLOR", requires = "folder")]
         color: Option<FolderColor>,
 
         // === Color Dot Options (both modes) ===
-        /// Add a colored dot badge
+        /// Add a colored dot badge. Centered on Windows and placed at the bottom right on Linux
         #[arg(long, value_enum, value_name = "COLOR")]
         color_dot: Option<FolderColor>,
 
-        /// Color dot position [experimental; default depends on the icon medium]
+        /// Color dot position [experimental; default depends on platform]
         #[arg(long, value_name = "POSITION", hide = true)]
         color_dot_position: Option<PositionArg>,
 
@@ -83,13 +85,14 @@ enum Commands {
         #[arg(long, value_name = "MODE", hide = true)]
         color_dot_anchor_mode: Option<AnchorModeArg>,
 
-        /// Color dot scale factor (0.0-1.0) [experimental; default depends on the icon medium]
+        /// Color dot scale factor (0.0-1.0) [experimental; default depends on platform]
         #[arg(long, value_name = "SCALE", hide = true)]
         color_dot_scale: Option<f32>,
 
         // === Decal Options (folder-mode only) ===
         /// Decal source: an SVG file path or raw SVG markup.
-        /// This gets centered on the folder and tinted to a slightly darker color.
+        /// This gets centered on the folder and tinted to a slightly darker color, making it appear imprinted.
+        /// This is only supported on Windows
         #[arg(long, value_name = "SOURCE", requires = "folder")]
         decal: Option<String>,
 
