@@ -1,6 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core';
 import type {
 	CanvasRenderer,
+	DefaultPlacements,
 	FolderColorMetadata,
 	IconCapabilities,
 	IconSizeSpec,
@@ -82,6 +83,9 @@ class RendererStore {
 
 	/** Why each unrealizable layer is unavailable. */
 	rejections = $state<LayerRejections>(NO_REJECTIONS);
+
+	/** Where overlays and the color dot go on this base; shared with the backend. */
+	defaultPlacements = $state<DefaultPlacements | null>(null);
 
 	readonly supportsDecal = $derived(this.capabilities.decal);
 	readonly supportsSolidColor = $derived(this.capabilities.solidColor);
@@ -205,6 +209,7 @@ class RendererStore {
 		this.isCustom = renderer.isCustom();
 		this.capabilities = renderer.capabilities();
 		this.rejections = renderer.layerRejections();
+		this.defaultPlacements = renderer.defaultPlacements();
 		this.status = 'ready';
 		this.version++;
 	}
@@ -362,6 +367,7 @@ class RendererStore {
 		this.customImage = null;
 		this.capabilities = ALL_CAPABILITIES;
 		this.rejections = NO_REJECTIONS;
+		this.defaultPlacements = null;
 	}
 
 	#assertRenderer() {

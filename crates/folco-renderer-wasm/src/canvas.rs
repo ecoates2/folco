@@ -41,7 +41,8 @@ use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
-    FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconCapabilities, IconImage,
+    DefaultPlacements, FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind,
+    IconCapabilities, IconImage,
     IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode,
     OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer,
     SvgFolderIconBase, SvgFolderIconCustomizer,
@@ -407,6 +408,14 @@ impl CanvasRenderer {
     #[wasm_bindgen(js_name = "layerRejections")]
     pub fn layer_rejections(&self) -> Result<Ts<LayerRejections>, JsError> {
         Ok(self.base_kind().rejections().into_ts()?)
+    }
+
+    /// Default overlay and color dot placement for this base's medium.
+    ///
+    /// The backend applies the same defaults, so the CLI matches the GUI.
+    #[wasm_bindgen(js_name = "defaultPlacements")]
+    pub fn default_placements(&self) -> Result<Ts<DefaultPlacements>, JsError> {
+        Ok(self.base_kind().default_placements().into_ts()?)
     }
 
     /// Returns `true` if the active customizer uses the vector pipeline.

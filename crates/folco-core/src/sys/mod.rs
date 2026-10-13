@@ -11,7 +11,7 @@
 //! Also provides two platform size ladders: the sizes in the system's own
 //! folder icon, and the sizes a user-supplied image is rasterized to.
 
-use folco_renderer::{IconSizeSpec, RectPx, SurfaceColor};
+use folco_renderer::{DefaultPlacements, IconSizeSpec, RectPx, SurfaceColor};
 use serde::{Deserialize, Serialize};
 
 use crate::image_file::{ImageFile, ImageFormat};
@@ -37,6 +37,28 @@ pub enum OutputMedium {
     Raster,
     /// A single scalable SVG.
     Vector,
+}
+
+impl OutputMedium {
+    /// The medium the platform's stock folder icon is customized in.
+    ///
+    /// Raster where hand-measured metadata exists for it, vector everywhere else.
+    pub fn system_folder_icon() -> Self {
+        match RasterFolderMetadata::current_platform() {
+            Some(_) => Self::Raster,
+            None => Self::Vector,
+        }
+    }
+
+    /// Default overlay and color dot placement over a base of this medium.
+    ///
+    /// The same values the GUI preview uses, so the CLI produces matching icons.
+    pub fn default_placements(self) -> DefaultPlacements {
+        match self {
+            Self::Raster => DefaultPlacements::RASTER,
+            Self::Vector => DefaultPlacements::VECTOR,
+        }
+    }
 }
 
 /// Which media this platform's folder icon write path accepts.

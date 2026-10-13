@@ -16,6 +16,7 @@ use image::RgbaImage;
 /// Position for image overlay placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 #[serde(rename_all = "kebab-case")]
 pub enum OverlayPosition {
     /// Bottom-left corner of content bounds.

@@ -54,6 +54,7 @@ mod icon;
 pub mod layer;
 pub mod medium;
 pub mod output;
+mod placement;
 mod profile;
 mod svg_custom_customizer;
 mod svg_folder_customizer;
@@ -75,6 +76,7 @@ pub use layer::{
 };
 pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
 pub use output::Render;
+pub use placement::{DefaultPlacements, Placement};
 pub use profile::{CustomProfile, CustomizationProfile, FolderProfile};
 pub use svg_custom_customizer::{SvgCustomIconCustomizer, SvgCustomLayers};
 pub use svg_folder_customizer::{

@@ -54,8 +54,9 @@ pub use sys::{OutputMedium, PlatformSizeSpec, WriteCapabilities};
 // This allows consumers to use profiles without importing the renderer crate directly
 pub use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomLayers, CustomProfile, CustomizationProfile,
-    DecalConfig, FolderColor, FolderColorExt, FolderColorMetadata, FolderIconBase,
-    FolderIconCustomizer, FolderLayers, FolderProfile, IconBase, IconBaseKind, IconCapabilities,
-    IconCustomizer, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerKind, LayerSet,
-    OverlayAnchorMode, OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgSource,
+    DecalConfig, DefaultPlacements, FolderColor, FolderColorExt, FolderColorMetadata,
+    FolderIconBase, FolderIconCustomizer, FolderLayers, FolderProfile, IconBase, IconBaseKind,
+    IconCapabilities, IconCustomizer, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerKind,
+    LayerSet, OverlayAnchorMode, OverlayPosition, Placement, RectPx, SolidColorConfig,
+    SurfaceColor, SvgSource,
 };

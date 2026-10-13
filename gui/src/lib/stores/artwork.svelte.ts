@@ -18,10 +18,6 @@ export type Placement = 'decal' | 'overlay';
 /** How an overlay attaches to its anchor point. */
 export type AnchorMode = 'inset' | 'centered';
 
-const OVERLAY_POSITION = 'center';
-const OVERLAY_SCALE = 0.7;
-const COLOR_DOT_POSITION = 'center';
-const COLOR_DOT_SCALE = 0.7;
 const DECAL_SCALE = 0.7;
 
 class ArtworkStore {
@@ -145,10 +141,14 @@ class ArtworkStore {
 
 	/** Writes the current selection into the renderer's decal, overlay and color dot layers. */
 	#push() {
-		if (renderer.status !== 'ready') return;
+		const defaults = renderer.defaultPlacements;
+		if (renderer.status !== 'ready' || !defaults) return;
 
 		const art = this.selection;
 		const placement = this.effectivePlacement;
+
+		const { position: overlayPosition, scale: overlayScale } = defaults.overlay;
+		const { position: colorDotPosition, scale: colorDotScale } = defaults.colorDot;
 
 		// Each layer is written every time: setting only the one that gained the
 		// artwork would leave the others still configured, and still rendering.
@@ -159,20 +159,20 @@ class ArtworkStore {
 				art.color.r,
 				art.color.g,
 				art.color.b,
-				COLOR_DOT_POSITION,
+				colorDotPosition,
 				this.anchorMode,
-				COLOR_DOT_SCALE
+				colorDotScale
 			);
 		} else {
 			renderer.clearColorDot();
 		}
 
 		if (art?.kind === 'emoji') {
-			renderer.setOverlayEmoji(art.emoji, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
+			renderer.setOverlayEmoji(art.emoji, overlayPosition, this.anchorMode, overlayScale);
 		} else if (art?.kind === 'icon' && placement === 'overlay') {
-			renderer.setOverlay(art.svg, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
+			renderer.setOverlay(art.svg, overlayPosition, this.anchorMode, overlayScale);
 		} else {
-			renderer.setOverlay(null, OVERLAY_POSITION, this.anchorMode, OVERLAY_SCALE);
+			renderer.setOverlay(null, overlayPosition, this.anchorMode, overlayScale);
 		}
 	}
 }

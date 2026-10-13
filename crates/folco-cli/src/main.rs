@@ -5,9 +5,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
-    CustomizationContextBuilder, CustomizationProfile, DecalConfig, ImageFile, ImageFormat,
-    ImageOverlayConfig, ImageSource, LayerKind, OverlayAnchorMode, OverlayPosition, SvgSource,
-    WriteCapabilities,
+    CustomizationContextBuilder, CustomizationProfile, DecalConfig, DefaultPlacements, ImageFile,
+    ImageFormat, ImageOverlayConfig, ImageSource, LayerKind, OutputMedium, OverlayAnchorMode,
+    OverlayPosition, SvgSource, WriteCapabilities,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -71,21 +71,21 @@ enum Commands {
         color: Option<FolderColor>,
 
         // === Color Dot Options (both modes) ===
-        /// Add a colored dot badge (bottom-right by default)
+        /// Add a colored dot badge
         #[arg(long, value_enum, value_name = "COLOR")]
         color_dot: Option<FolderColor>,
 
-        /// Color dot position
-        #[arg(long, value_name = "POSITION", default_value = "bottom-right")]
-        color_dot_position: PositionArg,
+        /// Color dot position [experimental; default depends on the icon medium]
+        #[arg(long, value_name = "POSITION", hide = true)]
+        color_dot_position: Option<PositionArg>,
 
         /// Color dot anchor mode [experimental; default: inset]
         #[arg(long, value_name = "MODE", hide = true)]
         color_dot_anchor_mode: Option<AnchorModeArg>,
 
-        /// Color dot scale factor (0.0-1.0)
-        #[arg(long, value_name = "SCALE", default_value = "0.40")]
-        color_dot_scale: f32,
+        /// Color dot scale factor (0.0-1.0) [experimental; default depends on the icon medium]
+        #[arg(long, value_name = "SCALE", hide = true)]
+        color_dot_scale: Option<f32>,
 
         // === Decal Options (folder-mode only) ===
         /// Decal source: an SVG file path or raw SVG markup.
@@ -109,17 +109,17 @@ enum Commands {
         #[arg(long, value_name = "SOURCE")]
         overlay: Option<String>,
 
-        /// Overlay position
-        #[arg(long, value_name = "POSITION", default_value = "center")]
-        overlay_position: PositionArg,
+        /// Overlay position [experimental; default depends on the icon medium]
+        #[arg(long, value_name = "POSITION", hide = true)]
+        overlay_position: Option<PositionArg>,
 
         /// Overlay anchor mode [experimental; default: inset]
         #[arg(long, value_name = "MODE", hide = true)]
         overlay_anchor_mode: Option<AnchorModeArg>,
 
-        /// Overlay scale factor (0.0-1.0)
-        #[arg(long, value_name = "SCALE", default_value = "0.70")]
-        overlay_scale: f32,
+        /// Overlay scale factor (0.0-1.0) [experimental; default depends on the icon medium]
+        #[arg(long, value_name = "SCALE", hide = true)]
+        overlay_scale: Option<f32>,
     },
 
     /// Reset folder icons to system default
@@ -300,8 +300,12 @@ async fn main() -> Result<()> {
             overlay_scale,
         } => {
             for (flag, set) in [
+                ("--overlay-position", overlay_position.is_some()),
                 ("--overlay-anchor-mode", overlay_anchor_mode.is_some()),
+                ("--overlay-scale", overlay_scale.is_some()),
+                ("--color-dot-position", color_dot_position.is_some()),
                 ("--color-dot-anchor-mode", color_dot_anchor_mode.is_some()),
+                ("--color-dot-scale", color_dot_scale.is_some()),
             ] {
                 if set && !experimental {
                     bail!(
@@ -311,16 +315,31 @@ async fn main() -> Result<()> {
                 }
             }
             let overlay_anchor_mode = overlay_anchor_mode.unwrap_or_default();
-            let color_dot_config = |color: FolderColor| {
+            // Unset placement flags fall back to the defaults for the base's medium,
+            // which is only known once the mode (and custom image) is resolved.
+            let color_dot_config = |color: FolderColor, defaults: &DefaultPlacements| {
                 color.to_color_dot_config().with_placement(
-                    color_dot_position.clone().into(),
+                    color_dot_position
+                        .clone()
+                        .map_or(defaults.color_dot.position, Into::into),
                     color_dot_anchor_mode.clone().unwrap_or_default().into(),
-                    color_dot_scale,
+                    color_dot_scale.unwrap_or(defaults.color_dot.scale),
+                )
+            };
+            let overlay_config = |source: ImageSource, defaults: &DefaultPlacements| {
+                ImageOverlayConfig::new(
+                    source,
+                    overlay_position
+                        .clone()
+                        .map_or(defaults.overlay.position, Into::into),
+                    overlay_anchor_mode.clone().into(),
+                    overlay_scale.unwrap_or(defaults.overlay.scale),
                 )
             };
 
             if folder {
                 // ── Folder mode ────────────────────────────────────
+                let defaults = OutputMedium::system_folder_icon().default_placements();
                 let profile = if let Some(json) = folder_customization_profile {
                     CustomizationProfile::from_json(&json)
                         .context("Failed to parse CustomizationProfile JSON")?
@@ -332,7 +351,7 @@ async fn main() -> Result<()> {
                     }
 
                     if let Some(color) = color_dot {
-                        p = p.with_color_dot(color_dot_config(color));
+                        p = p.with_color_dot(color_dot_config(color, &defaults));
                     }
 
                     if let Some(ref source) = decal {
@@ -342,12 +361,7 @@ async fn main() -> Result<()> {
 
                     if let Some(ref source) = overlay {
                         let source = resolve_overlay_source(source)?;
-                        p = p.with_overlay(ImageOverlayConfig::new(
-                            source,
-                            overlay_position.into(),
-                            overlay_anchor_mode.clone().into(),
-                            overlay_scale,
-                        ));
+                        p = p.with_overlay(overlay_config(source, &defaults));
                     }
 
                     // Require at least one layer when not using a JSON profile
@@ -373,13 +387,14 @@ async fn main() -> Result<()> {
 
                 let format = ImageFormat::of_source(&image_source);
                 let caps = WriteCapabilities::current_platform();
-                if caps.custom_image_medium(format).is_none() {
+                let Some(medium) = caps.custom_image_medium(format) else {
                     bail!(
                         "--custom-icon: {format} images can't be used as folder icons on this system \
                          (supported file types: {})",
                         caps.custom_image_extensions().join(", ")
                     );
-                }
+                };
+                let defaults = medium.default_placements();
 
                 let profile = if let Some(json) = custom_icon_profile {
                     CustomizationProfile::from_json(&json)
@@ -388,17 +403,12 @@ async fn main() -> Result<()> {
                     let mut p = CustomizationProfile::new();
 
                     if let Some(color) = color_dot {
-                        p = p.with_color_dot(color_dot_config(color));
+                        p = p.with_color_dot(color_dot_config(color, &defaults));
                     }
 
                     if let Some(ref source) = overlay {
                         let source = resolve_overlay_source(source)?;
-                        p = p.with_overlay(ImageOverlayConfig::new(
-                            source,
-                            overlay_position.into(),
-                            overlay_anchor_mode.clone().into(),
-                            overlay_scale,
-                        ));
+                        p = p.with_overlay(overlay_config(source, &defaults));
                     }
 
                     p
