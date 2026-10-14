@@ -62,7 +62,7 @@
 
 <div class={cn(className)}>
 	<div class="mb-6 flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-foreground">{workflow.spec.title}</h1>
+		<h1 class="text-2xl font-bold text-foreground">Folder Customization</h1>
 		<ThemeSelector />
 	</div>
 

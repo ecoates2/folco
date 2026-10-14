@@ -11,23 +11,23 @@ import type { WorkflowId, WorkflowSpec } from './types';
 export const WORKFLOWS: Record<WorkflowId, WorkflowSpec> = {
 	folder: {
 		id: 'folder',
-		title: 'Customize Folder',
+		title: 'Use System Folder Icon',
 		sections: [
 			{ id: 'solid-color', label: 'Solid Color', layers: ['solidColor'] },
 			{ id: 'color-dot', label: 'Color Dot', layers: ['colorDot'] },
 			{ id: 'emoji', label: 'Emoji Overlay', layers: ['overlay'] },
-			{ id: 'icon', label: 'Icon', layers: ['decal', 'overlay'] }
+			{ id: 'icon', label: 'Iconify', layers: ['decal', 'overlay'] }
 		]
 	},
 	'custom-image': {
 		id: 'custom-image',
-		title: 'Custom Icon',
+		title: 'Select Custom Icon',
 		sections: [
 			// No layers: this section supplies the base rather than decorating it.
 			{ id: 'source-image', label: 'Source Image' },
 			{ id: 'color-dot', label: 'Color Dot', layers: ['colorDot'] },
 			{ id: 'emoji', label: 'Emoji Overlay', layers: ['overlay'] },
-			{ id: 'icon', label: 'Icon', layers: ['decal', 'overlay'] }
+			{ id: 'icon', label: 'Iconify', layers: ['decal', 'overlay'] }
 		]
 	}
 };

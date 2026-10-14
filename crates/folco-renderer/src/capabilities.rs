@@ -108,39 +108,34 @@ impl IconBaseKind {
     ///
     /// Phrased for end users; callers surface it verbatim.
     pub fn rejection(self, layer: LayerKind) -> Option<&'static str> {
-        if self.capabilities().supports(layer) {
-            return None;
-        }
-        Some(match self {
-            Self::VectorFolder => match layer {
-                LayerKind::SolidColor => {
-                    "this system's folder icon is a scalable SVG, which has no pixels to recolor"
-                }
-                _ => {
-                    "this system's folder icon is a scalable SVG, and decals are imprinted per-pixel"
-                }
-            },
-            Self::RasterCustomImage => match layer {
-                LayerKind::SolidColor => {
-                    "a custom image has no known surface color to recolor away from"
-                }
-                _ => {
-                    "decals are tinted against a folder's surface color, which a custom image has none of"
-                }
-            },
-            Self::VectorCustomImage => match layer {
-                LayerKind::SolidColor => {
-                    "a custom SVG image is scalable markup, which has no pixels to recolor"
-                }
-                _ => "a custom SVG image is scalable markup, and decals are imprinted per-pixel",
-            },
-            // Realizes every layer, so `supports` already returned None above.
-            Self::RasterFolder => {
-                panic!(
-                    "RasterFolder supports all layers — this branch is unreachable; if reached, a new IconBaseKind variant was added without updating rejection()"
-                )
+        use IconBaseKind as B;
+        use LayerKind as L;
+
+        // Kept in step with `capabilities()` by `rejection_is_present_exactly_when_unsupported`.
+        match (self, layer) {
+            (B::RasterFolder, _) | (_, L::ColorDot | L::Overlay) => None,
+
+            (B::VectorFolder, L::SolidColor) => {
+                Some("HSL color shifts are unsupported for SVG icons")
             }
-        })
+            (B::VectorFolder, L::Decal) => Some(
+                "Imprinted decals are unsupported for SVG icons",
+            ),
+
+            (B::RasterCustomImage, L::SolidColor) => {
+                Some("HSL color shifts are unsupported for custom image icons")
+            }
+            (B::RasterCustomImage, L::Decal) => Some(
+                "Imprinted decals are unsupported for custom image icons",
+            ),
+
+            (B::VectorCustomImage, L::SolidColor) => {
+                Some("HSL color shifts are unsupported for custom image icons")
+            }
+            (B::VectorCustomImage, L::Decal) => {
+                Some("Imprinted decals are unsupported for custom image icons")
+            }
+        }
     }
 
     /// Why each layer this base can't realize is unavailable.

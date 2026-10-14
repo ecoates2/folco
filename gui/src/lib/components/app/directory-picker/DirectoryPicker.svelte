@@ -102,7 +102,7 @@
 		{#if directories.length === 0}
 			<div class="flex flex-col items-center gap-2 text-muted-foreground">
 				<FolderIcon class="size-8 opacity-50" />
-				<span class="text-sm">Drop folders here or click Add</span>
+				<span class="text-sm">Drop folders here</span>
 			</div>
 		{:else}
 			<div class="flex flex-col gap-1">
