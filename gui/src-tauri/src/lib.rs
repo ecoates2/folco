@@ -1,9 +1,11 @@
+mod cli;
 mod dto;
 mod state;
 mod theme;
 
 use std::path::PathBuf;
 
+use cli::LaunchDirectories;
 use dto::{
     CustomImageDto, CustomImageSupportDto, FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto,
     SvgFolderIconBaseDto,
@@ -158,14 +160,23 @@ fn experimental_enabled() -> bool {
     folco_core::experimental::enabled_from_env()
 }
 
+/// Folders passed on the command line, to pre-populate the folder list.
+#[tauri::command]
+fn get_launch_directories(launch: tauri::State<'_, LaunchDirectories>) -> Vec<PathBuf> {
+    launch.0.clone()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let launch_directories = LaunchDirectories::from_args();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_prevent_default::init())
         .manage(AppState::new())
+        .manage(launch_directories)
         .invoke_handler(tauri::generate_handler![
             get_folder_icon_base,
             get_folder_icon_svg,
@@ -177,6 +188,7 @@ pub fn run() {
             get_custom_image_bytes,
             reset_folders,
             experimental_enabled,
+            get_launch_directories,
             set_startup_theme
         ])
         .setup(|app| {

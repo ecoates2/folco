@@ -46,6 +46,11 @@ export function isExperimentalEnabled(): Promise<boolean> {
 	return invoke('experimental_enabled');
 }
 
+/** Absolute folder paths passed on the command line. */
+export function getLaunchDirectories(): Promise<string[]> {
+	return invoke('get_launch_directories');
+}
+
 /** Wire shape of `folco_core::progress::Progress`. */
 export type CustomizeProgress =
 	| { kind: 'started'; total: number }

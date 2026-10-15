@@ -1,8 +1,18 @@
+import { getLaunchDirectories } from '$lib/services/tauri-commands';
 import { open } from '@tauri-apps/plugin-dialog';
 
 class DirectoryStore {
 	paths = $state<string[]>([]);
 	selectedIndex = $state<number | null>(null);
+
+	/** Adds any folders passed on the command line. */
+	async init() {
+		try {
+			this.add(await getLaunchDirectories());
+		} catch {
+			// Not running under Tauri; nothing to pre-populate.
+		}
+	}
 
 	/** Prompts the user for folders and adds the ones not already listed. */
 	async browse() {

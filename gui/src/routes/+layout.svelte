@@ -3,6 +3,7 @@
   import { theme } from "$lib/stores/theme.svelte";
   import { features } from "$lib/stores/features.svelte";
   import { platform } from "$lib/stores/platform.svelte";
+  import { directories } from "$lib/stores/directories.svelte";
   import { errorDialog } from "$lib/stores/error-dialog.svelte";
   import { ErrorDialog } from "$lib/components/app/error-dialog";
   import { onMount } from "svelte";
@@ -28,6 +29,7 @@
     theme.init();
     features.init();
     platform.init();
+    directories.init();
     dismissBootLoader();
 
     return () => {

@@ -29,4 +29,5 @@ folco-core = { path = "../../crates/folco-core" }
 folco-transfer = { path = "../../crates/folco-transfer" }
 tauri-plugin-updater = "2"
 tauri-plugin-fs = "2"
+clap = { version = "4", features = ["derive"] }
 
