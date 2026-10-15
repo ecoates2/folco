@@ -8,8 +8,7 @@
 //! as [`RasterFolderMetadata`]. Every other platform must supply a scalable SVG
 //! folder icon.
 //!
-//! Also provides two platform size ladders: the sizes in the system's own
-//! folder icon, and the sizes a user-supplied image is rasterized to.
+//! Also provides the size ladder a user-supplied image is rasterized to.
 
 use folco_renderer::{DefaultPlacements, IconSizeSpec, RectPx, SurfaceColor};
 use serde::{Deserialize, Serialize};
@@ -140,14 +139,6 @@ impl RasterFolderMetadata {
 
 /// A platform icon size ladder.
 ///
-/// Two distinct ladders exist per platform, and they need not agree:
-///
-/// - [`system_folder_icon`](Self::system_folder_icon): the sizes the OS's
-///   stock folder icon ships in.
-/// - [`custom_image`](Self::custom_image): the sizes a user-supplied image is
-///   rasterized to before being written. A custom image has no inherent ladder,
-///   so this is driven by what the platform's write path consumes.
-///
 /// # Example
 ///
 /// ```
@@ -172,18 +163,13 @@ impl PlatformSizeSpec {
         &self.sizes
     }
 
-    /// The sizes the host OS's stock folder icon ships in.
+    /// The sizes a user-supplied image is rasterized to for the host OS.
+    ///
+    /// A custom image has no inherent ladder, so this is driven by what the
+    /// platform's write path consumes.
     ///
     /// - **Windows**: 16, 20, 24, 32, 40, 48, 64, 256 (all @1x)
     /// - **macOS**: 16, 32, 128, 256, 512 (@1x and @2x)
-    /// - **Linux**: 16, 22, 24, 32, 48, 64, 128, 256 (all @1x)
-    pub fn system_folder_icon() -> Self {
-        Self::system_folder_icon_impl()
-    }
-
-    /// The sizes a user-supplied image is rasterized to for the host OS.
-    ///
-    /// - **Windows**, **macOS**: the [system folder icon](Self::system_folder_icon) ladder
     /// - **Linux**: 512 only; the file manager scales the single written file
     pub fn custom_image() -> Self {
         Self::custom_image_impl()
@@ -229,18 +215,10 @@ mod platform_size_spec_tests {
     use super::*;
 
     #[test]
-    fn ladders_are_non_empty() {
-        assert!(!PlatformSizeSpec::system_folder_icon().sizes().is_empty());
-        assert!(!PlatformSizeSpec::custom_image().sizes().is_empty());
-    }
-
-    #[test]
-    fn all_sizes_are_positive() {
-        let specs = [
-            PlatformSizeSpec::system_folder_icon(),
-            PlatformSizeSpec::custom_image(),
-        ];
-        for size in specs.iter().flat_map(PlatformSizeSpec::sizes) {
+    fn custom_image_sizes_are_non_empty_and_positive() {
+        let spec = PlatformSizeSpec::custom_image();
+        assert!(!spec.sizes().is_empty());
+        for size in spec.sizes() {
             assert!(size.width > 0);
             assert!(size.height > 0);
             assert!(size.scale > 0.0);

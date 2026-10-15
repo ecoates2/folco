@@ -17,7 +17,10 @@ impl SystemFormat for RendererIconSet {
             .into_iter()
             .map(|renderer_image| {
                 let dynamic = image::DynamicImage::ImageRgba8(renderer_image.data);
-                icon_sys::IconImage { data: dynamic }
+                icon_sys::IconImage {
+                    data: dynamic,
+                    scale: renderer_image.scale,
+                }
             })
             .collect();
         SysIconSet { images, svg: None }

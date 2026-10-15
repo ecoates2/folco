@@ -23,7 +23,10 @@ impl ImageFormat {
     pub fn from_extension(ext: &str) -> Option<Self> {
         if ext.eq_ignore_ascii_case("svg") {
             Some(Self::Svg)
-        } else if RASTER_EXTENSIONS.iter().any(|r| ext.eq_ignore_ascii_case(r)) {
+        } else if RASTER_EXTENSIONS
+            .iter()
+            .any(|r| ext.eq_ignore_ascii_case(r))
+        {
             Some(Self::Raster)
         } else {
             None
@@ -37,7 +40,11 @@ impl ImageFormat {
 
     /// The format of an image source; emoji count as SVG.
     pub fn of_source(source: &ImageSource) -> Self {
-        if source.is_svg() { Self::Svg } else { Self::Raster }
+        if source.is_svg() {
+            Self::Svg
+        } else {
+            Self::Raster
+        }
     }
 }
 
@@ -86,7 +93,9 @@ impl ImageFile {
         };
 
         match format {
-            ImageFormat::Svg => std::fs::read_to_string(path).map(Self::Svg).map_err(read_err),
+            ImageFormat::Svg => std::fs::read_to_string(path)
+                .map(Self::Svg)
+                .map_err(read_err),
             ImageFormat::Raster => std::fs::read(path).map(Self::Raster).map_err(read_err),
         }
     }
@@ -137,8 +146,14 @@ mod tests {
         std::fs::write(&svg, "<svg/>").unwrap();
         std::fs::write(&png, [1u8, 2, 3]).unwrap();
 
-        assert_eq!(ImageFile::read(&svg).unwrap(), ImageFile::Svg("<svg/>".into()));
-        assert_eq!(ImageFile::read(&png).unwrap(), ImageFile::Raster(vec![1, 2, 3]));
+        assert_eq!(
+            ImageFile::read(&svg).unwrap(),
+            ImageFile::Svg("<svg/>".into())
+        );
+        assert_eq!(
+            ImageFile::read(&png).unwrap(),
+            ImageFile::Raster(vec![1, 2, 3])
+        );
     }
 
     #[test]

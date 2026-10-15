@@ -7,8 +7,8 @@
 //!
 //! The conversion is necessary because `icon-sys` stores images as
 //! `image::DynamicImage` for flexibility with system APIs, while
-//! `folco-renderer` uses `image::RgbaImage` with additional metadata (scale
-//! factor, content bounds) for rendering.
+//! `folco-renderer` uses `image::RgbaImage` with additional metadata (content
+//! bounds) for rendering.
 
 use crate::sys::RasterFolderMetadata;
 
@@ -58,7 +58,7 @@ pub fn convert_icon_set(sys_icon_set: &SysIconSet) -> RendererIconSet {
     let images = sys_icon_set
         .images
         .iter()
-        .map(|sys_image| to_renderer_image(sys_image.data.to_rgba8(), &metadata))
+        .map(|sys_image| to_renderer_image(sys_image.data.to_rgba8(), sys_image.scale, &metadata))
         .collect();
 
     RendererIconSet::from_images(images)
@@ -73,7 +73,7 @@ pub(crate) fn into_renderer_icon_set(
     let images = sys_icon_set
         .images
         .into_iter()
-        .map(|sys_image| to_renderer_image(sys_image.data.into_rgba8(), metadata))
+        .map(|sys_image| to_renderer_image(sys_image.data.into_rgba8(), sys_image.scale, metadata))
         .collect();
 
     RendererIconSet::from_images(images)
@@ -89,11 +89,13 @@ pub(crate) fn platform_metadata() -> RasterFolderMetadata {
         .expect("this platform has no raster folder icon metadata; its folder icon must be SVG")
 }
 
-fn to_renderer_image(rgba: image::RgbaImage, metadata: &RasterFolderMetadata) -> RendererIconImage {
+fn to_renderer_image(
+    rgba: image::RgbaImage,
+    scale: f32,
+    metadata: &RasterFolderMetadata,
+) -> RendererIconImage {
     let content_bounds = (metadata.content_bounds)(rgba.width(), rgba.height());
-
-    // System icons use scale 1.0
-    RendererIconImage::new(rgba, 1.0, content_bounds)
+    RendererIconImage::new(rgba, scale, content_bounds)
 }
 
 #[cfg(test)]
@@ -113,6 +115,7 @@ mod tests {
         SysIconSet {
             images: vec![icon_sys::IconImage {
                 data: image::DynamicImage::ImageRgba8(rgba),
+                scale: 1.0,
             }],
             svg: None,
         }

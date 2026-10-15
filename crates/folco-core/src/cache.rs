@@ -177,6 +177,7 @@ impl IconCache {
 
             manifest.icons.push(CachedIconInfo {
                 size,
+                scale: image.scale,
                 index,
                 path: path.to_string_lossy().to_string(),
             });
@@ -213,7 +214,10 @@ impl IconCache {
             }
 
             let img = image::open(&path)?;
-            images.push(icon_sys::IconImage { data: img });
+            images.push(icon_sys::IconImage {
+                data: img,
+                scale: info.scale,
+            });
         }
 
         // Reload the scalable SVG variant if one was cached.
@@ -262,8 +266,15 @@ struct CacheManifest {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct CachedIconInfo {
     size: u32,
+    // Caches written before scale was recorded hold only @1x images.
+    #[serde(default = "default_scale")]
+    scale: f32,
     index: usize,
     path: String,
+}
+
+fn default_scale() -> f32 {
+    1.0
 }
 
 #[cfg(test)]

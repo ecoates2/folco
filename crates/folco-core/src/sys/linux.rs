@@ -25,19 +25,4 @@ impl PlatformSizeSpec {
             sizes: vec![IconSizeSpec::square(512, 1.0)],
         }
     }
-
-    pub(super) fn system_folder_icon_impl() -> Self {
-        Self {
-            sizes: vec![
-                IconSizeSpec::square(16, 1.0),
-                IconSizeSpec::square(22, 1.0),
-                IconSizeSpec::square(24, 1.0),
-                IconSizeSpec::square(32, 1.0),
-                IconSizeSpec::square(48, 1.0),
-                IconSizeSpec::square(64, 1.0),
-                IconSizeSpec::square(128, 1.0),
-                IconSizeSpec::square(256, 1.0),
-            ],
-        }
-    }
 }
