@@ -77,7 +77,7 @@
 <div
 	bind:this={container}
 	onwheel={handleWheel}
-	class={cn('inline-flex flex-col items-center gap-3 rounded-lg border border-border bg-background p-4', className)}
+	class={cn('inline-flex flex-col items-center gap-3 rounded-lg border border-border bg-checkerboard p-4', className)}
 >
 	<div
 		class="relative flex items-center justify-center"

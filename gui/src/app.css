@@ -113,6 +113,18 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@utility bg-checkerboard {
+  --checker-size: 12px;
+  background-color: var(--color-gray-300);
+  background-image: conic-gradient(
+    var(--color-gray-500) 25%,
+    transparent 0 50%,
+    var(--color-gray-500) 0 75%,
+    transparent 0
+  );
+  background-size: calc(var(--checker-size) * 2) calc(var(--checker-size) * 2);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
