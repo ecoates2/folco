@@ -2255,7 +2255,9 @@ dependencies = [
 
 [[package]]
 name = "icon-sys"
-version = "0.1.2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80c06efba10407d67197bdeb9678bc189ffa5bbb3d4fb6ca2f5c4476910b65c1"
 dependencies = [
  "base64 0.23.1",
  "filetime",

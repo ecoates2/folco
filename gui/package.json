@@ -23,7 +23,7 @@
 		"@tauri-apps/plugin-fs": "^2.7.0",
 		"@tauri-apps/plugin-opener": "^2.7.1",
 		"folco-renderer-wasm": "file:../crates/folco-renderer-wasm/pkg",
-		"iconify-picker": "^0.7.2",
+		"iconify-picker": "^0.8.0",
 		"tailwindcss": "^4.3.3"
 	},
 	"devDependencies": {

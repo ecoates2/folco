@@ -11,7 +11,7 @@
         "@tauri-apps/plugin-fs": "^2.7.0",
         "@tauri-apps/plugin-opener": "^2.7.1",
         "folco-renderer-wasm": "file:../crates/folco-renderer-wasm/pkg",
-        "iconify-picker": "^0.7.2",
+        "iconify-picker": "^0.8.0",
         "tailwindcss": "^4.3.3",
       },
       "devDependencies": {
@@ -347,7 +347,7 @@
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
-    "iconify-picker": ["iconify-picker@0.7.2", "", {}, "sha512-TBkyB64+ux9/qAiVD6T0TK1494m0qG6bkh1asih0JZCHy/GW9yqB9W1g2P5paWQI004kcu3MQET/WxCD3aKOpg=="],
+    "iconify-picker": ["iconify-picker@0.8.0", "", {}, "sha512-ITtrDStrZxMi0JC4NksRi0moXk8gIPx2nWx3TMAb4pmriN7EnQR0Vzu5YMeaSaVi2bI/SsOwHoYEbWtmZc1vdQ=="],
 
     "inline-style-parser": ["inline-style-parser@0.2.7", "", {}, "sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA=="],
 
