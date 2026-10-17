@@ -16,6 +16,8 @@
         "title": "Folco",
         "width": 800,
         "height": 800,
+        "minWidth": 760,
+        "minHeight": 640,
         "create": false
       }
     ],

@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* shadcn-svelte styles use bare data-* variants; bits-ui emits data-state/data-orientation values. */
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-checked (&[data-state="checked"]);
+@custom-variant data-unchecked (&[data-state="unchecked"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
 :root {
   color-scheme: light;
   --radius: 0.625rem;

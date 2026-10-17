@@ -2,7 +2,7 @@
   import { FolderCustomization } from '$lib/components/app/folder-customization';
 </script>
 
-<main class="container mx-auto max-w-2xl p-6">
+<main class="h-screen overflow-hidden">
   <FolderCustomization />
 </main>
 

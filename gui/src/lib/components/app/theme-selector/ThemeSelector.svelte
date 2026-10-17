@@ -13,7 +13,7 @@
 >
 	{#each options as pref}
 		<div class="flex items-center gap-2">
-			<RadioGroup.Item value={pref} />
+			<RadioGroup.Item value={pref} id="{pref}-theme" />
 			<label
 				for="{pref}-theme"
 				class="cursor-pointer text-sm font-medium text-foreground"

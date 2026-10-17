@@ -2,6 +2,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 	import FolderIcon from '@lucide/svelte/icons/folder';
+	import MinusIcon from '@lucide/svelte/icons/minus';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 	import { stat } from '@tauri-apps/plugin-fs';
@@ -83,8 +85,26 @@
 	}
 </script>
 
-<div class={cn('flex flex-col gap-3', className)}>
-	<div class="text-lg font-semibold text-foreground">Folder(s)</div>
+<div class={cn('flex flex-col gap-2', className)}>
+	<div class="flex items-center gap-2">
+		<h2 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+			Folders{#if directories.length > 0}&nbsp;({directories.length}){/if}
+		</h2>
+
+		<div class="ml-auto flex gap-1.5">
+			<Button variant="outline" size="sm" onclick={onAdd}>
+				<PlusIcon />
+				Add
+			</Button>
+			<Button variant="outline" size="sm" onclick={handleRemove} disabled={selectedIndex === null}>
+				<MinusIcon />
+				Remove
+			</Button>
+			<Button variant="ghost" size="sm" onclick={onClearAll} disabled={directories.length === 0}>
+				Clear all
+			</Button>
+		</div>
+	</div>
 
 	<!-- Directory List / Drop Zone -->
 	<div
@@ -92,7 +112,7 @@
 		tabindex="0"
 		aria-label="Selected directories"
 		class={cn(
-			'max-h-64 min-h-40 overflow-y-auto rounded-md border-2 border-dashed bg-background p-2 transition-colors',
+			'min-h-0 flex-1 overflow-y-auto rounded-md border-2 border-dashed bg-background p-2 transition-colors',
 			isDragging
 				? 'border-primary bg-primary/5'
 				: 'border-input hover:border-muted-foreground/50',
@@ -101,8 +121,8 @@
 	>
 		{#if directories.length === 0}
 			<div class="flex flex-col items-center gap-2 text-muted-foreground">
-				<FolderIcon class="size-8 opacity-50" />
-				<span class="text-sm">Drop folders here</span>
+				<FolderIcon class="size-6 opacity-50" />
+				<span class="text-sm">Drop folders here or click Add</span>
 			</div>
 		{:else}
 			<div class="flex flex-col gap-1">
@@ -126,30 +146,5 @@
 				{/each}
 			</div>
 		{/if}
-	</div>
-
-	<!-- Action Buttons -->
-	<div class="flex gap-2">
-		<Button variant="default" size="sm" onclick={onAdd} class="flex-1">
-			Add
-		</Button>
-		<Button
-			variant="default"
-			size="sm"
-			onclick={handleRemove}
-			disabled={selectedIndex === null}
-			class="flex-1"
-		>
-			Remove
-		</Button>
-		<Button
-			variant="default"
-			size="sm"
-			onclick={onClearAll}
-			disabled={directories.length === 0}
-			class="flex-1"
-		>
-			Clear All
-		</Button>
 	</div>
 </div>
