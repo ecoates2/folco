@@ -77,29 +77,31 @@
 <div
 	bind:this={container}
 	onwheel={handleWheel}
-	class={cn('inline-flex flex-col items-center gap-3 rounded-lg border border-border bg-checkerboard p-4', className)}
+	class={cn('inline-flex flex-col items-center gap-3', className)}
 >
-	<div
-		class="relative flex items-center justify-center"
-		style="width: {displaySize}px; height: {displaySize}px;"
-	>
-		<!-- Kept mounted so `bind:this` resolves before the render effect runs. -->
-		<canvas
-			bind:this={canvas}
-			class:invisible={!hasPainted}
-			style="max-width: {displaySize}px; max-height: {displaySize}px; width: auto; height: auto;"
-		></canvas>
+	<div class="rounded-lg border border-border bg-checkerboard p-4">
+		<div
+			class="relative flex items-center justify-center"
+			style="width: {displaySize}px; height: {displaySize}px;"
+		>
+			<!-- Kept mounted so `bind:this` resolves before the render effect runs. -->
+			<canvas
+				bind:this={canvas}
+				class:invisible={!hasPainted}
+				style="max-width: {displaySize}px; max-height: {displaySize}px; width: auto; height: auto;"
+			></canvas>
 
-		{#if !hasPainted}
-			<div class="absolute inset-0 flex items-center justify-center">
-				{#if renderer.status === 'error'}
-					<p class="text-muted-foreground px-4 text-center text-sm">Preview unavailable</p>
-				{:else if renderer.status !== 'uninitialized'}
-				<!-- TODO: Revisit broken spinner rendering: renders in DOM but is invisible -->
-					<Spinner class="text-muted-foreground size-8" />
-				{/if}
-			</div>
-		{/if}
+			{#if !hasPainted}
+				<div class="absolute inset-0 flex items-center justify-center">
+					{#if renderer.status === 'error'}
+						<p class="text-muted-foreground px-4 text-center text-sm">Preview unavailable</p>
+					{:else if renderer.status !== 'uninitialized'}
+						<!-- TODO: Revisit broken spinner rendering: renders in DOM but is invisible -->
+						<Spinner class="text-muted-foreground size-8" />
+					{/if}
+				</div>
+			{/if}
+		</div>
 	</div>
 
 	{#if renderer.availableSizes.length > 1}
