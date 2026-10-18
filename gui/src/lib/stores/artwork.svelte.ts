@@ -124,7 +124,8 @@ class ArtworkStore {
 		this.#push();
 	}
 
-	selectColorDot(color: FolderColorMetadata) {
+	/** Picks a color dot preset, or clears the dot with `null`. */
+	selectColorDot(color: FolderColorMetadata | null) {
 		this.#colorDot = color;
 		this.kind = 'colorDot';
 		this.#push();

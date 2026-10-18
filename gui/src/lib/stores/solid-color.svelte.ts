@@ -2,22 +2,15 @@ import type { FolderColorMetadata } from 'folco-renderer-wasm';
 import { renderer } from './renderer.svelte';
 
 class SolidColorStore {
-	enabled = $state(false);
-
-	// Kept while toggled off so turning it back on restores the pick.
+	// Kept on bases that can't take a solid color so switching back restores it.
 	#pick = $state<FolderColorMetadata | null>(null);
 
-	/** The picked preset's id, or null if none was picked yet. */
+	/** The picked preset's id, or null for no solid color. */
 	readonly selectedId = $derived(this.#pick?.id ?? null);
 
-	setEnabled(on: boolean) {
-		this.enabled = on;
-		this.#push();
-	}
-
-	select(color: FolderColorMetadata) {
+	/** Picks a preset, or clears the solid color with `null`. */
+	select(color: FolderColorMetadata | null) {
 		this.#pick = color;
-		this.enabled = true;
 		this.#push();
 	}
 
@@ -29,7 +22,7 @@ class SolidColorStore {
 	#push() {
 		if (renderer.status !== 'ready') return;
 
-		const pick = this.enabled ? this.#pick : null;
+		const pick = renderer.supportsSolidColor ? this.#pick : null;
 		if (pick) renderer.setSolidColor(pick.r, pick.g, pick.b);
 		else renderer.clearSolidColor();
 	}

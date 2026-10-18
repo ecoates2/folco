@@ -16,7 +16,6 @@
 
 	import * as EmojiPicker from '$lib/components/ui/emoji-picker';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
-	import { Switch } from '$lib/components/ui/switch';
 	import * as Tabs from '$lib/components/ui/tabs';
 
 	interface Props {
@@ -55,8 +54,11 @@
 		})
 	);
 
+	// The pick survives bases that can't render it, but isn't shown as applied there.
 	const solidPick = $derived(
-		renderer.availableColors.find((c) => c.id === solidColor.selectedId)
+		solidSection?.available
+			? renderer.availableColors.find((c) => c.id === solidColor.selectedId)
+			: undefined
 	);
 	const selection = $derived(artwork.selection);
 	// An <img> never runs script inside the SVG, unlike inlining it with {@html}.
@@ -65,12 +67,6 @@
 	);
 
 	// A layer the base can't render must not stay on.
-	$effect(() => {
-		if (solidSection && !solidSection.available && solidColor.enabled) {
-			untrack(() => solidColor.setEnabled(false));
-		}
-	});
-
 	$effect(() => {
 		const active = overlayTabs.find((tab) => tab.kind === artwork.kind);
 		if (active && !active.available) untrack(() => artwork.setKind('none'));
@@ -137,14 +133,7 @@
 			class="flex flex-col gap-2"
 			title={solidSection.available ? undefined : solidSection.reason}
 		>
-			<div class="flex items-center justify-between">
-				<h2 id="solid-color-heading" class={HEADING}>{solidSection.label}</h2>
-				<Switch
-					bind:checked={() => solidColor.enabled, (on) => solidColor.setEnabled(on)}
-					disabled={!solidSection.available}
-					aria-labelledby="solid-color-heading"
-				/>
-			</div>
+			<h2 class={HEADING}>{solidSection.label}</h2>
 			<PickerPopover
 				title={solidSection.label}
 				label={solidPick?.displayName ?? 'Choose color…'}

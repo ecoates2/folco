@@ -41,7 +41,7 @@ class FolderOperationsStore {
 	/** Whether applying would change anything: a custom image, or a realizable option. */
 	readonly hasCustomization = $derived(
 		renderer.customImage !== null ||
-			(solidColor.enabled && solidColor.selectedId !== null && renderer.supportsSolidColor) ||
+			(solidColor.selectedId !== null && renderer.supportsSolidColor) ||
 			artwork.selection !== null
 	);
 
