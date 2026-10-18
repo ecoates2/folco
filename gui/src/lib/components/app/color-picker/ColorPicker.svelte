@@ -9,15 +9,24 @@
 		value?: string | null;
 		/** Fired when a color is selected, or with `null` when "None" is picked. */
 		onchange?: (color: FolderColorMetadata | null) => void;
+		/** Accessible name of the swatch group. */
+		label?: string;
+		disabled?: boolean;
 		class?: string;
 	}
 
-	let { value = $bindable(null), onchange, class: className }: Props = $props();
+	let {
+		value = $bindable(null),
+		onchange,
+		label = 'Folder color',
+		disabled = false,
+		class: className
+	}: Props = $props();
 
 	const colors = $derived(renderer.availableColors);
 
 	const SWATCH =
-		'size-7 rounded-full border-2 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
+		'size-7 rounded-full border-2 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100';
 
 	function select(color: FolderColorMetadata | null) {
 		value = color?.id ?? null;
@@ -28,7 +37,8 @@
 <div
 	class={cn('flex flex-wrap gap-1.5', className)}
 	role="radiogroup"
-	aria-label="Folder color"
+	aria-label={label}
+	aria-disabled={disabled || undefined}
 >
 	<button
 		type="button"
@@ -36,6 +46,7 @@
 		aria-checked={value === null}
 		aria-label="None"
 		title="None"
+		{disabled}
 		class={cn(
 			SWATCH,
 			'flex items-center justify-center bg-muted text-muted-foreground',
@@ -53,6 +64,7 @@
 			aria-checked={selected}
 			aria-label={color.displayName}
 			title={color.displayName}
+			{disabled}
 			class={cn(SWATCH, selected ? 'border-foreground scale-110' : 'border-transparent')}
 			style="background-color: rgb({color.r}, {color.g}, {color.b});"
 			onclick={() => select(color)}

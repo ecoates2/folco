@@ -14,11 +14,12 @@
       {
         "label": "main",
         "title": "Folco",
-        "width": 800,
+        "width": 1024,
         "height": 800,
-        "minWidth": 760,
+        "minWidth": 1024,
         "minHeight": 640,
-        "create": false
+        "create": false,
+        "resizable": false
       }
     ],
     "security": {

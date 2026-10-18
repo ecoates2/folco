@@ -3,7 +3,6 @@
 
 	interface Props {
 		collection?: string;
-		hideSearch?: boolean;
 		pageSize?: number;
 		buttonLabel?: string;
 		filter?: string;
@@ -17,7 +16,6 @@
 
 	let {
 		collection = 'mdi',
-		hideSearch = false,
 		pageSize = 60,
 		buttonLabel = 'Choose Icon',
 		filter = '',
@@ -43,7 +41,6 @@
 	page-size={pageSize}
 	button-label={buttonLabel}
 	theme={iconTheme}
-	hide-search={hideSearch ? '' : undefined}
 	onicon-selected={handleIconSelected}
 ></iconify-picker>
 

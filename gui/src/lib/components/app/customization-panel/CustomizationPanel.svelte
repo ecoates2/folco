@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { tick, untrack, type Snippet } from 'svelte';
-	import type { FolderColorMetadata } from 'folco-renderer-wasm';
 	import { artwork, type ArtworkKind } from '$lib/stores/artwork.svelte';
 	import { features } from '$lib/stores/features.svelte';
 	import { renderer } from '$lib/stores/renderer.svelte';
@@ -12,7 +11,6 @@
 	import { ColorPicker } from '$lib/components/app/color-picker';
 	import { IconPicker } from '$lib/components/app/icon-picker';
 	import { PickerPanel } from '$lib/components/app/picker-panel';
-	import { PickerPopover } from '$lib/components/app/picker-popover';
 	import { SourceImagePicker } from '$lib/components/app/source-image-picker';
 
 	import { Button } from '$lib/components/ui/button';
@@ -93,13 +91,6 @@
 	});
 </script>
 
-{#snippet swatch(color: FolderColorMetadata | undefined)}
-	<span
-		class="size-4 shrink-0 rounded-full border border-border"
-		style:background-color={color ? `rgb(${color.r}, ${color.g}, ${color.b})` : 'transparent'}
-	></span>
-{/snippet}
-
 {#snippet choiceRow(
 	name: string,
 	label: string,
@@ -173,23 +164,18 @@
 		</section>
 	{/if}
 
-	{#if solidSection}
+	{#if solidSection && solidSection.available}
 		<section
 			class="flex flex-col gap-2"
 			title={solidSection.available ? undefined : solidSection.reason}
 		>
 			<h2 class={HEADING}>{solidSection.label}</h2>
-			<PickerPopover
-				title={solidSection.label}
-				label={solidPick?.displayName ?? 'Choose color…'}
+			<ColorPicker
+				label={solidSection.label}
+				value={solidPick?.id ?? null}
 				disabled={!solidSection.available}
-				contentClass="w-64"
-			>
-				{#snippet preview()}
-					{@render swatch(solidPick)}
-				{/snippet}
-				<ColorPicker value={solidColor.selectedId} onchange={(color) => solidColor.select(color)} />
-			</PickerPopover>
+				onchange={(color) => solidColor.select(color)}
+			/>
 		</section>
 	{/if}
 
@@ -212,16 +198,11 @@
 
 			<Tabs.Content value="colorDot" class={BOX}>
 				{@render anchorRow('color-dot-anchor')}
-				<PickerPopover
-					title="Color dot"
-					label={selection?.kind === 'colorDot' ? selection.color.displayName : 'Choose color…'}
-					contentClass="w-64"
-				>
-					{#snippet preview()}
-						{@render swatch(selection?.kind === 'colorDot' ? selection.color : undefined)}
-					{/snippet}
-					<ColorPicker value={artwork.colorDotId} onchange={(color) => artwork.selectColorDot(color)} />
-				</PickerPopover>
+				<ColorPicker
+					label="Color dot"
+					value={artwork.colorDotId}
+					onchange={(color) => artwork.selectColorDot(color)}
+				/>
 			</Tabs.Content>
 
 			<Tabs.Content value="emoji" class={BOX}>
@@ -279,10 +260,8 @@
 
 {#if drill === 'icon'}
 	<PickerPanel title="Icon" open onclose={closeDrill}>
-		<!-- Search is hidden: it's currently broken. -->
 		<IconPicker
 			collection="mdi"
-			hideSearch
 			pageSize={30}
 			class="min-h-0 flex-1"
 			onselect={(svg) => artwork.selectIcon(svg)}
