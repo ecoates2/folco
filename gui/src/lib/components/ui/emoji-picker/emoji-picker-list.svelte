@@ -47,7 +47,7 @@
 				<CommandPrimitive.GroupHeading class="text-muted-foreground px-2 py-1 text-xs">
 					Recents
 				</CommandPrimitive.GroupHeading>
-				<CommandPrimitive.GroupItems class="grid grid-cols-6 px-2">
+				<CommandPrimitive.GroupItems class="grid grid-cols-6 justify-items-center px-2">
 					{#each recents as item (item)}
 						{@const { name, skin } = parseValue(item)}
 						{@const emoji = emojiData.emojis[name].skins[skin].native}
@@ -75,7 +75,7 @@
 				<CommandPrimitive.GroupHeading class="text-muted-foreground px-2 py-1 text-xs">
 					{casing.camelToPascal(category.id)}
 				</CommandPrimitive.GroupHeading>
-				<CommandPrimitive.GroupItems class="grid grid-cols-6 px-2">
+				<CommandPrimitive.GroupItems class="grid grid-cols-6 justify-items-center px-2">
 					{#each emojis as item (item)}
 						{@const emoji = emojiData.emojis[item]}
 						{@const emojiSkin = emoji.skins.length > 1 ? pickerState.skinIndex : 0}

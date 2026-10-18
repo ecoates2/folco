@@ -51,15 +51,13 @@
 	<AppRail />
 
 	<div class="grid min-h-0 grid-rows-[1fr_auto]">
-		<div class="grid min-h-0 grid-cols-[1fr_20rem]">
+		<!-- The preview hugs its content; the sidebar takes all remaining width. -->
+		<div class="grid min-h-0 grid-cols-[min-content_minmax(0,1fr)]">
 			<section aria-label="Preview" class="flex min-h-0 items-center justify-center overflow-hidden p-6">
 				<IconPreview />
 			</section>
 
-			<aside
-				aria-label="Customization"
-				class="min-h-0 overflow-y-auto border-l border-border p-4"
-			>
+			<aside aria-label="Customization" class="relative min-h-0 border-l border-border">
 				<CustomizationPanel />
 			</aside>
 		</div>
