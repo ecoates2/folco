@@ -14,11 +14,12 @@
       {
         "label": "main",
         "title": "Folco",
-        "width": 800,
+        "width": 1080,
         "height": 800,
-        "minWidth": 760,
-        "minHeight": 640,
-        "create": false
+        "minWidth": 1080,
+        "minHeight": 800,
+        "create": false,
+        "resizable": false
       }
     ],
     "security": {
@@ -29,6 +30,9 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": "all",
+    "resources": {
+      "../app-icon.svg": "app-icon.svg"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

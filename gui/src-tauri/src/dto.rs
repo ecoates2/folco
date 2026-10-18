@@ -37,6 +37,17 @@ pub struct CustomImageDto {
     pub file_name: String,
 }
 
+/// Package metadata from `Cargo.toml` that the Tauri JS API doesn't expose.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AppMetadataDto {
+    pub description: &'static str,
+    /// Each in Cargo's `Name <email>` form.
+    pub authors: Vec<&'static str>,
+    pub repository: &'static str,
+    /// Whether this is a debug (non-release) build.
+    pub debug: bool,
+}
+
 /// What custom images this platform can write.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CustomImageSupportDto {

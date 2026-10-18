@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use cli::LaunchDirectories;
 use dto::{
-    CustomImageDto, CustomImageSupportDto, FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto,
+    AppMetadataDto, CustomImageDto, CustomImageSupportDto, FolderIconBaseDto, PlatformSizeSpecDto, ProgressDto,
     SvgFolderIconBaseDto,
 };
 use folco_core::progress::{progress_channel, ProgressSender};
@@ -160,6 +160,17 @@ fn experimental_enabled() -> bool {
     folco_core::experimental::enabled_from_env()
 }
 
+#[tauri::command]
+fn get_app_metadata(app: tauri::AppHandle) -> AppMetadataDto {
+    let info = app.package_info();
+    AppMetadataDto {
+        description: info.description,
+        authors: info.authors.split(':').filter(|a| !a.is_empty()).collect(),
+        repository: env!("CARGO_PKG_REPOSITORY"),
+        debug: cfg!(debug_assertions),
+    }
+}
+
 /// Folders passed on the command line, to pre-populate the folder list.
 #[tauri::command]
 fn get_launch_directories(launch: tauri::State<'_, LaunchDirectories>) -> Vec<PathBuf> {
@@ -189,6 +200,7 @@ pub fn run() {
             reset_folders,
             experimental_enabled,
             get_launch_directories,
+            get_app_metadata,
             set_startup_theme
         ])
         .setup(|app| {

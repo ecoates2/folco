@@ -1,8 +1,10 @@
 [package]
 name = "folco-gui"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "An open-source, cross-platform application to customize folder icons"
+authors = ["Ethan Coates <ethancoates1567@gmail.com>"]
+repository = "https://github.com/ecoates2/folco"
+homepage = "https://github.com/ecoates2/folco"
 edition = "2021"
 publish = false
 

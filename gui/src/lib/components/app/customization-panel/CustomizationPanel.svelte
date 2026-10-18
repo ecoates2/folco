@@ -240,7 +240,7 @@
 						hideSearch
 						pageSize={30}
 						height="24rem"
-						class="block w-[35rem]"
+						class="block w-[30rem]"
 						onselect={(svg) => artwork.selectIcon(svg)}
 					/>
 				</PickerPopover>

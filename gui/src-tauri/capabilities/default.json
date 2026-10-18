@@ -8,6 +8,10 @@
     "opener:default",
     "dialog:default",
     "fs:allow-stat",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "$RESOURCE/app-icon.svg" }]
+    },
     "updater:default"
   ]
 }

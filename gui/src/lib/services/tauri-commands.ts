@@ -51,6 +51,20 @@ export function getLaunchDirectories(): Promise<string[]> {
 	return invoke('get_launch_directories');
 }
 
+/** Package metadata from the GUI crate's `Cargo.toml`. */
+export interface AppMetadata {
+	description: string;
+	/** Each in Cargo's `Name <email>` form. */
+	authors: string[];
+	repository: string;
+	/** Whether this is a debug (non-release) build. */
+	debug: boolean;
+}
+
+export function getAppMetadata(): Promise<AppMetadata> {
+	return invoke('get_app_metadata');
+}
+
 /** Wire shape of `folco_core::progress::Progress`. */
 export type CustomizeProgress =
 	| { kind: 'started'; total: number }
