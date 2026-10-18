@@ -15,7 +15,6 @@
 	import { SourceImagePicker } from '$lib/components/app/source-image-picker';
 
 	import * as EmojiPicker from '$lib/components/ui/emoji-picker';
-	import type { EmojiPickerSkin } from '$lib/components/ui/emoji-picker/types';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -64,9 +63,6 @@
 	const iconSrc = $derived(
 		selection?.kind === 'icon' ? `data:image/svg+xml,${encodeURIComponent(selection.svg)}` : null
 	);
-
-	// Lives here because the picker remounts each time its popover opens.
-	let emojiSkin = $state<EmojiPickerSkin>(0);
 
 	// A layer the base can't render must not stay on.
 	$effect(() => {
@@ -196,9 +192,11 @@
 
 			<Tabs.Content value="emoji" class={BOX}>
 				{@render anchorRow('emoji-anchor')}
+				<!-- Mounting ~1,900 emoji is too slow to do on every open, so it happens behind the boot loader. -->
 				<PickerPopover
 					title="Emoji"
 					label={selection?.kind === 'emoji' ? selection.data.name : 'Choose emoji…'}
+					keepMounted
 				>
 					{#snippet preview()}
 						{#if selection?.kind === 'emoji'}
@@ -206,7 +204,6 @@
 						{/if}
 					{/snippet}
 					<EmojiPicker.Root
-						bind:skin={emojiSkin}
 						onSelect={(emoji) => artwork.selectEmoji(emoji)}
 						onSkinChange={(skin) => artwork.setEmojiSkin(skin)}
 					>
@@ -225,7 +222,7 @@
 				{@render choiceRow(
 					'icon-placement',
 					'Placement',
-					artwork.effectivePlacement,
+					artwork.iconPlacement,
 					[
 						{
 							value: 'decal',
@@ -239,7 +236,7 @@
 						if (v === 'decal' || v === 'overlay') artwork.setPlacement(v);
 					}
 				)}
-				{#if artwork.effectivePlacement === 'overlay'}
+				{#if artwork.iconPlacement === 'overlay'}
 					{@render anchorRow('icon-anchor')}
 				{/if}
 				<PickerPopover title="Icon" label={iconSrc ? 'Change icon…' : 'Choose icon…'}>
@@ -254,7 +251,7 @@
 						hideSearch
 						pageSize={30}
 						height="24rem"
-						class="block w-[22rem]"
+						class="block w-[35rem]"
 						onselect={(svg) => artwork.selectIcon(svg)}
 					/>
 				</PickerPopover>

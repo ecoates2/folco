@@ -81,15 +81,21 @@ class ArtworkStore {
 	);
 
 	/**
-	 * Where the artwork actually lands.
+	 * Where an icon lands, whether or not one is picked yet. Vector folder
+	 * icons have no decal layer, so decals fall back to overlays there.
+	 */
+	readonly iconPlacement = $derived<Placement>(
+		this.placement === 'decal' && renderer.supportsDecal ? 'decal' : 'overlay'
+	);
+
+	/**
+	 * Where the current artwork actually lands.
 	 *
 	 * Decals are monochrome imprints tinted against the folder, so emoji can
-	 * only be overlays; vector folder icons have no decal layer at all.
+	 * only be overlays.
 	 */
 	readonly effectivePlacement = $derived<Placement>(
-		this.selection?.kind === 'icon' && this.placement === 'decal' && renderer.supportsDecal
-			? 'decal'
-			: 'overlay'
+		this.selection?.kind === 'icon' ? this.iconPlacement : 'overlay'
 	);
 
 	/** Switches the active source, or clears it with `'none'`. */
