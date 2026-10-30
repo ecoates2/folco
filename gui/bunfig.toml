@@ -1,0 +1,3 @@
+[test]
+# Compiles .svelte and .svelte.ts (rune) modules so stores can be imported in tests.
+preload = ["./tests/preload.ts"]
