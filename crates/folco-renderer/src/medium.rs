@@ -1,67 +1,8 @@
-//! Rendering medium abstraction.
+//! SVG canvas for the vector rendering pipeline.
 //!
-//! A [`Medium`] ties together the *canvas* a layer pipeline draws onto and the
-//! *output* it ultimately produces. Two media exist:
-//!
-//! - [`RasterMedium`] — pixel-based. Layers mutate an [`IconImage`] and the
-//!   pipeline yields an [`IconSet`] of concrete sizes. This is the classic
-//!   folder/custom pipeline (HSL color targeting, tile compositing, etc.).
-//! - [`SvgMedium`] — vector-based. Layers append markup to an [`SvgCanvas`]
-//!   and the pipeline yields a single scalable SVG [`String`]. Used when the
-//!   platform hands us a scalable folder icon (e.g. GNOME icon themes).
-//!
-//! Splitting by medium lets each layer strategy stay honest about what it can
-//! do: raster layers can HSL-shift pixels, while SVG layers must express the
-//! same *intent* (a folder color, a badge) with vector-friendly techniques
-//! such as a color-dot overlay or nested `<image>` elements.
-//!
-//! # Status
-//!
-//! The raster pipeline does not yet consume [`RasterMedium`] directly; it is
-//! defined here as the documented contract that the raster customizer will
-//! adopt in a later phase. The SVG pipeline is built on [`SvgMedium`] /
-//! [`SvgCanvas`] as of Phase 1.
-
-use crate::icon::{IconImage, IconSet};
-
-// TODO: Pretty sure this is dead code...
-
-// ============================================================================
-// Medium
-// ============================================================================
-
-/// A rendering medium: the canvas layers draw onto plus the final output type.
-pub trait Medium {
-    /// The mutable drawing surface threaded through the layer pipeline.
-    type Canvas<'a>;
-
-    /// The final rendered artifact produced from the canvas.
-    type Output;
-}
-
-/// Pixel-based rendering medium (the classic raster pipeline).
-///
-/// Uninhabited marker type — it exists to name the raster canvas/output pair,
-/// not to be instantiated.
-#[derive(Debug, Clone, Copy)]
-pub enum RasterMedium {}
-
-impl Medium for RasterMedium {
-    type Canvas<'a> = IconImage;
-    type Output = IconSet;
-}
-
-/// Vector-based rendering medium.
-///
-/// Layers append markup fragments to an [`SvgCanvas`]; the pipeline serializes
-/// the result to a single scalable SVG string.
-#[derive(Debug, Clone, Copy)]
-pub enum SvgMedium {}
-
-impl Medium for SvgMedium {
-    type Canvas<'a> = SvgCanvas<'a>;
-    type Output = String;
-}
+//! Vector layers express the same *intents* as raster layers (a folder color,
+//! a badge) with vector-friendly techniques such as a color-dot overlay or
+//! nested `<image>` elements, appended as markup to an [`SvgCanvas`].
 
 // ============================================================================
 // SvgCanvas

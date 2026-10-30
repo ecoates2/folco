@@ -56,16 +56,17 @@ Goal: make the later phases mechanically verifiable. No production code changes.
 
 Each bullet: delete, `cargo check --workspace`, commit.
 
-- [ ] `context.rs`: remove `customize_folders` (sync), `reset_folders` (sync), `customize_folder`, `reset_folder`, `customize_folders_custom` (sync). Update the two doc-comment examples in `context.rs:325-335` and `lib.rs:28-31` to the async forms. The GUI already `block_on`s the async versions (`state.rs:143,156`), so there is no sync consumer.
-- [ ] `context.rs`: remove `customizer()`, `customizer_mut()`, context-level `export_profile()`.
-- [ ] `context.rs`: remove `cache()`, `cache_mut()`, `refresh_cache()`, `output_medium()` — **verify** with a workspace grep first; the `CustomizationContextBuilder::with_force_cache_refresh` path is the real refresh entry point.
-- [ ] `medium.rs`: delete the `Medium` trait, `RasterMedium`, `SvgMedium` (`:12-60`). Keep `SvgCanvas`. The file's own `TODO: Pretty sure this is dead code...` is correct.
-- [ ] `layer/mod.rs:274`: delete the stale `NOTE` about `LayerPipeline` (type no longer exists).
-- [ ] `gui/src/lib/components/app/splash-overlay/`: empty directory, delete.
-- [ ] `gui/src-tauri/src/lib.rs:238-242`: delete the commented-out devtools block.
-- [ ] `folco-core`: `custom_image_medium()` on the context is bypassed by both callers, which reach into `WriteCapabilities::current_platform().custom_image_medium(format)` directly (`folco-cli/main.rs:393`, `state.rs:167`). Pick one: keep the context method and route both callers through it, or delete it. Recommend keep + route (one place to change when capabilities grow).
+- [x] `context.rs`: remove `customize_folders` (sync), `reset_folders` (sync), `customize_folder`, `reset_folder`, `customize_folders_custom` (sync). Update the two doc-comment examples in `context.rs:325-335` and `lib.rs:28-31` to the async forms. The GUI already `block_on`s the async versions (`state.rs:143,156`), so there is no sync consumer.
+- [x] `context.rs`: remove `customizer()`, `customizer_mut()`, context-level `export_profile()`. (`FolderStrategy::export_profile` went with it — no remaining callers.)
+- [x] `context.rs`: remove `cache()`, `cache_mut()`, `refresh_cache()`, `output_medium()` — verified by grep. The `cache` field went too; `build()` only needs the `IconCache` long enough to load the icon set.
+- [x] `medium.rs`: delete the `Medium` trait, `RasterMedium`, `SvgMedium`. Keep `SvgCanvas`.
+- [x] `layer/mod.rs`: delete the stale `NOTE` about `LayerPipeline`.
+- [x] `gui/src/lib/components/app/splash-overlay/`: empty directory, deleted.
+- [x] `gui/src-tauri/src/lib.rs`: delete the commented-out devtools block.
+- [x] `folco-core`: `custom_image_medium()`. **Chose neither option as written.** Routing didn't fit: the CLI checks before it has a context (and needs `caps.custom_image_extensions()` for its error message), and the GUI's `load_custom_image` only has a path/format — no `ImageSource`, and it deliberately doesn't read the file first. The decision is platform-static, so `WriteCapabilities::current_platform().custom_image_medium(format)` *is* the right single entry point for callers. Made the context method private (it's still used by `customize_folders_with_image_async`), which removes the duplicate public surface.
+- [x] (Unplanned, pre-existing) Three renderer doc tests called the private `render_all()` and had been failing. Switched the examples to `Render::render_full_output()`. Needed to make `cargo test --workspace` a usable gate.
 
-Expected: `context.rs` 925 → ~700 lines before any restructuring.
+Result: `context.rs` 925 → 732 lines, `medium.rs` 168 → 109. No behaviour change.
 
 ## 4. Phase 2 — `folco-renderer`: one contract for all customizers
 

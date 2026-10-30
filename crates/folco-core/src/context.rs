@@ -152,7 +152,6 @@ impl CustomizationContextBuilder {
         let folder_provider = PlatformFolderSettingsProvider::new();
 
         Ok(CustomizationContext {
-            cache,
             strategy,
             folder_provider,
         })
@@ -258,14 +257,6 @@ impl FolderStrategy {
         }
     }
 
-    /// Exports the current settings as a profile.
-    fn export_profile(&self) -> CustomizationProfile {
-        match self {
-            FolderStrategy::Raster(c) => c.export_profile(),
-            FolderStrategy::Svg(c) => c.export_profile(),
-        }
-    }
-
     /// Renders the artifact written to the system, in `icon-sys` format.
     fn render_output(&mut self) -> Result<SysIconSet> {
         match self {
@@ -307,71 +298,36 @@ impl FolderStrategy {
 /// This struct provides the primary API for:
 /// - Customizing folder icons with profiles
 /// - Resetting folders to default icons
-/// - Accessing the icon customizer for live preview
-/// - Managing the icon cache
+/// - Exposing the base folder icon for frontend previews
 ///
 /// # Example
 ///
 /// ```ignore
-/// use folco_core::{CustomizationContext, CustomizationContextBuilder, CustomizationProfile};
+/// use folco_core::{CustomizationContextBuilder, CustomizationProfile, SolidColorConfig};
+/// use folco_core::progress::progress_channel;
 /// use std::path::PathBuf;
 ///
 /// // Build the context
-/// let mut ctx = CustomizationContextBuilder::new()
-///     .with_app_info("com", "example", "folco")
-///     .build()?;
+/// let mut ctx = CustomizationContextBuilder::new().build()?;
 ///
 /// // Apply a customization profile
 /// let profile = CustomizationProfile::new()
-///     .with_hue_rotation(HueRotationSettings { degrees: 180.0, enabled: true });
+///     .with_solid_color(SolidColorConfig::new(33, 150, 243));
 ///
 /// let folders = vec![PathBuf::from("/path/to/folder")];
-/// ctx.customize_folders(&folders, profile)?;
+/// let (tx, _rx) = progress_channel(32);
+/// ctx.customize_folders_async(folders.clone(), profile, tx).await;
 ///
 /// // Reset to default
-/// ctx.reset_folders(&folders)?;
+/// let (tx, _rx) = progress_channel(32);
+/// ctx.reset_folders_async(folders, tx).await;
 /// ```
 pub struct CustomizationContext {
-    cache: IconCache,
     strategy: FolderStrategy,
     folder_provider: PlatformFolderSettingsProvider,
 }
 
 impl CustomizationContext {
-    /// Returns a reference to the raster icon customizer, if the active
-    /// strategy is raster-based.
-    ///
-    /// Returns `None` when the platform provided a scalable SVG icon (the SVG
-    /// pipeline exposes no raster customizer). Use for live preview rendering
-    /// without applying to folders.
-    pub fn customizer(&self) -> Option<&FolderIconCustomizer> {
-        match &self.strategy {
-            FolderStrategy::Raster(c) => Some(c.as_ref()),
-            FolderStrategy::Svg(_) => None,
-        }
-    }
-
-    /// Returns a mutable reference to the raster icon customizer, if the active
-    /// strategy is raster-based.
-    ///
-    /// Returns `None` when the active strategy is SVG-based.
-    pub fn customizer_mut(&mut self) -> Option<&mut FolderIconCustomizer> {
-        match &mut self.strategy {
-            FolderStrategy::Raster(c) => Some(c.as_mut()),
-            FolderStrategy::Svg(_) => None,
-        }
-    }
-
-    /// Returns a reference to the icon cache.
-    pub fn cache(&self) -> &IconCache {
-        &self.cache
-    }
-
-    /// Returns a mutable reference to the icon cache.
-    pub fn cache_mut(&mut self) -> &mut IconCache {
-        &mut self.cache
-    }
-
     /// Returns the base icon data (icons + surface color).
     ///
     /// This is useful for folco-gui to pass icon images and the surface
@@ -413,103 +369,10 @@ impl CustomizationContext {
         self.strategy.unsupported_layers(profile)
     }
 
-    /// Exports the current customizer settings as a profile.
-    pub fn export_profile(&self) -> CustomizationProfile {
-        self.strategy.export_profile()
-    }
-
-    /// Customizes the icons for the specified folders.
-    ///
-    /// This method:
-    /// 1. Applies the profile to the customizer
-    /// 2. Renders the customized icon set
-    /// 3. Converts to system format
-    /// 4. Applies to each folder
-    ///
-    /// # Arguments
-    ///
-    /// * `folders` - Collection of folder paths to customize
-    /// * `profile` - The customization profile to apply
-    ///
-    /// # Returns
-    ///
-    /// A vector of results, one for each folder. This allows partial success
-    /// where some folders succeed and others fail.
-    pub fn customize_folders<P: AsRef<Path>>(
-        &mut self,
-        folders: &[P],
-        profile: CustomizationProfile,
-    ) -> Vec<Result<()>> {
-        // Apply the profile
-        self.apply_profile(profile);
-
-        // Render the customized icons and convert to system format
-        let sys_icons = match self.strategy.render_output() {
-            Ok(icons) => icons,
-            Err(e) => return vec![Err(e)],
-        };
-
-        // Apply to each folder
-        folders
-            .iter()
-            .map(|folder| {
-                self.folder_provider
-                    .set_icon_for_folder(folder.as_ref(), &sys_icons)
-                    .map_err(|e| {
-                        Error::FolderCustomization(folder.as_ref().to_path_buf(), e.to_string())
-                    })
-            })
-            .collect()
-    }
-
-    /// Resets the icons for the specified folders to the system default.
-    ///
-    /// # Arguments
-    ///
-    /// * `folders` - Collection of folder paths to reset
-    ///
-    /// # Returns
-    ///
-    /// A vector of results, one for each folder.
-    pub fn reset_folders<P: AsRef<Path>>(&self, folders: &[P]) -> Vec<Result<()>> {
-        folders
-            .iter()
-            .map(|folder| {
-                self.folder_provider
-                    .reset_icon_for_folder(folder.as_ref())
-                    .map_err(|e| Error::FolderReset(folder.as_ref().to_path_buf(), e.to_string()))
-            })
-            .collect()
-    }
-
-    /// Customizes a single folder with the given profile.
-    ///
-    /// Convenience method for customizing a single folder.
-    pub fn customize_folder<P: AsRef<Path>>(
-        &mut self,
-        folder: P,
-        profile: CustomizationProfile,
-    ) -> Result<()> {
-        self.customize_folders(&[folder], profile)
-            .into_iter()
-            .next()
-            .unwrap_or(Ok(()))
-    }
-
-    /// Resets a single folder to the system default icon.
-    ///
-    /// Convenience method for resetting a single folder.
-    pub fn reset_folder<P: AsRef<Path>>(&self, folder: P) -> Result<()> {
-        self.reset_folders(&[folder])
-            .into_iter()
-            .next()
-            .unwrap_or(Ok(()))
-    }
-
     /// Resets the icons for the specified folders to system default with progress reporting.
     ///
-    /// This is the async version of [`reset_folders`](Self::reset_folders) that
-    /// reports progress through a tokio channel.
+    /// Per-folder outcomes are reported through `progress`; the final
+    /// [`Progress::Completed`] carries the success/failure counts.
     ///
     /// # Arguments
     ///
@@ -578,18 +441,11 @@ impl CustomizationContext {
             .await;
     }
 
-    /// Clears the icon cache and refreshes from system resources.
-    pub fn refresh_cache(&mut self) -> Result<()> {
-        let sys_icons = self.cache.refresh()?;
-        self.strategy = FolderStrategy::from_sys_icon_set(sys_icons)?;
-        Ok(())
-    }
-
     /// Customizes the icons for the specified folders with progress reporting.
     ///
-    /// This is the async version of [`customize_folders`](Self::customize_folders) that
-    /// reports progress through a tokio channel. Use this for GUI progress bars or
-    /// CLI progress indicators.
+    /// Applies the profile, renders once, then writes the result to each
+    /// folder. Progress is reported through a tokio channel for GUI progress
+    /// bars or CLI progress indicators.
     ///
     /// # Arguments
     ///
@@ -637,14 +493,6 @@ impl CustomizationContext {
     // Custom Icon Support
     // ========================================================================
 
-    /// The medium this platform writes folder icons in.
-    pub fn output_medium(&self) -> OutputMedium {
-        match self.strategy {
-            FolderStrategy::Raster(_) => OutputMedium::Raster,
-            FolderStrategy::Svg(_) => OutputMedium::Vector,
-        }
-    }
-
     /// The medium `source` is customized and written in when used as a custom image.
     ///
     /// Decided by the platform's [`WriteCapabilities`]: SVG stays vector where
@@ -654,7 +502,7 @@ impl CustomizationContext {
     /// # Errors
     ///
     /// Returns [`Error::UnsupportedCustomImage`] if the platform can't write it in any medium.
-    pub fn custom_image_medium(&self, source: &ImageSource) -> Result<OutputMedium> {
+    fn custom_image_medium(&self, source: &ImageSource) -> Result<OutputMedium> {
         let format = ImageFormat::of_source(source);
         WriteCapabilities::current_platform()
             .custom_image_medium(format)
@@ -686,52 +534,10 @@ impl CustomizationContext {
         Ok(CustomIconCustomizer::from_image(source, specs.sizes())?)
     }
 
-    /// Applies custom icons to the specified folders.
-    ///
-    /// This method:
-    /// 1. Renders the custom icon set from the customizer
-    /// 2. Converts to system format
-    /// 3. Applies to each folder
-    ///
-    /// # Arguments
-    ///
-    /// * `folders` - Collection of folder paths to customize
-    /// * `customizer` - A configured [`CustomIconCustomizer`] (typically from [`create_custom_icon_customizer`](Self::create_custom_icon_customizer))
-    ///
-    /// # Returns
-    ///
-    /// A vector of results, one for each folder.
-    pub fn customize_folders_custom<P: AsRef<Path>>(
-        &self,
-        folders: &[P],
-        customizer: &mut CustomIconCustomizer,
-    ) -> Vec<Result<()>> {
-        // Render the custom icons
-        let rendered = match customizer.render_full_output() {
-            Ok(icons) => icons,
-            Err(e) => return vec![Err(Error::Render(e))],
-        };
-
-        // Convert to system format
-        let sys_icons = rendered.into_sys();
-
-        // Apply to each folder
-        folders
-            .iter()
-            .map(|folder| {
-                self.folder_provider
-                    .set_icon_for_folder(folder.as_ref(), &sys_icons)
-                    .map_err(|e| {
-                        Error::FolderCustomization(folder.as_ref().to_path_buf(), e.to_string())
-                    })
-            })
-            .collect()
-    }
-
     /// Applies custom icons to the specified folders with progress reporting.
     ///
-    /// This is the async version of [`customize_folders_custom`](Self::customize_folders_custom)
-    /// that reports progress through a tokio channel.
+    /// Renders the customizer once, converts to system format, and writes to
+    /// each folder, reporting progress through a tokio channel.
     ///
     /// # Arguments
     ///
@@ -776,9 +582,10 @@ impl CustomizationContext {
 
     /// Uses `source` as the folder icon, decorated per `profile`, on every folder.
     ///
-    /// Written in [`custom_image_medium`](Self::custom_image_medium): SVG stays
-    /// SVG where the platform allows it. Surface-relative intents (`solid_color`,
-    /// `decal`) are ignored: a custom image has no surface color.
+    /// Written in the medium [`WriteCapabilities::custom_image_medium`] picks
+    /// for `source`'s format: SVG stays SVG where the platform allows it.
+    /// Surface-relative intents (`solid_color`, `decal`) are ignored: a custom
+    /// image has no surface color.
     ///
     /// # Errors
     ///

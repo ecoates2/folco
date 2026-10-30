@@ -15,20 +15,23 @@
 //! # Example
 //!
 //! ```ignore
-//! use folco_core::{CustomizationContext, CustomizationContextBuilder};
+//! use folco_core::{CustomizationContextBuilder, CustomizationProfile, SolidColorConfig};
+//! use folco_core::progress::progress_channel;
 //! use std::path::PathBuf;
 //!
 //! // Initialize with cached system icons
-//! let ctx = CustomizationContextBuilder::new()
-//!     .with_app_info("com", "example", "folco")
-//!     .build()?;
+//! let mut ctx = CustomizationContextBuilder::new().build()?;
 //!
-//! // Customize folders with a profile
+//! // Customize folders with a profile; per-folder outcomes arrive on `rx`
 //! let folders = vec![PathBuf::from("/path/to/folder")];
-//! ctx.customize_folders(&folders, profile)?;
+//! let profile = CustomizationProfile::new()
+//!     .with_solid_color(SolidColorConfig::new(33, 150, 243));
+//! let (tx, _rx) = progress_channel(32);
+//! ctx.customize_folders_async(folders.clone(), profile, tx).await;
 //!
 //! // Reset folders to default
-//! ctx.reset_folders(&folders)?;
+//! let (tx, _rx) = progress_channel(32);
+//! ctx.reset_folders_async(folders, tx).await;
 //! ```
 
 mod cache;

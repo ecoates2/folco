@@ -55,7 +55,7 @@ pub trait LayerSet {
 /// # Example (folder icons)
 ///
 /// ```
-/// use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor};
+/// use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor, Render};
 ///
 /// let surface = SurfaceColor::new(255, 217, 112);
 /// let base = FolderIconBase::new(IconSet::new(), surface);
@@ -64,13 +64,13 @@ pub trait LayerSet {
 /// customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
 /// customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 ///
-/// let output = customizer.render_all();
+/// let output = customizer.render_full_output();
 /// ```
 ///
 /// # Example (custom icons)
 ///
 /// ```ignore
-/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayPosition};
+/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayPosition, Render};
 ///
 /// let source = ImageSource::svg("<svg>...</svg>");
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
@@ -80,7 +80,7 @@ pub trait LayerSet {
 ///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
 /// ));
 ///
-/// let output = customizer.render_all();
+/// let output = customizer.render_full_output();
 /// ```
 pub struct IconCustomizer<L: LayerSet> {
     /// The base icons and associated metadata.

@@ -76,7 +76,7 @@ impl LayerSet for CustomLayers {
 /// # Example
 ///
 /// ```ignore
-/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayPosition};
+/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayPosition, Render};
 ///
 /// let source = ImageSource::svg("<svg>...</svg>");
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
@@ -86,7 +86,7 @@ impl LayerSet for CustomLayers {
 ///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
 /// ));
 ///
-/// let output = customizer.render_all();
+/// let output = customizer.render_full_output();
 /// ```
 pub type CustomIconCustomizer = IconCustomizer<CustomLayers>;
 

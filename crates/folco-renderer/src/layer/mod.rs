@@ -396,10 +396,6 @@ impl CompositeLayer {
     }
 }
 
-// NOTE: LayerPipeline has been replaced by the LayerSet trait.
-// See customizer.rs for the generic engine and
-// folder_customizer.rs / custom_customizer.rs for concrete layer sets.
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor};
+//! use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor, Render};
 //!
 //! let surface = SurfaceColor::new(255, 217, 112);
 //! let base = FolderIconBase::new(IconSet::new(), surface);
@@ -16,7 +16,7 @@
 //! customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
 //! customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
 //!
-//! let output = customizer.render_all();
+//! let output = customizer.render_full_output();
 //! ```
 //!
 //! # Serializable Profiles
@@ -74,7 +74,7 @@ pub use layer::{
     CacheKey, ColorDotConfig, DecalConfig, DominantColor, ImageOverlayConfig, ImageSource, Layer,
     LayerConfig, OverlayAnchorMode, OverlayPosition, RenderContext, SolidColorConfig, SvgSource,
 };
-pub use medium::{Medium, RasterMedium, SvgCanvas, SvgMedium};
+pub use medium::SvgCanvas;
 pub use output::Render;
 pub use placement::{DefaultPlacements, Placement};
 pub use profile::{CustomProfile, CustomizationProfile, FolderProfile};
