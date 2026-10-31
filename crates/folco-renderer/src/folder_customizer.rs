@@ -34,7 +34,7 @@ use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::customizer::{IconCustomizer, LayerSet};
 use crate::error::RenderError;
 use crate::icon::{FolderIconBase, IconBase};
-use crate::layer::svg::composite_over;
+use image::imageops::overlay;
 use crate::layer::{
     CacheKey, ColorDotConfig, DecalConfig, DependencyVersion, ImageOverlayConfig, Layer,
     RenderContext, SolidColorConfig,
@@ -90,7 +90,7 @@ impl LayerSet for FolderLayers {
 
         // 2. Decal tile layer — tints against the dominant color solid color emits
         if let Some(tile) = self.decal.render_tile(ctx, key, decal_deps)? {
-            composite_over(&mut ctx.image.data, tile, 0, 0);
+            overlay(&mut ctx.image.data, tile, 0, 0);
         }
 
         // 3. Color dot tile layer
@@ -98,7 +98,7 @@ impl LayerSet for FolderLayers {
             .color_dot
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, tile, 0, 0);
+            overlay(&mut ctx.image.data, tile, 0, 0);
         }
 
         // 4. Overlay tile layer
@@ -106,7 +106,7 @@ impl LayerSet for FolderLayers {
             .overlay
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, tile, 0, 0);
+            overlay(&mut ctx.image.data, tile, 0, 0);
         }
 
         Ok(())

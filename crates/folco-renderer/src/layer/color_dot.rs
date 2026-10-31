@@ -14,7 +14,6 @@
 //! [`SvgLayer<ColorDotConfig>`](crate::SvgLayer) nests the same circle markup
 //! in the output document.
 
-use super::svg::composite_over;
 use super::{
     CacheKey, DependencyVersion, ImageSource, Layer, LayerConfig, OverlayAnchorMode,
     OverlayPosition, RenderContext,
@@ -22,6 +21,7 @@ use super::{
 use crate::error::RenderError;
 use crate::placement::Placement;
 use image::RgbaImage;
+use image::imageops::overlay;
 
 // ============================================================================
 // Geometry
@@ -157,7 +157,7 @@ fn render_color_dot(
     let dot = ImageSource::svg(color_dot_svg(config)).render_at_size(dot_size)?;
 
     let (x, y) = super::overlay::pixel_position(&config.placement, &bounds, &dot);
-    composite_over(&mut tile, &dot, x, y);
+    overlay(&mut tile, &dot, i64::from(x), i64::from(y));
 
     Ok(tile)
 }

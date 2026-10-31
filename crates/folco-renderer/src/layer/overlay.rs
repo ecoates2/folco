@@ -4,7 +4,7 @@
 //! via [`ImageSource`].
 
 use super::image_source::ImageSource;
-use super::svg::{SvgSource, composite_over};
+use super::svg::SvgSource;
 use super::{CacheKey, DependencyVersion, Layer, LayerConfig, RenderContext};
 use crate::error::RenderError;
 use crate::icon::RectPx;
@@ -160,7 +160,7 @@ fn render_overlay(
 
     let overlay_img = config.source.render_at_size(overlay_size)?;
     let (x, y) = pixel_position(&config.placement, &bounds, &overlay_img);
-    composite_over(&mut tile, &overlay_img, x, y);
+    image::imageops::overlay(&mut tile, &overlay_img, i64::from(x), i64::from(y));
 
     Ok(tile)
 }

@@ -26,7 +26,7 @@ pub trait LayerSet {
     /// Execute all layers against the render context in order.
     ///
     /// Each layer should either mutate `ctx.image` directly (base layers)
-    /// or render a tile and composite it via `composite_over`.
+    /// or render a tile and composite it via `image::imageops::overlay`.
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError>;
 
     /// Combined version of all layers.

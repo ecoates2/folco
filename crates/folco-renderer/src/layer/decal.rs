@@ -1,6 +1,6 @@
 //! Decal imprint layer — configuration and rendering.
 
-use super::svg::{SvgSource, composite_over, render_source_with_color};
+use super::svg::{SvgSource, render_source_with_color};
 use super::{CacheKey, DependencyVersion, DominantColor, Layer, LayerConfig, RenderContext};
 use crate::error::RenderError;
 use crate::icon::SurfaceColor;
@@ -106,7 +106,7 @@ pub(crate) fn render_decal(
     let center_x = bounds.x as i32 + (bounds.width as i32 - decal_img.width() as i32) / 2;
     let center_y = bounds.y as i32 + (bounds.height as i32 - decal_img.height() as i32) / 2;
 
-    composite_over(&mut tile, &decal_img, center_x, center_y);
+    image::imageops::overlay(&mut tile, &decal_img, i64::from(center_x), i64::from(center_y));
 
     Ok(tile)
 }

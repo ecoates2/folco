@@ -10,7 +10,7 @@ use crate::capabilities::{IconBaseKind, IconCapabilities};
 use crate::customizer::{IconCustomizer, LayerSet};
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconSet, IconSizeSpec};
-use crate::layer::svg::composite_over;
+use image::imageops::overlay;
 use crate::layer::{
     CacheKey, ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource, Layer,
     RenderContext,
@@ -41,14 +41,14 @@ impl LayerSet for CustomLayers {
             .color_dot
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, tile, 0, 0);
+            overlay(&mut ctx.image.data, tile, 0, 0);
         }
 
         if let Some(tile) = self
             .overlay
             .render_tile(ctx, key, DependencyVersion::NONE)?
         {
-            composite_over(&mut ctx.image.data, tile, 0, 0);
+            overlay(&mut ctx.image.data, tile, 0, 0);
         }
 
         Ok(())

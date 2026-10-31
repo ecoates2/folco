@@ -5,7 +5,7 @@
 
 use std::borrow::Cow;
 
-use image::{Rgba, RgbaImage};
+use image::RgbaImage;
 use resvg::tiny_skia::{Pixmap, Transform};
 use resvg::usvg::{Options, Tree};
 
@@ -299,96 +299,18 @@ fn replace_color_attr(svg: &str, attr: &str, new_color: &str) -> String {
     result
 }
 
-/// Converts a tiny_skia Pixmap to an image::RgbaImage.
+/// Converts a tiny_skia Pixmap (premultiplied) to a straight-alpha RgbaImage.
 fn pixmap_to_rgba_image(pixmap: &Pixmap) -> RgbaImage {
-    let width = pixmap.width();
-    let height = pixmap.height();
-    let mut img = RgbaImage::new(width, height);
-
-    for y in 0..height {
-        for x in 0..width {
-            let pixel = pixmap.pixel(x, y).unwrap();
-            // tiny_skia uses premultiplied alpha, we need to unpremultiply
-            let (r, g, b, a) =
-                unpremultiply(pixel.red(), pixel.green(), pixel.blue(), pixel.alpha());
-            img.put_pixel(x, y, Rgba([r, g, b, a]));
-        }
-    }
-
-    img
-}
-
-/// Unpremultiplies a premultiplied alpha pixel.
-fn unpremultiply(r: u8, g: u8, b: u8, a: u8) -> (u8, u8, u8, u8) {
-    if a == 0 {
-        (0, 0, 0, 0)
-    } else {
-        let a_f = a as f32 / 255.0;
-        (
-            (r as f32 / a_f).round().min(255.0) as u8,
-            (g as f32 / a_f).round().min(255.0) as u8,
-            (b as f32 / a_f).round().min(255.0) as u8,
-            a,
-        )
-    }
-}
-
-// ============================================================================
-// Compositing
-// ============================================================================
-
-/// Composites a source image onto a destination image at the specified position.
-///
-/// Uses standard alpha blending (source over destination).
-pub fn composite_over(dest: &mut RgbaImage, src: &RgbaImage, x: i32, y: i32) {
-    let dest_width = dest.width() as i32;
-    let dest_height = dest.height() as i32;
-
-    for sy in 0..src.height() {
-        for sx in 0..src.width() {
-            let dx = x + sx as i32;
-            let dy = y + sy as i32;
-
-            // Skip if outside destination bounds
-            if dx < 0 || dy < 0 || dx >= dest_width || dy >= dest_height {
-                continue;
-            }
-
-            let src_pixel = src.get_pixel(sx, sy);
-            let dst_pixel = dest.get_pixel(dx as u32, dy as u32);
-
-            // Alpha blending (source over)
-            let blended = alpha_blend(*src_pixel, *dst_pixel);
-            dest.put_pixel(dx as u32, dy as u32, blended);
-        }
-    }
-}
-
-/// Alpha blends two RGBA pixels (source over destination).
-fn alpha_blend(src: Rgba<u8>, dst: Rgba<u8>) -> Rgba<u8> {
-    let sa = src[3] as f32 / 255.0;
-    let da = dst[3] as f32 / 255.0;
-
-    // Source over compositing
-    let out_a = sa + da * (1.0 - sa);
-
-    if out_a == 0.0 {
-        return Rgba([0, 0, 0, 0]);
-    }
-
-    let blend = |s: u8, d: u8| -> u8 {
-        let sf = s as f32 / 255.0;
-        let df = d as f32 / 255.0;
-        let out = (sf * sa + df * da * (1.0 - sa)) / out_a;
-        (out * 255.0).round() as u8
-    };
-
-    Rgba([
-        blend(src[0], dst[0]),
-        blend(src[1], dst[1]),
-        blend(src[2], dst[2]),
-        (out_a * 255.0).round() as u8,
-    ])
+    let data = pixmap
+        .pixels()
+        .iter()
+        .flat_map(|p| {
+            let c = p.demultiply();
+            [c.red(), c.green(), c.blue(), c.alpha()]
+        })
+        .collect();
+    RgbaImage::from_raw(pixmap.width(), pixmap.height(), data)
+        .expect("pixmap dimensions match its pixel buffer")
 }
 
 // ============================================================================
@@ -423,41 +345,6 @@ mod tests {
             center[1] > center[0],
             "Green should dominate after color replacement"
         );
-    }
-
-    #[test]
-    fn composite_simple() {
-        // Create a 10x10 red background
-        let mut dest = RgbaImage::from_pixel(10, 10, Rgba([255, 0, 0, 255]));
-
-        // Create a 4x4 blue overlay
-        let src = RgbaImage::from_pixel(4, 4, Rgba([0, 0, 255, 255]));
-
-        // Composite at (3, 3)
-        composite_over(&mut dest, &src, 3, 3);
-
-        // Check that the overlay area is blue
-        assert_eq!(dest.get_pixel(5, 5).0, [0, 0, 255, 255]);
-
-        // Check that outside the overlay is still red
-        assert_eq!(dest.get_pixel(0, 0).0, [255, 0, 0, 255]);
-    }
-
-    #[test]
-    fn composite_with_transparency() {
-        // Create a 10x10 red background
-        let mut dest = RgbaImage::from_pixel(10, 10, Rgba([255, 0, 0, 255]));
-
-        // Create a 4x4 semi-transparent blue overlay
-        let src = RgbaImage::from_pixel(4, 4, Rgba([0, 0, 255, 128]));
-
-        // Composite at (0, 0)
-        composite_over(&mut dest, &src, 0, 0);
-
-        // The result should be a blend of red and blue
-        let pixel = dest.get_pixel(0, 0);
-        assert!(pixel[0] > 0, "Should have some red");
-        assert!(pixel[2] > 0, "Should have some blue");
     }
 
     #[test]

@@ -87,9 +87,10 @@ This phase is the lever for everything downstream. Order matters; each step is i
 - [x] `DefaultPlacements::{RASTER,VECTOR}` carry `anchor_mode: Inset`. GUI only reads `position`/`scale` off `defaultPlacements()`; confirmed additive, `bun run check` clean after regenerating the wasm pkg.
 - [x] **Math unified — but not via `unit_rect`.** A 0..1 rect can't reproduce the raster output byte-for-byte: raster floors the overlay size first (`(min_dim * scale) as u32`) and halves by integer division, so `bx + x_unit * bw` drifts by a pixel. Instead `Placement::origin<T: PlacementScalar>(total_w, total_h, w, h)` holds the single 9-arm rule table generically; `i32` halves by integer division (pixels), `f32` by `/2.0` (percent). `layer/overlay.rs::pixel_position` and `svg_layer/overlay.rs::percent_rect` are 3-line wrappers. `calculate_position` is deleted, but kept verbatim as a **test oracle** in `placement.rs` — `raster_origin_matches_legacy_formula_for_every_combination` runs all 10 `(position, anchor)` combinations × 4 geometries (odd sizes, offset non-square bounds) and asserts pixel equality. The `*_rasterizes_into_bottom_right` tests still pass.
 
-### 2c. Move compositing out of `layer/svg.rs`
+### 2c. Move compositing out of `layer/svg.rs` — done 2026-10-31
 
-- [ ] New `layer/composite.rs`: `composite_over`, `alpha_blend`, `pixmap_to_rgba_image`, `unpremultiply` + their tests. `layer/svg.rs` keeps `SvgSource`, `render_svg*`, `replace_svg_colors`. Update the three `use crate::layer::svg::composite_over` imports. Pure move.
+- [x] ~~New `layer/composite.rs`~~ **Replaced with library calls instead** (user's call, after review). The hand-rolled `composite_over`/`alpha_blend` were a reimplementation of `image::imageops::overlay` (same source-over semantics, same clipping incl. negative offsets); `pixmap_to_rgba_image`/`unpremultiply` reimplemented `tiny_skia::PremultipliedColorU8::demultiply()`. All seven call sites now call `imageops::overlay` directly; `pixmap_to_rgba_image` is a 10-line `demultiply` + `from_raw` in `svg.rs`. ~120 lines deleted.
+- **Known numeric deviation** (accepted): `image`'s `Rgba::blend` truncates the blended channel to `u8` where ours rounded, so anti-aliased edge pixels can differ by 1 LSB; it also leaves a fully-transparent destination pixel untouched where ours zeroed it. `demultiply()` rounds in `f64` where ours used `f32` — differs only at exact `.5` ties. All pixel-sampling tests still pass.
 
 ### 2d. Declarative layer-set bookkeeping
 
