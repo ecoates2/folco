@@ -23,6 +23,7 @@ pub mod decal;
 pub mod image_source;
 pub mod overlay;
 pub mod solid_color;
+mod state;
 pub mod svg;
 
 pub use color_dot::ColorDotConfig;
@@ -30,6 +31,7 @@ pub use decal::DecalConfig;
 pub use image_source::ImageSource;
 pub use overlay::{ImageOverlayConfig, OverlayAnchorMode, OverlayPosition};
 pub use solid_color::SolidColorConfig;
+pub use state::LayerState;
 pub use svg::SvgSource;
 
 use crate::error::RenderError;
@@ -203,10 +205,6 @@ impl CacheKey {
 }
 
 // ============================================================================
-// Generic Layer
-// ============================================================================
-
-// ============================================================================
 // Layer Cache Output
 // ============================================================================
 
@@ -229,30 +227,21 @@ enum CachedOutput {
 // Generic Layer
 // ============================================================================
 
-/// A generic layer with configuration, caching, and version tracking.
+/// A raster layer: [`LayerState`] plus a per-size cache of rendered output.
 ///
-/// The layer tracks:
-/// - Optional configuration of type `C` — `Some(config)` means active, `None` means inactive
-/// - A version number that increments on any state change
-/// - A cache of rendered outputs keyed by size
-/// - The dependency version when each cache entry was stored
-///
-/// A layer is **active** when it has a configuration set. Presence/absence of
-/// config is the sole on/off switch: `Some(config)` = render with this config,
-/// `None` = render nothing (base passes through). This makes export/import
-/// lossless — what you see is what you get.
+/// The cache is keyed by size and stamped with the upstream
+/// [`DependencyVersion`] at store time, so an entry is only served when both
+/// the size and the upstream state still match.
 #[derive(Debug)]
 pub struct Layer<C: LayerConfig> {
-    config: Option<C>,
-    version: u64,
+    state: LayerState<C>,
     cache: HashMap<CacheKey, (CachedOutput, u64)>,
 }
 
 impl<C: LayerConfig> Default for Layer<C> {
     fn default() -> Self {
         Self {
-            config: None,
-            version: 0,
+            state: LayerState::default(),
             cache: HashMap::new(),
         }
     }
@@ -264,17 +253,17 @@ impl<C: LayerConfig> Layer<C> {
     /// `Some(config)` means the layer is active and will render.
     /// `None` means the layer is inactive and produces no output.
     pub fn config(&self) -> Option<&C> {
-        self.config.as_ref()
+        self.state.config()
     }
 
     /// Returns true if this layer is active (has a configuration set).
     pub fn is_active(&self) -> bool {
-        self.config.is_some()
+        self.state.is_active()
     }
 
     /// Returns the current version number.
     pub fn version(&self) -> u64 {
-        self.version
+        self.state.version()
     }
 
     /// Sets the configuration. Returns true if it changed.
@@ -283,27 +272,18 @@ impl<C: LayerConfig> Layer<C> {
     /// deactivates it. Clears the cache and increments version when
     /// the config differs.
     pub fn set_config(&mut self, config: Option<C>) -> bool {
-        let differs = match (&self.config, &config) {
-            (None, None) => false,
-            (Some(_), None) | (None, Some(_)) => true,
-            (Some(old), Some(new)) => old.differs_from(new),
-        };
-
-        if differs {
-            self.config = config;
-            self.version = self.version.wrapping_add(1);
+        let changed = self.state.set_config(config);
+        if changed {
             self.cache.clear();
-            true
-        } else {
-            false
         }
+        changed
     }
 
     /// Invalidates the cache and increments version.
     ///
     /// Called when upstream layers change.
     pub fn invalidate(&mut self) {
-        self.version = self.version.wrapping_add(1);
+        self.state.invalidate();
         self.cache.clear();
     }
 
@@ -332,7 +312,7 @@ impl<C: LayerConfig> Layer<C> {
         deps: DependencyVersion,
         render: impl FnOnce(&C) -> Result<RgbaImage, RenderError>,
     ) -> Result<Option<&RgbaImage>, RenderError> {
-        let Some(config) = &self.config else {
+        let Some(config) = self.state.config() else {
             return Ok(None);
         };
 

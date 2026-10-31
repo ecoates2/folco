@@ -72,11 +72,11 @@ Result: `context.rs` 925 → 732 lines, `medium.rs` 168 → 109. No behaviour ch
 
 This phase is the lever for everything downstream. Order matters; each step is independently shippable.
 
-### 2a. Extract `LayerState<C>` (dedupe `Layer` / `SvgLayer`)
+### 2a. Extract `LayerState<C>` (dedupe `Layer` / `SvgLayer`) — done 2026-10-31
 
-- [ ] New `layer/state.rs`: `pub struct LayerState<C> { config: Option<C>, version: u64 }` with `config()`, `is_active()`, `version()`, `set_config() -> bool`, `apply()`, `invalidate()` — moved verbatim from `layer/mod.rs:225-300`.
-- [ ] `Layer<C>` becomes `{ state: LayerState<C>, cache: HashMap<..> }`; its `set_config` delegates and additionally clears the cache. `SvgLayer<C>` becomes `pub type SvgLayer<C> = LayerState<C>;` (or a newtype if you want distinct inherent impls — a type alias is fine because the `render_fragment` impls are on `SvgLayer<Specific>` which still resolve).
-- [ ] Delete `svg_layer/mod.rs:22-88`.
+- [x] New `layer/state.rs`: `pub struct LayerState<C> { config: Option<C>, version: u64 }` with `config()`, `is_active()`, `version()`, `set_config() -> bool`, `invalidate()`. `SvgLayer::apply()` was **not** carried over — it was a zero-caller alias for `set_config`. Three unit tests pin the version-bump semantics.
+- [x] `Layer<C>` is now `{ state: LayerState<C>, cache: HashMap<..> }`; `set_config`/`invalidate` delegate and clear the cache. `SvgLayer<C>` is `pub type SvgLayer<C> = LayerState<C>;` — the `render_fragment` inherent impls on `SvgLayer<ColorDotConfig>` / `SvgLayer<ImageOverlayConfig>` resolve through the alias unchanged.
+- [x] Deleted the duplicate skeleton from `svg_layer/mod.rs`.
 
 ### 2b. Introduce a real `Placement` value type
 
