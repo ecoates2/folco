@@ -247,6 +247,7 @@ mod tests {
         ColorDotConfig, DecalConfig, ImageOverlayConfig, OverlayAnchorMode, OverlayPosition,
         SolidColorConfig,
     };
+    use crate::placement::Placement;
 
     fn full_profile() -> CustomizationProfile {
         CustomizationProfile::new()
@@ -255,9 +256,7 @@ mod tests {
             .with_decal(DecalConfig::new("<svg></svg>", 0.5))
             .with_overlay(ImageOverlayConfig::from_svg(
                 "<svg></svg>",
-                OverlayPosition::TopLeft,
-                OverlayAnchorMode::Inset,
-                0.25,
+                Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Inset, 0.25),
             ))
     }
 

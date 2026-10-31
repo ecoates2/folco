@@ -44,7 +44,7 @@ use folco_renderer::{
     DefaultPlacements, FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind,
     IconCapabilities, IconImage,
     IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode,
-    OverlayPosition, RectPx, SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer,
+    OverlayPosition, Placement, RectPx, SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer,
     SvgFolderIconBase, SvgFolderIconCustomizer,
 };
 
@@ -483,7 +483,9 @@ impl CanvasRenderer {
     ) -> Result<(), JsError> {
         let pos = parse_overlay_position(position)?;
         let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
-        let config = Some(ColorDotConfig::new(r, g, b).with_placement(pos, anchor_mode, scale));
+        let config = Some(
+            ColorDotConfig::new(r, g, b).with_placement(Placement::new(pos, anchor_mode, scale)),
+        );
         match &mut self.active {
             ActiveCustomizer::Folder(c) => {
                 c.layers.color_dot.set_config(config);
@@ -563,9 +565,10 @@ impl CanvasRenderer {
         let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
 
         let config = match svg_data {
-            Some(svg) if !svg.is_empty() => {
-                Some(ImageOverlayConfig::from_svg(svg, pos, anchor_mode, scale))
-            }
+            Some(svg) if !svg.is_empty() => Some(ImageOverlayConfig::from_svg(
+                svg,
+                Placement::new(pos, anchor_mode, scale),
+            )),
             _ => None,
         };
 
@@ -594,8 +597,9 @@ impl CanvasRenderer {
     ) -> Result<(), JsError> {
         let pos = parse_overlay_position(position)?;
         let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
-        let config = ImageOverlayConfig::from_emoji(emoji, pos, anchor_mode, scale)
-            .map_err(|e| JsError::new(&e.to_string()))?;
+        let config =
+            ImageOverlayConfig::from_emoji(emoji, Placement::new(pos, anchor_mode, scale))
+                .map_err(|e| JsError::new(&e.to_string()))?;
         self.set_overlay_config(Some(config));
         Ok(())
     }

@@ -51,7 +51,10 @@ use crate::layer::{ColorDotConfig, DecalConfig, ImageOverlayConfig, SolidColorCo
 ///     "targetG": 150,
 ///     "targetB": 243
 ///   },
-///   "colorDot": { "r": 33, "g": 150, "b": 243 },
+///   "colorDot": {
+///     "r": 33, "g": 150, "b": 243,
+///     "placement": { "position": "bottom-right", "anchorMode": "inset", "scale": 0.4 }
+///   },
 ///   "decal": {
 ///     "source": { "raw": "<svg>...</svg>" },
 ///     "scale": 0.5
@@ -433,16 +436,17 @@ mod tests {
     fn overlay_position_serialization() {
         let profile = CustomizationProfile::new().with_overlay(ImageOverlayConfig::from_svg(
             "icon",
-            OverlayPosition::TopLeft,
-            OverlayAnchorMode::Inset,
-            0.25,
+            crate::Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Inset, 0.25),
         ));
 
         let json = profile.to_json().unwrap();
         assert!(json.contains("\"top-left\""));
 
         let restored = CustomizationProfile::from_json(&json).unwrap();
-        assert_eq!(restored.overlay.unwrap().position, OverlayPosition::TopLeft);
+        assert_eq!(
+            restored.overlay.unwrap().placement.position,
+            OverlayPosition::TopLeft
+        );
     }
 
     #[test]

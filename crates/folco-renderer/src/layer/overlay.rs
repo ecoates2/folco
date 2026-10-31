@@ -7,6 +7,8 @@ use super::image_source::ImageSource;
 use super::svg::{SvgSource, composite_over};
 use super::{CacheKey, DependencyVersion, Layer, LayerConfig, RenderContext};
 use crate::error::RenderError;
+use crate::icon::RectPx;
+use crate::placement::Placement;
 use image::RgbaImage;
 
 // ============================================================================
@@ -34,6 +36,7 @@ pub enum OverlayPosition {
 /// How an overlay is anchored relative to the chosen position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 #[serde(rename_all = "kebab-case")]
 pub enum OverlayAnchorMode {
     /// Keep the overlay fully inside the content bounds.
@@ -49,7 +52,7 @@ pub enum OverlayAnchorMode {
 
 /// Configuration for image overlay — pure data.
 ///
-/// Stores the image source, position, and scale. Rendering logic
+/// Stores the image source and its [`Placement`]. Rendering logic
 /// lives on [`Layer<ImageOverlayConfig>`].
 ///
 /// # Image Sources
@@ -65,105 +68,57 @@ pub struct ImageOverlayConfig {
     /// The image source (SVG, emoji, or raster).
     pub source: ImageSource,
 
-    /// Position within the icon's content bounds.
-    pub position: OverlayPosition,
-
-    /// How the overlay is anchored relative to the chosen position.
-    #[serde(default)]
-    pub anchor_mode: OverlayAnchorMode,
-
-    /// Scale factor relative to the icon's content bounds (0.0-1.0).
-    pub scale: f32,
+    /// Where the overlay sits and how big it is, relative to the icon's content bounds.
+    pub placement: Placement,
 }
 
 impl ImageOverlayConfig {
     /// Creates a new overlay config from any image source.
-    ///
-    /// The scale is clamped to 0.0-1.0.
-    pub fn new(
-        source: impl Into<ImageSource>,
-        position: OverlayPosition,
-        anchor_mode: OverlayAnchorMode,
-        scale: f32,
-    ) -> Self {
+    pub fn new(source: impl Into<ImageSource>, placement: Placement) -> Self {
         Self {
             source: source.into(),
-            position,
-            anchor_mode,
-            scale: scale.clamp(0.0, 1.0),
+            placement,
         }
     }
 
     /// Creates a new overlay config from raw SVG markup.
     ///
     /// Convenience constructor that wraps `SvgSource::from_svg()` in an `ImageSource`.
-    pub fn from_svg(
-        svg: impl Into<String>,
-        position: OverlayPosition,
-        anchor_mode: OverlayAnchorMode,
-        scale: f32,
-    ) -> Self {
-        Self::new(
-            ImageSource::from(SvgSource::from_svg(svg)),
-            position,
-            anchor_mode,
-            scale,
-        )
+    pub fn from_svg(svg: impl Into<String>, placement: Placement) -> Self {
+        Self::new(ImageSource::from(SvgSource::from_svg(svg)), placement)
     }
 
     /// Creates a new overlay config from an emoji.
     ///
     /// Returns an error if the emoji is not supported by twemoji_assets.
     #[cfg(feature = "twemoji")]
-    pub fn from_emoji(
-        emoji: &str,
-        position: OverlayPosition,
-        anchor_mode: OverlayAnchorMode,
-        scale: f32,
-    ) -> Result<Self, RenderError> {
-        Ok(Self {
-            source: ImageSource::from(SvgSource::from_emoji(emoji)?),
-            position,
-            anchor_mode,
-            scale: scale.clamp(0.0, 1.0),
-        })
+    pub fn from_emoji(emoji: &str, placement: Placement) -> Result<Self, RenderError> {
+        Ok(Self::new(
+            ImageSource::from(SvgSource::from_emoji(emoji)?),
+            placement,
+        ))
     }
 
     /// Creates a new overlay config from an emoji name (e.g., "duck").
     ///
     /// Returns an error if the name is not recognized by twemoji_assets.
     #[cfg(feature = "twemoji")]
-    pub fn from_emoji_name(
-        name: &str,
-        position: OverlayPosition,
-        anchor_mode: OverlayAnchorMode,
-        scale: f32,
-    ) -> Result<Self, RenderError> {
-        Ok(Self {
-            source: ImageSource::from(SvgSource::from_emoji_name(name)?),
-            position,
-            anchor_mode,
-            scale: scale.clamp(0.0, 1.0),
-        })
+    pub fn from_emoji_name(name: &str, placement: Placement) -> Result<Self, RenderError> {
+        Ok(Self::new(
+            ImageSource::from(SvgSource::from_emoji_name(name)?),
+            placement,
+        ))
     }
 
     /// Creates a new overlay config from PNG-encoded raster data.
-    pub fn from_raster(
-        png_data: Vec<u8>,
-        position: OverlayPosition,
-        anchor_mode: OverlayAnchorMode,
-        scale: f32,
-    ) -> Self {
-        Self::new(ImageSource::raster(png_data), position, anchor_mode, scale)
+    pub fn from_raster(png_data: Vec<u8>, placement: Placement) -> Self {
+        Self::new(ImageSource::raster(png_data), placement)
     }
 }
 
 impl LayerConfig for ImageOverlayConfig {
     fn differs_from(&self, other: &Self) -> bool {
-        self.source != other.source
-            || self.position != other.position
-            || self.anchor_mode != other.anchor_mode
-            || (self.scale - other.scale).abs() > 0.0001
+        self.source != other.source || self.placement.differs_from(&other.placement)
     }
 }
 
@@ -193,7 +148,7 @@ fn render_overlay(
 ) -> Result<RgbaImage, RenderError> {
     let bounds = ctx.image.content_bounds;
     let min_dim = bounds.width.min(bounds.height) as f32;
-    let overlay_size = (min_dim * config.scale) as u32;
+    let overlay_size = (min_dim * config.placement.scale) as u32;
 
     let width = ctx.image.data.width();
     let height = ctx.image.data.height();
@@ -204,96 +159,63 @@ fn render_overlay(
     }
 
     let overlay_img = config.source.render_at_size(overlay_size)?;
-
-    let (x, y) = calculate_position(
-        config.position,
-        config.anchor_mode,
-        &bounds,
-        overlay_img.width(),
-        overlay_img.height(),
-    );
-
+    let (x, y) = pixel_position(&config.placement, &bounds, &overlay_img);
     composite_over(&mut tile, &overlay_img, x, y);
 
     Ok(tile)
 }
 
-/// Calculates the (x, y) position for the overlay based on position setting and bounds.
+/// Pixel origin of an already-rasterized `image` placed within `bounds`.
 ///
 /// Shared with the color dot so both layers place identically.
-pub(crate) fn calculate_position(
-    position: OverlayPosition,
-    anchor_mode: OverlayAnchorMode,
-    bounds: &crate::icon::RectPx,
-    overlay_width: u32,
-    overlay_height: u32,
+pub(crate) fn pixel_position(
+    placement: &Placement,
+    bounds: &RectPx,
+    image: &RgbaImage,
 ) -> (i32, i32) {
-    let bx = bounds.x as i32;
-    let by = bounds.y as i32;
-    let bw = bounds.width as i32;
-    let bh = bounds.height as i32;
-    let ow = overlay_width as i32;
-    let oh = overlay_height as i32;
-
-    match (position, anchor_mode) {
-        (OverlayPosition::TopLeft, OverlayAnchorMode::Inset) => (bx, by),
-        (OverlayPosition::TopRight, OverlayAnchorMode::Inset) => (bx + bw - ow, by),
-        (OverlayPosition::BottomLeft, OverlayAnchorMode::Inset) => (bx, by + bh - oh),
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Inset) => (bx + bw - ow, by + bh - oh),
-        (OverlayPosition::TopLeft, OverlayAnchorMode::Centered) => (bx - ow / 2, by - oh / 2),
-        (OverlayPosition::TopRight, OverlayAnchorMode::Centered) => (bx + bw - ow / 2, by - oh / 2),
-        (OverlayPosition::BottomLeft, OverlayAnchorMode::Centered) => {
-            (bx - ow / 2, by + bh - oh / 2)
-        }
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Centered) => {
-            (bx + bw - ow / 2, by + bh - oh / 2)
-        }
-        (OverlayPosition::Center, _) => (bx + (bw - ow) / 2, by + (bh - oh) / 2),
-    }
+    let (x, y) = placement.origin(
+        bounds.width as i32,
+        bounds.height as i32,
+        image.width() as i32,
+        image.height() as i32,
+    );
+    (bounds.x as i32 + x, bounds.y as i32 + y)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::icon::RectPx;
 
     #[test]
     fn centered_anchor_can_hang_off_bottom_right_corner() {
         let bounds = RectPx::new(10, 20, 100, 80);
-
-        let pos = calculate_position(
+        let image = RgbaImage::new(20, 10);
+        let placement = Placement::new(
             OverlayPosition::BottomRight,
             OverlayAnchorMode::Centered,
-            &bounds,
-            20,
-            10,
+            0.5,
         );
 
-        assert_eq!(pos, (100, 95));
+        assert_eq!(pixel_position(&placement, &bounds, &image), (100, 95));
     }
 
     #[test]
     fn inset_anchor_keeps_bottom_right_inside_bounds() {
         let bounds = RectPx::new(10, 20, 100, 80);
+        let image = RgbaImage::new(20, 10);
+        let placement =
+            Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.5);
 
-        let pos = calculate_position(
-            OverlayPosition::BottomRight,
-            OverlayAnchorMode::Inset,
-            &bounds,
-            20,
-            10,
-        );
-
-        assert_eq!(pos, (90, 90));
+        assert_eq!(pixel_position(&placement, &bounds, &image), (90, 90));
     }
 
     #[test]
     fn overlay_config_without_anchor_mode_defaults_to_inset() {
         let config: ImageOverlayConfig = serde_json::from_str(
-            r#"{"source":{"svg":{"raw":"<svg></svg>"}},"position":"bottom-right","scale":0.5}"#,
+            r#"{"source":{"svg":{"raw":"<svg></svg>"}},"placement":{"position":"bottom-right","scale":0.5}}"#,
         )
         .unwrap();
 
-        assert_eq!(config.anchor_mode, OverlayAnchorMode::Inset);
+        assert_eq!(config.placement.anchor_mode, OverlayAnchorMode::Inset);
     }
 }

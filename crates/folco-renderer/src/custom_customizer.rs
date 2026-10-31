@@ -76,15 +76,16 @@ impl LayerSet for CustomLayers {
 /// # Example
 ///
 /// ```ignore
-/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayPosition, Render};
+/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayAnchorMode, OverlayPosition, Placement, Render};
 ///
 /// let source = ImageSource::svg("<svg>...</svg>");
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
 /// let mut customizer = CustomIconCustomizer::from_image(&source, &specs).unwrap();
 ///
-/// customizer.layers.overlay.set_config(Some(
-///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
-/// ));
+/// customizer.layers.overlay.set_config(Some(ImageOverlayConfig::from_svg(
+///     "<svg>badge</svg>",
+///     Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
+/// )));
 ///
 /// let output = customizer.render_full_output();
 /// ```
@@ -151,6 +152,7 @@ mod tests {
     use crate::layer::{
         DecalConfig, OverlayAnchorMode, OverlayPosition, SolidColorConfig, SvgSource,
     };
+    use crate::placement::Placement;
 
     fn customizer() -> CustomIconCustomizer {
         CustomIconCustomizer::from_icon_set(IconSet::new())
@@ -162,9 +164,7 @@ mod tests {
             .with_color_dot(ColorDotConfig::new(1, 2, 3))
             .with_overlay(ImageOverlayConfig::from_svg(
                 "<svg></svg>",
-                OverlayPosition::TopLeft,
-                OverlayAnchorMode::Centered,
-                0.25,
+                Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Centered, 0.25),
             ));
 
         let mut c = customizer();
@@ -175,7 +175,7 @@ mod tests {
             &ColorDotConfig::new(1, 2, 3)
         );
         assert_eq!(
-            c.layers.overlay.config().unwrap().position,
+            c.layers.overlay.config().unwrap().placement.position,
             OverlayPosition::TopLeft
         );
     }
@@ -207,9 +207,7 @@ mod tests {
             .overlay
             .set_config(Some(ImageOverlayConfig::from_svg(
                 "<svg>badge</svg>",
-                OverlayPosition::BottomRight,
-                OverlayAnchorMode::Inset,
-                0.25,
+                Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
             )));
 
         let json = c.export_profile().to_json().unwrap();

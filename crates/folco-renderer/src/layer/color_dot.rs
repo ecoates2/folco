@@ -6,32 +6,34 @@
 //! vector) and user-supplied images alike.
 //!
 //! The dot is placed exactly like an [`ImageOverlayConfig`](super::ImageOverlayConfig):
-//! the same position, anchor mode and scale semantics, sharing the same
-//! placement math. By default it sits in the bottom-right corner.
+//! both carry a [`Placement`] and share its math. By default it sits in the
+//! bottom-right corner.
 //!
 //! The dot's markup lives here so the raster and vector media stay pixel-for-
 //! pixel equivalent: the raster layer rasterizes [`color_dot_svg`], while
 //! [`SvgLayer<ColorDotConfig>`](crate::SvgLayer) nests the same circle markup
 //! in the output document.
 
-use super::overlay::calculate_position;
 use super::svg::composite_over;
 use super::{
     CacheKey, DependencyVersion, ImageSource, Layer, LayerConfig, OverlayAnchorMode,
     OverlayPosition, RenderContext,
 };
 use crate::error::RenderError;
+use crate::placement::Placement;
 use image::RgbaImage;
 
 // ============================================================================
 // Geometry
 // ============================================================================
 
-/// Default dot edge length as a fraction of the icon's shorter content dimension.
-pub const DEFAULT_COLOR_DOT_SCALE: f32 = 0.40;
-
-/// Default dot position within the icon's content bounds.
-pub const DEFAULT_COLOR_DOT_POSITION: OverlayPosition = OverlayPosition::BottomRight;
+/// Where the dot goes unless a profile says otherwise: a bottom-right badge
+/// covering 40% of the icon's shorter content dimension.
+pub const DEFAULT_COLOR_DOT_PLACEMENT: Placement = Placement {
+    position: OverlayPosition::BottomRight,
+    anchor_mode: OverlayAnchorMode::Inset,
+    scale: 0.40,
+};
 
 /// The dot's own coordinate space, kept independent of the base icon's viewBox.
 pub(crate) const DOT_VIEWBOX: &str = "0 0 100 100";
@@ -42,9 +44,8 @@ pub(crate) const DOT_VIEWBOX: &str = "0 0 100 100";
 
 /// Configuration for the color dot — pure data.
 ///
-/// Placement fields mirror [`ImageOverlayConfig`](super::ImageOverlayConfig)
-/// and default to the bottom-right corner, so profiles that only carry
-/// `r`/`g`/`b` keep deserializing.
+/// `placement` defaults to [`DEFAULT_COLOR_DOT_PLACEMENT`], so profiles that
+/// only carry `r`/`g`/`b` keep deserializing.
 ///
 /// Rendering logic lives on [`Layer<ColorDotConfig>`] (raster) and
 /// [`SvgLayer<ColorDotConfig>`](crate::SvgLayer) (vector).
@@ -59,54 +60,30 @@ pub struct ColorDotConfig {
     /// Blue channel (0–255).
     pub b: u8,
 
-    /// Position within the icon's content bounds.
-    #[serde(default = "default_position")]
-    pub position: OverlayPosition,
-
-    /// How the dot is anchored relative to the chosen position.
-    #[serde(default)]
-    pub anchor_mode: OverlayAnchorMode,
-
-    /// Scale factor relative to the icon's content bounds (0.0-1.0).
-    #[serde(default = "default_scale")]
-    pub scale: f32,
+    /// Where the dot sits and how big it is, relative to the icon's content bounds.
+    #[serde(default = "default_placement")]
+    pub placement: Placement,
 }
 
-fn default_position() -> OverlayPosition {
-    DEFAULT_COLOR_DOT_POSITION
-}
-
-fn default_scale() -> f32 {
-    DEFAULT_COLOR_DOT_SCALE
+fn default_placement() -> Placement {
+    DEFAULT_COLOR_DOT_PLACEMENT
 }
 
 impl ColorDotConfig {
-    /// Creates a new color-dot config from RGB values, placed in the
-    /// bottom-right corner at the default scale.
+    /// Creates a new color-dot config from RGB values at the default placement.
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self {
             r,
             g,
             b,
-            position: DEFAULT_COLOR_DOT_POSITION,
-            anchor_mode: OverlayAnchorMode::default(),
-            scale: DEFAULT_COLOR_DOT_SCALE,
+            placement: DEFAULT_COLOR_DOT_PLACEMENT,
         }
     }
 
     /// Returns this config with the given placement.
-    ///
-    /// The scale is clamped to 0.0-1.0.
     #[must_use]
-    pub fn with_placement(
-        mut self,
-        position: OverlayPosition,
-        anchor_mode: OverlayAnchorMode,
-        scale: f32,
-    ) -> Self {
-        self.position = position;
-        self.anchor_mode = anchor_mode;
-        self.scale = scale.clamp(0.0, 1.0);
+    pub fn with_placement(mut self, placement: Placement) -> Self {
+        self.placement = placement;
         self
     }
 }
@@ -114,9 +91,7 @@ impl ColorDotConfig {
 impl LayerConfig for ColorDotConfig {
     fn differs_from(&self, other: &Self) -> bool {
         (self.r, self.g, self.b) != (other.r, other.g, other.b)
-            || self.position != other.position
-            || self.anchor_mode != other.anchor_mode
-            || (self.scale - other.scale).abs() > 0.0001
+            || self.placement.differs_from(&other.placement)
     }
 }
 
@@ -174,20 +149,14 @@ fn render_color_dot(
     let mut tile = RgbaImage::new(ctx.image.data.width(), ctx.image.data.height());
 
     let min_dim = bounds.width.min(bounds.height) as f32;
-    let dot_size = (min_dim * config.scale) as u32;
+    let dot_size = (min_dim * config.placement.scale) as u32;
     if dot_size == 0 {
         return Ok(tile);
     }
 
     let dot = ImageSource::svg(color_dot_svg(config)).render_at_size(dot_size)?;
 
-    let (x, y) = calculate_position(
-        config.position,
-        config.anchor_mode,
-        &bounds,
-        dot.width(),
-        dot.height(),
-    );
+    let (x, y) = super::overlay::pixel_position(&config.placement, &bounds, &dot);
     composite_over(&mut tile, &dot, x, y);
 
     Ok(tile)
@@ -249,9 +218,7 @@ mod tests {
     fn placement_moves_and_scales_the_dot() {
         let mut layer: Layer<ColorDotConfig> = Layer::default();
         layer.set_config(Some(ColorDotConfig::new(255, 0, 0).with_placement(
-            OverlayPosition::TopLeft,
-            OverlayAnchorMode::Inset,
-            0.5,
+            Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Inset, 0.5),
         )));
 
         let ctx = context(64);
@@ -278,13 +245,11 @@ mod tests {
     }
 
     #[test]
-    fn with_placement_clamps_scale() {
-        let config = ColorDotConfig::new(0, 0, 0).with_placement(
-            OverlayPosition::Center,
-            OverlayAnchorMode::Inset,
-            1.5,
-        );
-        assert_eq!(config.scale, 1.0);
+    fn placement_is_nested_in_json() {
+        let json = serde_json::to_value(ColorDotConfig::new(1, 2, 3)).unwrap();
+        assert_eq!(json["placement"]["position"], "bottom-right");
+        assert_eq!(json["placement"]["anchorMode"], "inset");
+        assert_eq!(json["placement"]["scale"].as_f64().unwrap() as f32, 0.4);
     }
 
     #[test]
@@ -298,12 +263,16 @@ mod tests {
     #[test]
     fn differs_from_detects_placement_change() {
         let a = ColorDotConfig::new(0, 0, 0);
-        let b = a.with_placement(
+        let b = a.with_placement(Placement::new(
             OverlayPosition::BottomRight,
             OverlayAnchorMode::Centered,
             0.4,
-        );
-        let c = a.with_placement(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.3);
+        ));
+        let c = a.with_placement(Placement::new(
+            OverlayPosition::BottomRight,
+            OverlayAnchorMode::Inset,
+            0.3,
+        ));
         assert!(a.differs_from(&b));
         assert!(a.differs_from(&c));
     }

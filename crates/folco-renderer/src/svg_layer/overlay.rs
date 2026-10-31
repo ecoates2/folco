@@ -18,7 +18,8 @@ use base64::engine::general_purpose::STANDARD;
 
 use super::SvgLayer;
 use crate::error::RenderError;
-use crate::layer::{ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition};
+use crate::layer::{ImageOverlayConfig, ImageSource};
+use crate::placement::Placement;
 
 impl SvgLayer<ImageOverlayConfig> {
     /// Renders the overlay as an SVG `<image>` fragment, or `None` if inactive.
@@ -38,7 +39,7 @@ impl SvgLayer<ImageOverlayConfig> {
 /// Builds the `<image>` fragment for an overlay.
 fn overlay_fragment(config: &ImageOverlayConfig) -> Result<String, RenderError> {
     let href = source_data_uri(&config.source)?;
-    let (x, y, size) = placement(config.position, config.anchor_mode, config.scale);
+    let (x, y, size) = percent_rect(&config.placement);
     Ok(format!(
         "<image href=\"{href}\" x=\"{x:.4}%\" y=\"{y:.4}%\" \
 width=\"{size:.4}%\" height=\"{size:.4}%\" preserveAspectRatio=\"xMidYMid meet\"/>"
@@ -59,41 +60,19 @@ fn source_data_uri(source: &ImageSource) -> Result<String, RenderError> {
     }
 }
 
-/// Computes `(x%, y%, size%)` placement for an overlay of the given scale.
-///
-/// `scale` is the overlay's edge length as a fraction of the icon. `Inset`
-/// keeps the overlay fully within bounds; `Centered` centers it on the chosen
-/// corner so it can hang off the edge (via negative offsets).
+/// Computes `(x%, y%, size%)` for a square layer at `placement` within the icon.
 ///
 /// Shared with the color dot so both layers place identically.
-pub(super) fn placement(
-    position: OverlayPosition,
-    anchor_mode: OverlayAnchorMode,
-    scale: f32,
-) -> (f32, f32, f32) {
-    let size = scale.clamp(0.0, 1.0) * 100.0;
-    let half = size / 2.0;
-
-    let (x, y) = match (position, anchor_mode) {
-        (OverlayPosition::Center, _) => ((100.0 - size) / 2.0, (100.0 - size) / 2.0),
-
-        (OverlayPosition::TopLeft, OverlayAnchorMode::Inset) => (0.0, 0.0),
-        (OverlayPosition::TopRight, OverlayAnchorMode::Inset) => (100.0 - size, 0.0),
-        (OverlayPosition::BottomLeft, OverlayAnchorMode::Inset) => (0.0, 100.0 - size),
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Inset) => (100.0 - size, 100.0 - size),
-
-        (OverlayPosition::TopLeft, OverlayAnchorMode::Centered) => (-half, -half),
-        (OverlayPosition::TopRight, OverlayAnchorMode::Centered) => (100.0 - half, -half),
-        (OverlayPosition::BottomLeft, OverlayAnchorMode::Centered) => (-half, 100.0 - half),
-        (OverlayPosition::BottomRight, OverlayAnchorMode::Centered) => (100.0 - half, 100.0 - half),
-    };
-
+pub(super) fn percent_rect(placement: &Placement) -> (f32, f32, f32) {
+    let size = placement.scale.clamp(0.0, 1.0) * 100.0;
+    let (x, y) = placement.origin(100.0, 100.0, size, size);
     (x, y, size)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layer::{OverlayAnchorMode, OverlayPosition};
     use image::{Rgba, RgbaImage};
 
     fn red_png_source() -> ImageSource {
@@ -112,9 +91,7 @@ mod tests {
         let mut layer: SvgLayer<ImageOverlayConfig> = SvgLayer::default();
         layer.set_config(Some(ImageOverlayConfig::from_svg(
             "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
-            OverlayPosition::Center,
-            OverlayAnchorMode::Inset,
-            0.5,
+            Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5),
         )));
         let fragment = layer.render_fragment().unwrap().unwrap();
 
@@ -128,9 +105,7 @@ mod tests {
         let mut layer: SvgLayer<ImageOverlayConfig> = SvgLayer::default();
         layer.set_config(Some(ImageOverlayConfig::new(
             red_png_source(),
-            OverlayPosition::BottomRight,
-            OverlayAnchorMode::Inset,
-            0.25,
+            Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
         )));
         let fragment = layer.render_fragment().unwrap().unwrap();
 
@@ -139,18 +114,22 @@ mod tests {
 
     #[test]
     fn inset_bottom_right_stays_in_bounds() {
-        let (x, y, size) = placement(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25);
+        let (x, y, size) = percent_rect(&Placement::new(
+            OverlayPosition::BottomRight,
+            OverlayAnchorMode::Inset,
+            0.25,
+        ));
         assert_eq!(size, 25.0);
         assert_eq!((x, y), (75.0, 75.0));
     }
 
     #[test]
     fn centered_bottom_right_can_hang_off() {
-        let (x, y, size) = placement(
+        let (x, y, size) = percent_rect(&Placement::new(
             OverlayPosition::BottomRight,
             OverlayAnchorMode::Centered,
             0.5,
-        );
+        ));
         assert_eq!(size, 50.0);
         // Centered on the corner: half hangs past the 100% edge.
         assert_eq!((x, y), (75.0, 75.0));
@@ -158,7 +137,11 @@ mod tests {
 
     #[test]
     fn centered_top_left_uses_negative_offsets() {
-        let (x, y, _) = placement(OverlayPosition::TopLeft, OverlayAnchorMode::Centered, 0.4);
+        let (x, y, _) = percent_rect(&Placement::new(
+            OverlayPosition::TopLeft,
+            OverlayAnchorMode::Centered,
+            0.4,
+        ));
         assert_eq!((x, y), (-20.0, -20.0));
     }
 }

@@ -6,7 +6,7 @@
 //! (viewBox).
 
 use super::SvgLayer;
-use super::overlay::placement;
+use super::overlay::percent_rect;
 use crate::layer::ColorDotConfig;
 use crate::layer::color_dot::{DOT_VIEWBOX, color_dot_circle};
 
@@ -26,7 +26,7 @@ impl SvgLayer<ColorDotConfig> {
 
 /// Builds the nested-`<svg>` fragment for a color dot at its configured placement.
 fn color_dot_fragment(config: &ColorDotConfig) -> String {
-    let (x, y, size) = placement(config.position, config.anchor_mode, config.scale);
+    let (x, y, size) = percent_rect(&config.placement);
     format!(
         "<svg x=\"{x:.4}%\" y=\"{y:.4}%\" width=\"{size:.4}%\" height=\"{size:.4}%\" \
 viewBox=\"{DOT_VIEWBOX}\" preserveAspectRatio=\"xMidYMid meet\">{}</svg>",
@@ -38,6 +38,7 @@ viewBox=\"{DOT_VIEWBOX}\" preserveAspectRatio=\"xMidYMid meet\">{}</svg>",
 mod tests {
     use super::*;
     use crate::layer::{OverlayAnchorMode, OverlayPosition};
+    use crate::placement::Placement;
 
     #[test]
     fn inactive_layer_renders_nothing() {
@@ -72,9 +73,7 @@ mod tests {
     fn fragment_follows_configured_placement() {
         let mut layer: SvgLayer<ColorDotConfig> = SvgLayer::default();
         layer.set_config(Some(ColorDotConfig::new(0, 0, 0).with_placement(
-            OverlayPosition::TopLeft,
-            OverlayAnchorMode::Centered,
-            0.2,
+            Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Centered, 0.2),
         )));
         let fragment = layer.render_fragment().unwrap();
 

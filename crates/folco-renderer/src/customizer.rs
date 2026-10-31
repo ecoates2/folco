@@ -70,15 +70,16 @@ pub trait LayerSet {
 /// # Example (custom icons)
 ///
 /// ```ignore
-/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayPosition, Render};
+/// use folco_renderer::{CustomIconCustomizer, ImageSource, IconSizeSpec, ImageOverlayConfig, OverlayAnchorMode, OverlayPosition, Placement, Render};
 ///
 /// let source = ImageSource::svg("<svg>...</svg>");
 /// let specs = vec![IconSizeSpec::square(32, 1.0), IconSizeSpec::square(256, 1.0)];
 /// let mut customizer = CustomIconCustomizer::from_image(&source, &specs).unwrap();
 ///
-/// customizer.layers.overlay.set_config(Some(
-///     ImageOverlayConfig::from_svg("<svg>badge</svg>", OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25)
-/// ));
+/// customizer.layers.overlay.set_config(Some(ImageOverlayConfig::from_svg(
+///     "<svg>badge</svg>",
+///     Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
+/// )));
 ///
 /// let output = customizer.render_full_output();
 /// ```

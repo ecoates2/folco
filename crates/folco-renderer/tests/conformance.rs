@@ -7,8 +7,9 @@
 use folco_renderer::{
     ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
     FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconSet,
-    ImageOverlayConfig, LayerKind, OverlayAnchorMode, OverlayPosition, SolidColorConfig,
-    SurfaceColor, SvgCustomIconCustomizer, SvgFolderIconBase, SvgFolderIconCustomizer,
+    ImageOverlayConfig, LayerKind, OverlayAnchorMode, OverlayPosition, Placement,
+    SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer, SvgFolderIconBase,
+    SvgFolderIconCustomizer,
 };
 
 const BASE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd970"/></svg>"##;
@@ -21,9 +22,7 @@ fn full_profile() -> CustomizationProfile {
         .with_color_dot(ColorDotConfig::new(255, 0, 0))
         .with_overlay(ImageOverlayConfig::from_svg(
             "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
-            OverlayPosition::TopLeft,
-            OverlayAnchorMode::Centered,
-            0.3,
+            Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Centered, 0.3),
         ))
 }
 

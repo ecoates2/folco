@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use folco_core::{
     CustomizationContextBuilder, CustomizationProfile, DecalConfig, DefaultPlacements, ImageFile,
     ImageFormat, ImageOverlayConfig, ImageSource, LayerKind, OutputMedium, OverlayAnchorMode,
-    OverlayPosition, SvgSource, WriteCapabilities,
+    OverlayPosition, Placement, SvgSource, WriteCapabilities,
     folder_color::{FolderColor, FolderColorExt},
     progress::{Progress, progress_channel},
 };
@@ -321,22 +321,24 @@ async fn main() -> Result<()> {
             // Unset placement flags fall back to the defaults for the base's medium,
             // which is only known once the mode (and custom image) is resolved.
             let color_dot_config = |color: FolderColor, defaults: &DefaultPlacements| {
-                color.to_color_dot_config().with_placement(
+                color.to_color_dot_config().with_placement(Placement::new(
                     color_dot_position
                         .clone()
                         .map_or(defaults.color_dot.position, Into::into),
                     color_dot_anchor_mode.clone().unwrap_or_default().into(),
                     color_dot_scale.unwrap_or(defaults.color_dot.scale),
-                )
+                ))
             };
             let overlay_config = |source: ImageSource, defaults: &DefaultPlacements| {
                 ImageOverlayConfig::new(
                     source,
-                    overlay_position
-                        .clone()
-                        .map_or(defaults.overlay.position, Into::into),
-                    overlay_anchor_mode.clone().into(),
-                    overlay_scale.unwrap_or(defaults.overlay.scale),
+                    Placement::new(
+                        overlay_position
+                            .clone()
+                            .map_or(defaults.overlay.position, Into::into),
+                        overlay_anchor_mode.clone().into(),
+                        overlay_scale.unwrap_or(defaults.overlay.scale),
+                    ),
                 )
             };
 

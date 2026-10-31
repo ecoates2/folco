@@ -198,6 +198,7 @@ mod tests {
     use crate::icon::{IconImage, IconSet, SurfaceColor};
     use crate::layer::decal::darken_color;
     use crate::layer::{Layer, OverlayAnchorMode, OverlayPosition};
+    use crate::placement::Placement;
     use image::RgbaImage;
 
     const TEST_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>"##;
@@ -487,12 +488,10 @@ mod tests {
     fn overlay_config_creation() {
         let config = ImageOverlayConfig::from_svg(
             "<svg></svg>",
-            OverlayPosition::BottomRight,
-            OverlayAnchorMode::Inset,
-            0.25,
+            Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
         );
-        assert_eq!(config.position, OverlayPosition::BottomRight);
-        assert_eq!(config.scale, 0.25);
+        assert_eq!(config.placement.position, OverlayPosition::BottomRight);
+        assert_eq!(config.placement.scale, 0.25);
     }
 
     #[test]

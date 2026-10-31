@@ -257,6 +257,7 @@ mod tests {
     use crate::layer::{
         ImageOverlayConfig, ImageSource, OverlayAnchorMode, OverlayPosition, SolidColorConfig,
     };
+    use crate::placement::Placement;
     use image::{Rgba, RgbaImage};
 
     const BASE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd970"/></svg>"##;
@@ -398,9 +399,7 @@ mod tests {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         let profile = FolderProfile::new().with_overlay(ImageOverlayConfig::from_svg(
             "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
-            OverlayPosition::BottomRight,
-            OverlayAnchorMode::Inset,
-            0.5,
+            Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.5),
         ));
         customizer.apply_profile(profile);
 
@@ -415,16 +414,14 @@ mod tests {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         let profile = FolderProfile::new().with_overlay(ImageOverlayConfig::from_svg(
             "<svg/>",
-            OverlayPosition::TopLeft,
-            OverlayAnchorMode::Centered,
-            0.3,
+            Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Centered, 0.3),
         ));
         customizer.apply_profile(profile);
 
         let exported = customizer.export_profile();
         let overlay = exported.overlay.unwrap();
-        assert_eq!(overlay.position, OverlayPosition::TopLeft);
-        assert_eq!(overlay.anchor_mode, OverlayAnchorMode::Centered);
+        assert_eq!(overlay.placement.position, OverlayPosition::TopLeft);
+        assert_eq!(overlay.placement.anchor_mode, OverlayAnchorMode::Centered);
     }
 
     #[test]
@@ -439,9 +436,7 @@ mod tests {
         let source = ImageSource::from_rgba_image(&blue).unwrap();
         customizer.apply_profile(FolderProfile::new().with_overlay(ImageOverlayConfig::new(
             source,
-            OverlayPosition::BottomRight,
-            OverlayAnchorMode::Inset,
-            0.25,
+            Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
         )));
         let svg = customizer.render_output().unwrap();
 
