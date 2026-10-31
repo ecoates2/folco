@@ -92,22 +92,10 @@ This phase is the lever for everything downstream. Order matters; each step is i
 - [x] ~~New `layer/composite.rs`~~ **Replaced with library calls instead** (user's call, after review). The hand-rolled `composite_over`/`alpha_blend` were a reimplementation of `image::imageops::overlay` (same source-over semantics, same clipping incl. negative offsets); `pixmap_to_rgba_image`/`unpremultiply` reimplemented `tiny_skia::PremultipliedColorU8::demultiply()`. All seven call sites now call `imageops::overlay` directly; `pixmap_to_rgba_image` is a 10-line `demultiply` + `from_raw` in `svg.rs`. ~120 lines deleted.
 - **Known numeric deviation** (accepted): `image`'s `Rgba::blend` truncates the blended channel to `u8` where ours rounded, so anti-aliased edge pixels can differ by 1 LSB; it also leaves a fully-transparent destination pixel untouched where ours zeroed it. `demultiply()` rounds in `f64` where ours used `f32` — differs only at exact `.5` ties. All pixel-sampling tests still pass.
 
-### 2d. Declarative layer-set bookkeeping
+### 2d. Declarative layer-set bookkeeping — done 2026-10-31
 
-- [ ] Add a small macro in `customizer.rs`:
-  ```rust
-  macro_rules! layer_set_versions {
-      ($ty:ty { $($layer:ident),+ $(,)? }) => {
-          impl $ty {
-              fn versions(&self) -> Vec<u64> { vec![$(self.$layer.version()),+] }
-              fn combined_version(&self) -> DependencyVersion { DependencyVersion::combine(&self.versions()) }
-              fn invalidate_all(&mut self) { $(self.$layer.invalidate();)+ }
-          }
-      };
-  }
-  ```
-  and invoke it once per layer set **in execution order**. This collapses 3 hand-maintained lists to 1 and fixes the `FolderLayers::versions()` ordering mismatch. `execute()` stays hand-written because it encodes the decal→solid dependency.
-- [ ] Add a unit test per layer set: toggling each layer individually changes `combined_version()`. That is the test that catches "forgot to add the new layer".
+- [x] `layer_set_versions!(a, b, ...)` in `customizer.rs`, `pub(crate) use`d. It expands to the `combined_version` / `invalidate_all` **trait methods directly inside the `impl LayerSet for` / `impl SvgLayerSet for` block** (both traits share those method names), so there's no inherent `versions()` helper — one list per layer set, period. All four sets use it in execution order; `FolderLayers` is now `solid_color, decal, color_dot, overlay`, fixing the ordering mismatch. `FolderLayers::versions()` deleted.
+- [x] `every_layer_changes_combined_version` test in each of the four layer-set files. Mutation-checked: removing `decal` from the `FolderLayers` list makes exactly that test fail.
 
 ### 2e. The `AnyCustomizer` trait (the big one)
 

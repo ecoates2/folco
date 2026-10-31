@@ -38,6 +38,27 @@ pub trait LayerSet {
     fn invalidate_all(&mut self);
 }
 
+/// Generates `combined_version` and `invalidate_all` for a layer set from one
+/// list of its layer fields, **in execution order**.
+///
+/// Expands inside an `impl LayerSet for ...` or `impl SvgLayerSet for ...`
+/// block. Keeping a single list is what stops a new layer from being added to
+/// `execute()` but forgotten by the cache bookkeeping — and because
+/// [`DependencyVersion::combine`] is order-sensitive, the order must match
+/// `execute()` so the composite cache key means what it says.
+macro_rules! layer_set_versions {
+    ($($layer:ident),+ $(,)?) => {
+        fn combined_version(&self) -> $crate::layer::DependencyVersion {
+            $crate::layer::DependencyVersion::combine(&[$(self.$layer.version()),+])
+        }
+
+        fn invalidate_all(&mut self) {
+            $(self.$layer.invalidate();)+
+        }
+    };
+}
+pub(crate) use layer_set_versions;
+
 // ============================================================================
 // IconCustomizer<L>
 // ============================================================================

@@ -31,7 +31,7 @@
 //! ```
 
 use crate::capabilities::{IconBaseKind, IconCapabilities};
-use crate::customizer::{IconCustomizer, LayerSet};
+use crate::customizer::{IconCustomizer, LayerSet, layer_set_versions};
 use crate::error::RenderError;
 use crate::icon::{FolderIconBase, IconBase};
 use image::imageops::overlay;
@@ -67,18 +67,6 @@ pub struct FolderLayers {
     pub overlay: Layer<ImageOverlayConfig>,
 }
 
-impl FolderLayers {
-    /// Returns a snapshot of all layer versions.
-    fn versions(&self) -> [u64; 4] {
-        [
-            self.solid_color.version(),
-            self.color_dot.version(),
-            self.decal.version(),
-            self.overlay.version(),
-        ]
-    }
-}
-
 impl LayerSet for FolderLayers {
     fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
         // The pipeline's dependency wiring lives here, not inside the layers:
@@ -112,16 +100,7 @@ impl LayerSet for FolderLayers {
         Ok(())
     }
 
-    fn combined_version(&self) -> DependencyVersion {
-        DependencyVersion::combine(&self.versions())
-    }
-
-    fn invalidate_all(&mut self) {
-        self.solid_color.invalidate();
-        self.color_dot.invalidate();
-        self.decal.invalidate();
-        self.overlay.invalidate();
-    }
+    layer_set_versions!(solid_color, decal, color_dot, overlay);
 }
 
 // ============================================================================
@@ -205,6 +184,39 @@ mod tests {
 
     /// Test surface color — uses the same golden-yellow as Windows folders.
     const TEST_SURFACE: SurfaceColor = SurfaceColor::new(255, 217, 112);
+
+    /// Catches a layer added to the struct and `execute()` but left out of
+    /// `layer_set_versions!` — its changes would then never invalidate the cache.
+    #[test]
+    fn every_layer_changes_combined_version() {
+        let baseline = FolderLayers::default().combined_version();
+        let placement = Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5);
+
+        let toggles: [fn(&mut FolderLayers, Placement); 4] = [
+            |l, _| {
+                l.solid_color.set_config(Some(SolidColorConfig::new(1, 2, 3)));
+            },
+            |l, _| {
+                l.decal.set_config(Some(DecalConfig::new("<svg/>", 0.5)));
+            },
+            |l, _| {
+                l.color_dot.set_config(Some(ColorDotConfig::new(1, 2, 3)));
+            },
+            |l, p| {
+                l.overlay.set_config(Some(ImageOverlayConfig::from_svg("<svg/>", p)));
+            },
+        ];
+
+        for (i, toggle) in toggles.iter().enumerate() {
+            let mut layers = FolderLayers::default();
+            toggle(&mut layers, placement);
+            assert_ne!(
+                layers.combined_version(),
+                baseline,
+                "layer #{i} is not tracked by combined_version"
+            );
+        }
+    }
 
     fn create_test_icon_base() -> FolderIconBase {
         let mut set = IconSet::new();

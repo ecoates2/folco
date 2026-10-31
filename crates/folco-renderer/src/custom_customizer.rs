@@ -7,7 +7,7 @@
 //! no surface color reference to recolor against.
 
 use crate::capabilities::{IconBaseKind, IconCapabilities};
-use crate::customizer::{IconCustomizer, LayerSet};
+use crate::customizer::{IconCustomizer, LayerSet, layer_set_versions};
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconSet, IconSizeSpec};
 use image::imageops::overlay;
@@ -54,14 +54,7 @@ impl LayerSet for CustomLayers {
         Ok(())
     }
 
-    fn combined_version(&self) -> DependencyVersion {
-        DependencyVersion::combine(&[self.color_dot.version(), self.overlay.version()])
-    }
-
-    fn invalidate_all(&mut self) {
-        self.color_dot.invalidate();
-        self.overlay.invalidate();
-    }
+    layer_set_versions!(color_dot, overlay);
 }
 
 // ============================================================================
@@ -156,6 +149,24 @@ mod tests {
 
     fn customizer() -> CustomIconCustomizer {
         CustomIconCustomizer::from_icon_set(IconSet::new())
+    }
+
+    /// Catches a layer added to the struct and `execute()` but left out of
+    /// `layer_set_versions!`.
+    #[test]
+    fn every_layer_changes_combined_version() {
+        let baseline = CustomLayers::default().combined_version();
+        let placement = Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5);
+
+        let mut dot = CustomLayers::default();
+        dot.color_dot.set_config(Some(ColorDotConfig::new(1, 2, 3)));
+        assert_ne!(dot.combined_version(), baseline, "color_dot untracked");
+
+        let mut overlay = CustomLayers::default();
+        overlay
+            .overlay
+            .set_config(Some(ImageOverlayConfig::from_svg("<svg/>", placement)));
+        assert_ne!(overlay.combined_version(), baseline, "overlay untracked");
     }
 
     #[test]
