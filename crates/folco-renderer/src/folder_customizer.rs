@@ -31,13 +31,10 @@
 //! ```
 
 use crate::capabilities::{IconBaseKind, IconCapabilities};
-use crate::customizer::{IconCustomizer, LayerSet, layer_set_versions};
-use crate::error::RenderError;
+use crate::customizer::{IconCustomizer, LayerSet};
 use crate::icon::{FolderIconBase, IconBase};
-use image::imageops::overlay;
 use crate::layer::{
-    CacheKey, ColorDotConfig, DecalConfig, DependencyVersion, ImageOverlayConfig, Layer,
-    RenderContext, SolidColorConfig,
+    ColorDotConfig, DecalConfig, ImageOverlayConfig, Layer, SolidColorConfig, Stage,
 };
 use crate::{CustomizationProfile, FolderProfile};
 
@@ -48,16 +45,16 @@ use crate::{CustomizationProfile, FolderProfile};
 /// Layer set for folder icon customization.
 ///
 /// Contains all four layers in pipeline order:
-/// 1. **Solid color** – Recolors the icon to a target RGB color (mutates image)
-/// 2. **Decal** – Renders an SVG at the center (tile composited on top)
-/// 3. **Color dot** – Renders a colored badge in the bottom-right (tile)
-/// 4. **Overlay** – Renders an image at a corner position (tile composited on top)
+/// 1. **Solid color** – Recolors the icon to a target RGB color
+/// 2. **Decal** – Imprints an SVG at the center, tinted against the recolored face
+/// 3. **Color dot** – Draws a colored badge at its placement
+/// 4. **Overlay** – Draws an image at its placement
 #[derive(Default)]
 pub struct FolderLayers {
     /// Solid color layer (root — no dependencies).
     pub solid_color: Layer<SolidColorConfig>,
 
-    /// Decal imprint layer (depends on solid color).
+    /// Decal imprint layer (reads the dominant color solid color emits).
     pub decal: Layer<DecalConfig>,
 
     /// Color dot badge layer (no dependencies).
@@ -68,39 +65,15 @@ pub struct FolderLayers {
 }
 
 impl LayerSet for FolderLayers {
-    fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
-        // The pipeline's dependency wiring lives here, not inside the layers:
-        // only the decal reads something an upstream layer produced.
-        let decal_deps = DependencyVersion::from_version(self.solid_color.version());
-
-        // 1. Solid color transforms ctx.image directly
-        self.solid_color.apply(ctx, key, DependencyVersion::NONE)?;
-
-        // 2. Decal tile layer — tints against the dominant color solid color emits
-        if let Some(tile) = self.decal.render_tile(ctx, key, decal_deps)? {
-            overlay(&mut ctx.image.data, tile, 0, 0);
-        }
-
-        // 3. Color dot tile layer
-        if let Some(tile) = self
-            .color_dot
-            .render_tile(ctx, key, DependencyVersion::NONE)?
-        {
-            overlay(&mut ctx.image.data, tile, 0, 0);
-        }
-
-        // 4. Overlay tile layer
-        if let Some(tile) = self
-            .overlay
-            .render_tile(ctx, key, DependencyVersion::NONE)?
-        {
-            overlay(&mut ctx.image.data, tile, 0, 0);
-        }
-
-        Ok(())
+    fn stages(&self) -> Vec<&dyn Stage> {
+        // Order is the dependency wiring: the decal must see solid color's output.
+        vec![
+            &self.solid_color,
+            &self.decal,
+            &self.color_dot,
+            &self.overlay,
+        ]
     }
-
-    layer_set_versions!(solid_color, decal, color_dot, overlay);
 }
 
 // ============================================================================
@@ -185,11 +158,11 @@ mod tests {
     /// Test surface color — uses the same golden-yellow as Windows folders.
     const TEST_SURFACE: SurfaceColor = SurfaceColor::new(255, 217, 112);
 
-    /// Catches a layer added to the struct and `execute()` but left out of
-    /// `layer_set_versions!` — its changes would then never invalidate the cache.
+    /// Catches a layer added to the struct but left out of `stages()` — it
+    /// would never render, and its edits would never invalidate anything.
     #[test]
-    fn every_layer_changes_combined_version() {
-        let baseline = FolderLayers::default().combined_version();
+    fn every_layer_is_a_stage() {
+        let baseline = FolderLayers::default().versions();
         let placement = Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5);
 
         let toggles: [fn(&mut FolderLayers, Placement); 4] = [
@@ -211,9 +184,9 @@ mod tests {
             let mut layers = FolderLayers::default();
             toggle(&mut layers, placement);
             assert_ne!(
-                layers.combined_version(),
+                layers.versions(),
                 baseline,
-                "layer #{i} is not tracked by combined_version"
+                "layer #{i} is not listed in stages()"
             );
         }
     }
@@ -508,9 +481,8 @@ mod tests {
 
     #[test]
     fn decal_uses_hsl_mutated_dominant_color() {
-        use crate::layer::decal::render_decal;
         use crate::layer::solid_color::apply_solid_color;
-        use crate::layer::{DominantColor, RenderContext};
+        use crate::layer::{DominantColor, RasterPaint, RenderContext};
 
         // Create a solid red image
         let mut red_img = RgbaImage::new(16, 16);
@@ -522,31 +494,26 @@ mod tests {
         // Apply color target (cyan-ish)
         let config = SolidColorConfig::new(0, 188, 212);
         let mut ctx = RenderContext::new(red_icon.clone());
-        ctx.set(TEST_SURFACE);
+        ctx.surface_color = Some(TEST_SURFACE);
         apply_solid_color(&mut ctx.image, &TEST_SURFACE, &config);
-        ctx.set(DominantColor::new(
+        ctx.dominant_color = Some(DominantColor::new(
             config.target_r,
             config.target_g,
             config.target_b,
             255,
         ));
 
-        // Verify color target emitted DominantColor
-        let emitted = ctx.get::<DominantColor>();
-        assert!(emitted.is_some(), "Color target should emit DominantColor");
-
-        let emitted_color = emitted.unwrap().as_tuple();
+        let emitted_color = ctx.dominant_color.unwrap().as_tuple();
         assert!(
             emitted_color.1 > emitted_color.0,
             "Emitted color should have more green than red for cyan target"
         );
 
         // Now apply decal - it should use the emitted color, not re-sample
-        let decal_config = DecalConfig::new(TEST_SVG, 0.5);
-        let _tile = render_decal(&decal_config, &ctx).unwrap();
+        DecalConfig::new(TEST_SVG, 0.5).paint(&mut ctx).unwrap();
 
         // The DominantColor property should still be the target color
-        let color_after_decal = ctx.get::<DominantColor>().unwrap().as_tuple();
+        let color_after_decal = ctx.dominant_color.unwrap().as_tuple();
         assert_eq!(
             color_after_decal, emitted_color,
             "Decal should consume but not overwrite DominantColor"
@@ -555,7 +522,7 @@ mod tests {
 
     #[test]
     fn decal_samples_base_when_hsl_disabled() {
-        use crate::layer::{CacheKey, DependencyVersion, DominantColor, RenderContext};
+        use crate::layer::{RenderContext, Stage};
 
         // Create a solid blue image
         let mut blue_img = RgbaImage::new(16, 16);
@@ -565,115 +532,38 @@ mod tests {
         let blue_icon = IconImage::new_full_content(blue_img, 1.0);
 
         // Set up layers: color target NOT configured (disabled)
-        let mut ct_layer: Layer<SolidColorConfig> = Layer::default();
-        // No config set — layer is inactive
+        let ct_layer: Layer<SolidColorConfig> = Layer::default();
 
         let mut decal_layer: Layer<DecalConfig> = Layer::default();
         decal_layer.set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
 
-        // Create context and apply through Layer::apply
         let mut ctx = RenderContext::new(blue_icon.clone());
-        ctx.set(TEST_SURFACE);
-        let key = CacheKey::from_icon(&blue_icon);
-        let decal_deps = DependencyVersion::from_version(ct_layer.version());
+        ctx.surface_color = Some(TEST_SURFACE);
 
-        // Apply color target layer (should skip because no config)
-        ct_layer
-            .apply(&mut ctx, key, DependencyVersion::NONE)
-            .unwrap();
-
-        // Verify no DominantColor was emitted (because color target was skipped)
+        // Inactive color target: no-op, no dominant color
+        ct_layer.run(&mut ctx).unwrap();
         assert!(
-            ctx.get::<DominantColor>().is_none(),
+            ctx.dominant_color.is_none(),
             "No DominantColor should exist when color target layer has no config"
         );
-
-        // Image should be unchanged (still blue)
         assert_eq!(
             ctx.image.data.get_pixel(0, 0).0,
             [0, 0, 255, 255],
             "Image should be unchanged when color target has no config"
         );
 
-        // Apply decal - it should fall back to surface color (the golden-yellow)
-        // Decal now returns a tile, not modifying ctx.image directly
-        let _tile = decal_layer.render_tile(&mut ctx, key, decal_deps).unwrap();
-
-        // Image should still be unchanged (decal produces a tile, doesn't composite)
+        // Decal falls back to the surface color and draws at the center;
+        // the corner is outside the 8px decal so it stays blue.
+        decal_layer.run(&mut ctx).unwrap();
         assert_eq!(
             ctx.image.data.get_pixel(0, 0).0,
             [0, 0, 255, 255],
-            "Image should still be blue"
+            "Corner outside the decal should still be blue"
         );
-    }
-
-    #[test]
-    fn disabled_hsl_layer_version_change_invalidates_decal_cache() {
-        use crate::layer::{CacheKey, DependencyVersion, DominantColor, RenderContext};
-
-        // Create red and blue test icons
-        let mut red_img = RgbaImage::new(16, 16);
-        for pixel in red_img.pixels_mut() {
-            pixel.0 = [255, 0, 0, 255];
-        }
-        let red_icon = IconImage::new_full_content(red_img, 1.0);
-        let key = CacheKey::from_icon(&red_icon);
-
-        // Set up layers
-        let mut ct_layer: Layer<SolidColorConfig> = Layer::default();
-        ct_layer.set_config(Some(SolidColorConfig::new(0, 188, 212)));
-        let mut decal_layer: Layer<DecalConfig> = Layer::default();
-        decal_layer.set_config(Some(DecalConfig::new(TEST_SVG, 0.5)));
-
-        // First render: color target enabled
-        let decal_deps_v1 = DependencyVersion::from_version(ct_layer.version());
-        let mut ctx1 = RenderContext::new(red_icon.clone());
-        ctx1.set(TEST_SURFACE);
-        ct_layer
-            .apply(&mut ctx1, key, DependencyVersion::NONE)
-            .unwrap();
-        decal_layer
-            .render_tile(&mut ctx1, key, decal_deps_v1)
-            .unwrap();
-
-        // Color target should have emitted DominantColor
-        let emitted_with_ct = ctx1.get::<DominantColor>().unwrap().as_tuple();
-        assert!(
-            emitted_with_ct.1 > emitted_with_ct.0,
-            "With color target enabled, emitted color should be cyan-ish"
-        );
-
-        // Now clear color target config — version should change
-        let old_version = ct_layer.version();
-        ct_layer.set_config(None);
-        let new_version = ct_layer.version();
         assert_ne!(
-            old_version, new_version,
-            "Clearing config should change its version"
-        );
-
-        // Second render: color target not configured
-        let decal_deps_v2 = DependencyVersion::from_version(ct_layer.version()); // New version!
-        let mut ctx2 = RenderContext::new(red_icon.clone());
-        ctx2.set(TEST_SURFACE);
-        ct_layer
-            .apply(&mut ctx2, key, DependencyVersion::NONE)
-            .unwrap();
-        decal_layer
-            .render_tile(&mut ctx2, key, decal_deps_v2)
-            .unwrap();
-
-        // No DominantColor should be emitted (color target was skipped)
-        assert!(
-            ctx2.get::<DominantColor>().is_none(),
-            "With color target cleared, no DominantColor should be emitted"
-        );
-
-        // Image should be original red (not shifted)
-        assert_eq!(
-            ctx2.image.data.get_pixel(0, 0).0,
-            [255, 0, 0, 255],
-            "With color target cleared, image should be original red"
+            ctx.image.data.get_pixel(8, 8).0,
+            [0, 0, 255, 255],
+            "Center should carry the decal"
         );
     }
 

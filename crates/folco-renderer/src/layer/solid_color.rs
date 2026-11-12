@@ -24,9 +24,7 @@
 //! A delta of 0.0 leaves the channel unchanged, +1.0 doubles it,
 //! and -1.0 drives it to zero.
 
-use super::{
-    CacheKey, CachedOutput, DependencyVersion, DominantColor, Layer, LayerConfig, RenderContext,
-};
+use super::{DominantColor, LayerConfig, RasterPaint, RenderContext};
 use crate::error::RenderError;
 use crate::icon::{IconImage, SurfaceColor};
 use palette::{Hsl, IntoColor, Srgb};
@@ -38,11 +36,12 @@ use palette::{Hsl, IntoColor, Srgb};
 /// Configuration for solid recoloring — pure data.
 ///
 /// Stores only the target RGB color. HSL delta computation and pixel
-/// transformation are handled by [`Layer<SolidColorConfig>::apply()`].
+/// transformation happen in [`RasterPaint::paint`].
 ///
 /// # Emitted Properties
 ///
-/// When applied, the layer emits [`DominantColor`] from the target values.
+/// When painted, the layer sets [`RenderContext::dominant_color`] from the
+/// target values so the decal tints against the recolored face.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
@@ -78,56 +77,23 @@ impl LayerConfig for SolidColorConfig {
 // Layer Rendering
 // ============================================================================
 
-impl Layer<SolidColorConfig> {
-    /// Apply the solid color layer to the render context, using cache if valid.
-    ///
-    /// Transforms `ctx.image` using GIMP-style HSL adjustment and emits
-    /// [`DominantColor`] for downstream layers. If inactive, the context
-    /// passes through unchanged.
+impl RasterPaint for SolidColorConfig {
+    /// Recolors `ctx.image` with a GIMP-style HSL adjustment and records the
+    /// target as the new dominant color.
     ///
     /// The [`SurfaceColor`] must be present in the render context.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the transform fails.
-    pub fn apply(
-        &mut self,
-        ctx: &mut RenderContext,
-        key: CacheKey,
-        deps: DependencyVersion,
-    ) -> Result<(), RenderError> {
-        if !self.is_active() {
-            return Ok(());
-        }
-
-        // Check cache first
-        if let Some(CachedOutput::Image(img)) = self.get_cached(key, deps) {
-            ctx.image = img.clone();
-            let config = self.config().unwrap();
-            ctx.set(DominantColor::new(
-                config.target_r,
-                config.target_g,
-                config.target_b,
-                255,
-            ));
-            return Ok(());
-        }
-
-        let config = self.config().unwrap();
-        let surface = *ctx
-            .get::<SurfaceColor>()
+    fn paint(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+        let surface = ctx
+            .surface_color
             .expect("SurfaceColor must be set in RenderContext");
 
-        apply_solid_color(&mut ctx.image, &surface, config);
-        ctx.set(DominantColor::new(
-            config.target_r,
-            config.target_g,
-            config.target_b,
+        apply_solid_color(&mut ctx.image, &surface, self);
+        ctx.dominant_color = Some(DominantColor::new(
+            self.target_r,
+            self.target_g,
+            self.target_b,
             255,
         ));
-
-        // Cache the transformed image
-        self.store(key, CachedOutput::Image(ctx.image.clone()), deps);
         Ok(())
     }
 }

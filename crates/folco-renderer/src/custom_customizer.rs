@@ -7,14 +7,10 @@
 //! no surface color reference to recolor against.
 
 use crate::capabilities::{IconBaseKind, IconCapabilities};
-use crate::customizer::{IconCustomizer, LayerSet, layer_set_versions};
+use crate::customizer::{IconCustomizer, LayerSet};
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconSet, IconSizeSpec};
-use image::imageops::overlay;
-use crate::layer::{
-    CacheKey, ColorDotConfig, DependencyVersion, ImageOverlayConfig, ImageSource, Layer,
-    RenderContext,
-};
+use crate::layer::{ColorDotConfig, ImageOverlayConfig, ImageSource, Layer, Stage};
 use crate::{CustomProfile, CustomizationProfile};
 
 // ============================================================================
@@ -35,26 +31,9 @@ pub struct CustomLayers {
 }
 
 impl LayerSet for CustomLayers {
-    fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError> {
-        // Both layers draw on top, so neither depends on an upstream result.
-        if let Some(tile) = self
-            .color_dot
-            .render_tile(ctx, key, DependencyVersion::NONE)?
-        {
-            overlay(&mut ctx.image.data, tile, 0, 0);
-        }
-
-        if let Some(tile) = self
-            .overlay
-            .render_tile(ctx, key, DependencyVersion::NONE)?
-        {
-            overlay(&mut ctx.image.data, tile, 0, 0);
-        }
-
-        Ok(())
+    fn stages(&self) -> Vec<&dyn Stage> {
+        vec![&self.color_dot, &self.overlay]
     }
-
-    layer_set_versions!(color_dot, overlay);
 }
 
 // ============================================================================
@@ -151,22 +130,21 @@ mod tests {
         CustomIconCustomizer::from_icon_set(IconSet::new())
     }
 
-    /// Catches a layer added to the struct and `execute()` but left out of
-    /// `layer_set_versions!`.
+    /// Catches a layer added to the struct but left out of `stages()`.
     #[test]
-    fn every_layer_changes_combined_version() {
-        let baseline = CustomLayers::default().combined_version();
+    fn every_layer_is_a_stage() {
+        let baseline = CustomLayers::default().versions();
         let placement = Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5);
 
         let mut dot = CustomLayers::default();
         dot.color_dot.set_config(Some(ColorDotConfig::new(1, 2, 3)));
-        assert_ne!(dot.combined_version(), baseline, "color_dot untracked");
+        assert_ne!(dot.versions(), baseline, "color_dot not in stages()");
 
         let mut overlay = CustomLayers::default();
         overlay
             .overlay
             .set_config(Some(ImageOverlayConfig::from_svg("<svg/>", placement)));
-        assert_ne!(overlay.combined_version(), baseline, "overlay untracked");
+        assert_ne!(overlay.versions(), baseline, "overlay not in stages()");
     }
 
     #[test]

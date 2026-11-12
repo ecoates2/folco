@@ -71,8 +71,9 @@ pub use icon::{
     SvgFolderIconBase,
 };
 pub use layer::{
-    CacheKey, ColorDotConfig, DecalConfig, DominantColor, ImageOverlayConfig, ImageSource, Layer,
-    LayerConfig, OverlayAnchorMode, OverlayPosition, RenderContext, SolidColorConfig, SvgSource,
+    ColorDotConfig, DecalConfig, DominantColor, ImageOverlayConfig, ImageSource, Layer,
+    LayerConfig, OverlayAnchorMode, OverlayPosition, RasterPaint, RenderContext,
+    SolidColorConfig, Stage, SvgSource,
 };
 pub use medium::SvgCanvas;
 pub use output::Render;
@@ -82,4 +83,4 @@ pub use svg_custom_customizer::{SvgCustomIconCustomizer, SvgCustomLayers};
 pub use svg_folder_customizer::{
     SvgFolderIconCustomizer, SvgFolderLayers, SvgIconCustomizer, SvgLayerSet, SvgRenderOutput,
 };
-pub use svg_layer::SvgLayer;
+pub use svg_layer::{SvgLayer, SvgPaint, SvgStage};

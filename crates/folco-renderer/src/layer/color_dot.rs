@@ -15,12 +15,10 @@
 //! in the output document.
 
 use super::{
-    CacheKey, DependencyVersion, ImageSource, Layer, LayerConfig, OverlayAnchorMode,
-    OverlayPosition, RenderContext,
+    ImageSource, LayerConfig, OverlayAnchorMode, OverlayPosition, RasterPaint, RenderContext,
 };
 use crate::error::RenderError;
 use crate::placement::Placement;
-use image::RgbaImage;
 use image::imageops::overlay;
 
 // ============================================================================
@@ -47,8 +45,8 @@ pub(crate) const DOT_VIEWBOX: &str = "0 0 100 100";
 /// `placement` defaults to [`DEFAULT_COLOR_DOT_PLACEMENT`], so profiles that
 /// only carry `r`/`g`/`b` keep deserializing.
 ///
-/// Rendering logic lives on [`Layer<ColorDotConfig>`] (raster) and
-/// [`SvgLayer<ColorDotConfig>`](crate::SvgLayer) (vector).
+/// Rendering logic lives in [`RasterPaint`] (raster) and
+/// [`SvgPaint`](crate::svg_layer::SvgPaint) (vector).
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
@@ -122,51 +120,31 @@ pub(crate) fn color_dot_svg(config: &ColorDotConfig) -> String {
 // Layer Rendering
 // ============================================================================
 
-impl Layer<ColorDotConfig> {
-    /// Renders the color dot to a transparent tile for compositing.
-    ///
-    /// Returns `None` if the layer is inactive.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the dot cannot be rasterized.
-    pub fn render_tile(
-        &mut self,
-        ctx: &RenderContext,
-        key: CacheKey,
-        deps: DependencyVersion,
-    ) -> Result<Option<&RgbaImage>, RenderError> {
-        self.cached_tile(key, deps, |config| render_color_dot(config, ctx))
+impl RasterPaint for ColorDotConfig {
+    /// Rasterizes the dot and draws it at its placement within the content bounds.
+    fn paint(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+        let bounds = ctx.image.content_bounds;
+        let min_dim = bounds.width.min(bounds.height) as f32;
+        let dot_size = (min_dim * self.placement.scale) as u32;
+        if dot_size == 0 {
+            return Ok(());
+        }
+
+        let dot = ImageSource::svg(color_dot_svg(self)).render_at_size(dot_size)?;
+        let (x, y) = super::overlay::pixel_position(&self.placement, &bounds, &dot);
+        overlay(&mut ctx.image.data, &dot, i64::from(x), i64::from(y));
+        Ok(())
     }
-}
-
-/// Rasterizes the dot at its configured position within the icon's content bounds.
-fn render_color_dot(
-    config: &ColorDotConfig,
-    ctx: &RenderContext,
-) -> Result<RgbaImage, RenderError> {
-    let bounds = ctx.image.content_bounds;
-    let mut tile = RgbaImage::new(ctx.image.data.width(), ctx.image.data.height());
-
-    let min_dim = bounds.width.min(bounds.height) as f32;
-    let dot_size = (min_dim * config.placement.scale) as u32;
-    if dot_size == 0 {
-        return Ok(tile);
-    }
-
-    let dot = ImageSource::svg(color_dot_svg(config)).render_at_size(dot_size)?;
-
-    let (x, y) = super::overlay::pixel_position(&config.placement, &bounds, &dot);
-    overlay(&mut tile, &dot, i64::from(x), i64::from(y));
-
-    Ok(tile)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::icon::{IconImage, RectPx};
+    use crate::layer::{Layer, Stage};
+    use image::RgbaImage;
 
+    /// A transparent canvas, so whatever the stage draws is all that's there.
     fn context(size: u32) -> RenderContext {
         RenderContext::new(IconImage::new(
             RgbaImage::new(size, size),
@@ -177,16 +155,11 @@ mod tests {
 
     #[test]
     fn inactive_layer_renders_nothing() {
-        let mut layer: Layer<ColorDotConfig> = Layer::default();
-        let ctx = context(64);
-        let key = CacheKey::from_icon(&ctx.image);
+        let layer: Layer<ColorDotConfig> = Layer::default();
+        let mut ctx = context(64);
+        layer.run(&mut ctx).unwrap();
 
-        assert!(
-            layer
-                .render_tile(&ctx, key, DependencyVersion::NONE)
-                .unwrap()
-                .is_none()
-        );
+        assert!(ctx.image.data.pixels().all(|p| p.0[3] == 0));
     }
 
     #[test]
@@ -194,24 +167,20 @@ mod tests {
         let mut layer: Layer<ColorDotConfig> = Layer::default();
         layer.set_config(Some(ColorDotConfig::new(33, 150, 243)));
 
-        let ctx = context(64);
-        let key = CacheKey::from_icon(&ctx.image);
-
-        let tile = layer
-            .render_tile(&ctx, key, DependencyVersion::NONE)
-            .unwrap()
-            .unwrap();
+        let mut ctx = context(64);
+        layer.run(&mut ctx).unwrap();
+        let img = &ctx.image.data;
 
         // Dot center: 64 - size(25)/2 ≈ 51.
-        let center = tile.get_pixel(51, 51);
+        let center = img.get_pixel(51, 51);
         assert!(center[3] > 0, "dot center should be opaque");
         assert!(
             center[2] > center[0],
             "blue should dominate for #2196f3, got {center:?}"
         );
 
-        // The top-left stays untouched so the tile composites cleanly.
-        assert_eq!(tile.get_pixel(0, 0).0[3], 0);
+        // The top-left stays untouched.
+        assert_eq!(img.get_pixel(0, 0).0[3], 0);
     }
 
     #[test]
@@ -221,18 +190,14 @@ mod tests {
             Placement::new(OverlayPosition::TopLeft, OverlayAnchorMode::Inset, 0.5),
         )));
 
-        let ctx = context(64);
-        let key = CacheKey::from_icon(&ctx.image);
-
-        let tile = layer
-            .render_tile(&ctx, key, DependencyVersion::NONE)
-            .unwrap()
-            .unwrap();
+        let mut ctx = context(64);
+        layer.run(&mut ctx).unwrap();
+        let img = &ctx.image.data;
 
         // 32px dot in the top-left: centered on (16, 16).
-        assert!(tile.get_pixel(16, 16).0[3] > 0, "dot should be top-left");
+        assert!(img.get_pixel(16, 16).0[3] > 0, "dot should be top-left");
         assert_eq!(
-            tile.get_pixel(48, 48).0[3],
+            img.get_pixel(48, 48).0[3],
             0,
             "bottom-right should be empty"
         );

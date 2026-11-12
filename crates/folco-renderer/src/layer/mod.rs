@@ -1,29 +1,24 @@
 //! Layer infrastructure for icon customization.
 //!
-//! This module provides the generic layer system used by `FolderIconCustomizer`.
-//! Each layer encapsulates an optional configuration, version tracking
-//! for cache invalidation, and a per-size output cache.
+//! A layer is a [`Layer<C>`]: an optional configuration `C` plus a version
+//! counter. `Some(config)` means the layer is active and will render; `None`
+//! means it renders nothing. Presence of config is the sole on/off switch, so
+//! export/import is lossless.
 //!
-//! # Architecture
+//! Rendering is the config's job. A raster config implements [`RasterPaint`]
+//! to draw itself into a [`RenderContext`]; the blanket [`Stage`] impl on
+//! `Layer<C>` then skips inactive layers. Layer sets list their layers as
+//! stages, **in execution order**, and the engine caches the context after
+//! each stage — so changing a later layer never re-runs an earlier one.
 //!
-//! Each layer config implements [`LayerConfig`] (pure data with change
-//! detection). Rendering logic lives on the concrete `Layer<Config>` types.
-//!
-//! - **Base layers** (e.g., solid color) transform the icon image directly
-//!   and cache the full result.
-//! - **Stackable layers** (e.g., color dot, decal, overlay) render to a
-//!   transparent tile of the same dimensions, which the pipeline composites
-//!   on top.
-//!
-//! Properties flow through the pipeline via [`RenderContext`], enabling
-//! layers to communicate without tight coupling.
+//! The vector medium reuses `Layer<C>` and the configs, with its own paint
+//! trait: see [`crate::svg_layer`].
 
 pub mod color_dot;
 pub mod decal;
 pub mod image_source;
 pub mod overlay;
 pub mod solid_color;
-mod state;
 pub mod svg;
 
 pub use color_dot::ColorDotConfig;
@@ -31,67 +26,45 @@ pub use decal::DecalConfig;
 pub use image_source::ImageSource;
 pub use overlay::{ImageOverlayConfig, OverlayAnchorMode, OverlayPosition};
 pub use solid_color::SolidColorConfig;
-pub use state::LayerState;
 pub use svg::SvgSource;
 
 use crate::error::RenderError;
-use crate::icon::IconImage;
-use image::RgbaImage;
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
+use crate::icon::{IconImage, SurfaceColor};
 
 // ============================================================================
 // Render Context
 // ============================================================================
 
-/// Context that flows through the rendering pipeline.
+/// The image being built, plus what upstream stages have learned about it.
 ///
-/// Layers can read properties set by upstream layers and emit new properties
-/// for downstream layers to consume. This enables loose coupling between layers.
-///
-/// # Example
-///
-/// ```ignore
-/// // Upstream layer emits a property
-/// ctx.set(DominantColor(r, g, b, a));
-///
-/// // Downstream layer reads the property
-/// if let Some(color) = ctx.get::<DominantColor>() {
-///     // Use the color...
-/// }
-/// ```
+/// Flows through the raster pipeline in stage order. The engine snapshots it
+/// after every stage, so everything a later stage needs must live here.
+#[derive(Debug, Clone)]
 pub struct RenderContext {
     /// The current image being processed through the pipeline.
     pub image: IconImage,
 
-    /// Typed property bag for inter-layer communication.
-    properties: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    /// The base icon's reference color, when the base is a system folder icon.
+    ///
+    /// Set by the engine before any stage runs. Surface-relative layers
+    /// (solid color, decal) need it; draw-on-top layers ignore it.
+    pub surface_color: Option<SurfaceColor>,
+
+    /// The color the icon's face currently reads as, if a stage has changed it.
+    ///
+    /// Emitted by solid color so the decal tints against the recolored face
+    /// rather than the original surface.
+    pub dominant_color: Option<DominantColor>,
 }
 
 impl RenderContext {
-    /// Creates a new render context with the given base image.
+    /// Creates a context over `image` with no surface color.
     pub fn new(image: IconImage) -> Self {
         Self {
             image,
-            properties: HashMap::new(),
+            surface_color: None,
+            dominant_color: None,
         }
-    }
-
-    /// Sets a typed property that downstream layers can read.
-    pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
-        self.properties.insert(TypeId::of::<T>(), Box::new(value));
-    }
-
-    /// Gets a typed property set by an upstream layer.
-    pub fn get<T: Any + Send + Sync>(&self) -> Option<&T> {
-        self.properties
-            .get(&TypeId::of::<T>())
-            .and_then(|b| b.downcast_ref())
-    }
-
-    /// Checks if a property has been set.
-    pub fn has<T: Any + Send + Sync>(&self) -> bool {
-        self.properties.contains_key(&TypeId::of::<T>())
     }
 }
 
@@ -103,7 +76,7 @@ impl RenderContext {
 ///
 /// Emitted by layers that modify the image appearance (like solid color).
 /// Consumed by layers that need to derive colors from the image (like decal).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DominantColor {
     pub r: u8,
     pub g: u8,
@@ -129,48 +102,109 @@ impl DominantColor {
 ///
 /// Configurations are pure data — they hold only the user's settings
 /// and know how to detect meaningful changes for cache invalidation.
-/// Rendering logic lives on the concrete [`Layer`] types.
 pub trait LayerConfig: Clone {
     /// Returns true if this config differs from another in a way that
     /// would produce different rendering output.
     fn differs_from(&self, other: &Self) -> bool;
 }
 
-// ============================================================================
-// Layer Dependencies
-// ============================================================================
-
-/// Represents the combined version of upstream layer dependencies.
+/// How a raster layer config draws itself.
 ///
-/// This is used to detect when a layer's cache is stale because an
-/// upstream layer has changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct DependencyVersion(u64);
+/// Implemented on the config type, not the layer: the layer only decides
+/// *whether* to paint (see [`Stage`]); the config decides *what*.
+pub trait RasterPaint {
+    /// Draws this config into `ctx`, mutating `ctx.image` in place.
+    ///
+    /// May also update `ctx` properties for downstream stages.
+    fn paint(&self, ctx: &mut RenderContext) -> Result<(), RenderError>;
+}
 
-impl DependencyVersion {
-    /// No dependencies (root layer).
-    pub const NONE: Self = Self(0);
+/// One step of the raster pipeline, as the engine sees it.
+///
+/// Object-safe so a layer set can hand back its layers as a plain list.
+pub trait Stage {
+    /// Changes whenever this stage's output could change.
+    fn version(&self) -> u64;
 
-    /// Creates a dependency version from a single version number.
-    pub fn from_version(version: u64) -> Self {
-        Self(version)
+    /// Runs the stage against `ctx`.
+    fn run(&self, ctx: &mut RenderContext) -> Result<(), RenderError>;
+}
+
+impl<C: LayerConfig + RasterPaint> Stage for Layer<C> {
+    fn version(&self) -> u64 {
+        Layer::version(self)
     }
 
-    /// Combines multiple upstream layer versions into one.
-    ///
-    /// Order-sensitive on purpose. Summing would let distinct pipeline states
-    /// collide — `[1, 0]` and `[0, 1]` sum alike — and a collision hands back a
-    /// stale cache entry as though it were fresh.
-    pub fn combine(versions: &[u64]) -> Self {
-        const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-        const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
-
-        let mut hash = FNV_OFFSET;
-        for version in versions {
-            hash ^= version;
-            hash = hash.wrapping_mul(FNV_PRIME);
+    fn run(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+        match self.config() {
+            Some(config) => config.paint(ctx),
+            None => Ok(()),
         }
-        Self(hash)
+    }
+}
+
+// ============================================================================
+// Layer
+// ============================================================================
+
+/// An optional configuration and a version counter for cache invalidation.
+///
+/// A layer is **active** when it has a configuration set. Presence/absence of
+/// config is the sole on/off switch: `Some(config)` = render with this config,
+/// `None` = render nothing (base passes through). This makes export/import
+/// lossless — what you see is what you get.
+#[derive(Debug)]
+pub struct Layer<C: LayerConfig> {
+    config: Option<C>,
+    version: u64,
+}
+
+impl<C: LayerConfig> Default for Layer<C> {
+    fn default() -> Self {
+        Self {
+            config: None,
+            version: 0,
+        }
+    }
+}
+
+impl<C: LayerConfig> Layer<C> {
+    /// Returns the current configuration, if any.
+    ///
+    /// `Some(config)` means the layer is active and will render.
+    /// `None` means the layer is inactive and produces no output.
+    pub fn config(&self) -> Option<&C> {
+        self.config.as_ref()
+    }
+
+    /// Returns true if this layer is active (has a configuration set).
+    pub fn is_active(&self) -> bool {
+        self.config.is_some()
+    }
+
+    /// Returns the current version number.
+    pub fn version(&self) -> u64 {
+        self.version
+    }
+
+    /// Sets the configuration. Returns true if it changed.
+    ///
+    /// Setting to `Some(config)` activates the layer; setting to `None`
+    /// deactivates it. Increments the version when the config differs.
+    pub fn set_config(&mut self, config: Option<C>) -> bool {
+        let differs = match (&self.config, &config) {
+            (None, None) => false,
+            (Some(_), None) | (None, Some(_)) => true,
+            (Some(old), Some(new)) => old.differs_from(new),
+        };
+
+        if differs {
+            self.config = config;
+            self.version = self.version.wrapping_add(1);
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -178,7 +212,7 @@ impl DependencyVersion {
 // CacheKey
 // ============================================================================
 
-/// Key for cached rendered images.
+/// Identifies one base image size in a cache.
 ///
 /// Uses width, height, and scale (as integer bits) to identify unique image sizes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -204,203 +238,48 @@ impl CacheKey {
     }
 }
 
-// ============================================================================
-// Layer Cache Output
-// ============================================================================
-
-/// Cached result from a layer's rendering.
-///
-/// Layers produce different types of output:
-/// - **Image-transforming layers** (e.g., solid_color) modify `ctx.image`
-///   directly and cache the full transformed result.
-/// - **Tile layers** (e.g., color_dot, decal, overlay) render to a transparent
-///   canvas of the same dimensions, which the pipeline composites on top.
-#[derive(Debug)]
-enum CachedOutput {
-    /// Full transformed image (e.g., solid_color mutates the base icon).
-    Image(IconImage),
-    /// Transparent tile for compositing (e.g., decal, overlay).
-    Tile(RgbaImage),
-}
-
-// ============================================================================
-// Generic Layer
-// ============================================================================
-
-/// A raster layer: [`LayerState`] plus a per-size cache of rendered output.
-///
-/// The cache is keyed by size and stamped with the upstream
-/// [`DependencyVersion`] at store time, so an entry is only served when both
-/// the size and the upstream state still match.
-#[derive(Debug)]
-pub struct Layer<C: LayerConfig> {
-    state: LayerState<C>,
-    cache: HashMap<CacheKey, (CachedOutput, u64)>,
-}
-
-impl<C: LayerConfig> Default for Layer<C> {
-    fn default() -> Self {
-        Self {
-            state: LayerState::default(),
-            cache: HashMap::new(),
-        }
-    }
-}
-
-impl<C: LayerConfig> Layer<C> {
-    /// Returns the current configuration, if any.
-    ///
-    /// `Some(config)` means the layer is active and will render.
-    /// `None` means the layer is inactive and produces no output.
-    pub fn config(&self) -> Option<&C> {
-        self.state.config()
-    }
-
-    /// Returns true if this layer is active (has a configuration set).
-    pub fn is_active(&self) -> bool {
-        self.state.is_active()
-    }
-
-    /// Returns the current version number.
-    pub fn version(&self) -> u64 {
-        self.state.version()
-    }
-
-    /// Sets the configuration. Returns true if it changed.
-    ///
-    /// Setting to `Some(config)` activates the layer; setting to `None`
-    /// deactivates it. Clears the cache and increments version when
-    /// the config differs.
-    pub fn set_config(&mut self, config: Option<C>) -> bool {
-        let changed = self.state.set_config(config);
-        if changed {
-            self.cache.clear();
-        }
-        changed
-    }
-
-    /// Invalidates the cache and increments version.
-    ///
-    /// Called when upstream layers change.
-    pub fn invalidate(&mut self) {
-        self.state.invalidate();
-        self.cache.clear();
-    }
-
-    /// Gets a cached output if valid for the given key and dependency version.
-    fn get_cached(&self, key: CacheKey, deps: DependencyVersion) -> Option<&CachedOutput> {
-        self.cache.get(&key).and_then(|(output, stored_dep)| {
-            if *stored_dep == deps.0 {
-                Some(output)
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Stores a layer output in the cache with the current dependency version.
-    fn store(&mut self, key: CacheKey, output: CachedOutput, deps: DependencyVersion) {
-        self.cache.insert(key, (output, deps.0));
-    }
-
-    /// Returns the cached tile for `key`, rendering and storing it first on a miss.
-    ///
-    /// Returns `None` if the layer is inactive.
-    fn cached_tile(
-        &mut self,
-        key: CacheKey,
-        deps: DependencyVersion,
-        render: impl FnOnce(&C) -> Result<RgbaImage, RenderError>,
-    ) -> Result<Option<&RgbaImage>, RenderError> {
-        let Some(config) = self.state.config() else {
-            return Ok(None);
-        };
-
-        // Checked up front: returning the hit directly trips NLL's conditional-return limitation.
-        if !matches!(self.get_cached(key, deps), Some(CachedOutput::Tile(_))) {
-            let tile = render(config)?;
-            self.store(key, CachedOutput::Tile(tile), deps);
-        }
-
-        match self.get_cached(key, deps) {
-            Some(CachedOutput::Tile(tile)) => Ok(Some(tile)),
-            _ => unreachable!("a fresh tile was stored above"),
-        }
-    }
-}
-
-// NOTE: Rendering methods (apply, render_tile) are implemented on `Layer<SpecificConfig>`
-// in each layer module (solid_color.rs, color_dot.rs, decal.rs, overlay.rs).
-
-// ============================================================================
-// Composite Layer
-// ============================================================================
-
-/// A cache-only layer for final composited images.
-///
-/// Unlike [`Layer<C>`], this has no configuration or enabled state.
-/// It purely caches the final rendered output and tracks a version
-/// for invalidation when any upstream layer changes.
-#[derive(Default)]
-pub struct CompositeLayer {
-    version: u64,
-    cache: HashMap<CacheKey, (IconImage, u64)>,
-}
-
-impl CompositeLayer {
-    /// Returns the current version number.
-    pub fn version(&self) -> u64 {
-        self.version
-    }
-
-    /// Invalidates the cache and increments version.
-    pub fn invalidate(&mut self) {
-        self.version = self.version.wrapping_add(1);
-        self.cache.clear();
-    }
-
-    /// Gets a cached image if valid for the given key and dependency version.
-    pub fn get_cached(&self, key: CacheKey, deps: DependencyVersion) -> Option<&IconImage> {
-        self.cache.get(&key).and_then(|(img, stored_dep)| {
-            if *stored_dep == deps.0 {
-                Some(img)
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Stores an image in the cache with the current dependency version.
-    pub fn store(&mut self, key: CacheKey, image: IconImage, deps: DependencyVersion) {
-        self.cache.insert(key, (image, deps.0));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn combine_distinguishes_which_layer_changed() {
-        assert_ne!(
-            DependencyVersion::combine(&[1, 0]),
-            DependencyVersion::combine(&[0, 1])
-        );
+    #[derive(Clone, Debug, PartialEq)]
+    struct Cfg(u8);
+
+    impl LayerConfig for Cfg {
+        fn differs_from(&self, other: &Self) -> bool {
+            self != other
+        }
     }
 
-    /// A collision here would serve a stale composite as if it were current.
     #[test]
-    fn combine_is_injective_over_a_small_version_space() {
-        let mut seen = std::collections::HashSet::new();
-        for a in 0..12u64 {
-            for b in 0..12u64 {
-                for c in 0..12u64 {
-                    assert!(
-                        seen.insert(DependencyVersion::combine(&[a, b, c])),
-                        "collision at {a},{b},{c}"
-                    );
-                }
-            }
-        }
+    fn starts_inactive_at_version_zero() {
+        let layer: Layer<Cfg> = Layer::default();
+        assert!(!layer.is_active());
+        assert_eq!(layer.config(), None);
+        assert_eq!(layer.version(), 0);
+    }
+
+    #[test]
+    fn set_config_bumps_version_only_on_change() {
+        let mut layer: Layer<Cfg> = Layer::default();
+
+        assert!(layer.set_config(Some(Cfg(1))));
+        assert_eq!(layer.version(), 1);
+        assert!(layer.is_active());
+
+        // Same config: no change, no bump.
+        assert!(!layer.set_config(Some(Cfg(1))));
+        assert_eq!(layer.version(), 1);
+
+        assert!(layer.set_config(Some(Cfg(2))));
+        assert_eq!(layer.version(), 2);
+
+        assert!(layer.set_config(None));
+        assert_eq!(layer.version(), 3);
+        assert!(!layer.is_active());
+
+        // None -> None is not a change.
+        assert!(!layer.set_config(None));
+        assert_eq!(layer.version(), 3);
     }
 }

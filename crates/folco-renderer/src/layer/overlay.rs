@@ -5,7 +5,7 @@
 
 use super::image_source::ImageSource;
 use super::svg::SvgSource;
-use super::{CacheKey, DependencyVersion, Layer, LayerConfig, RenderContext};
+use super::{LayerConfig, RasterPaint, RenderContext};
 use crate::error::RenderError;
 use crate::icon::RectPx;
 use crate::placement::Placement;
@@ -52,8 +52,8 @@ pub enum OverlayAnchorMode {
 
 /// Configuration for image overlay — pure data.
 ///
-/// Stores the image source and its [`Placement`]. Rendering logic
-/// lives on [`Layer<ImageOverlayConfig>`].
+/// Stores the image source and its [`Placement`]. Rendering happens in
+/// [`RasterPaint::paint`].
 ///
 /// # Image Sources
 ///
@@ -126,43 +126,21 @@ impl LayerConfig for ImageOverlayConfig {
 // Layer Rendering
 // ============================================================================
 
-impl Layer<ImageOverlayConfig> {
-    /// Render this overlay layer, returning a tile for compositing.
-    ///
-    /// Returns `None` if inactive. The tile is a transparent canvas with
-    /// the image rendered at the configured position.
-    pub fn render_tile(
-        &mut self,
-        ctx: &mut RenderContext,
-        key: CacheKey,
-        deps: DependencyVersion,
-    ) -> Result<Option<&RgbaImage>, RenderError> {
-        self.cached_tile(key, deps, |config| render_overlay(config, ctx))
+impl RasterPaint for ImageOverlayConfig {
+    /// Rasterizes the source and draws it at its placement within the content bounds.
+    fn paint(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+        let bounds = ctx.image.content_bounds;
+        let min_dim = bounds.width.min(bounds.height) as f32;
+        let overlay_size = (min_dim * self.placement.scale) as u32;
+        if overlay_size == 0 {
+            return Ok(());
+        }
+
+        let overlay_img = self.source.render_at_size(overlay_size)?;
+        let (x, y) = pixel_position(&self.placement, &bounds, &overlay_img);
+        image::imageops::overlay(&mut ctx.image.data, &overlay_img, i64::from(x), i64::from(y));
+        Ok(())
     }
-}
-
-/// Renders an overlay image onto a transparent tile at the configured position.
-fn render_overlay(
-    config: &ImageOverlayConfig,
-    ctx: &RenderContext,
-) -> Result<RgbaImage, RenderError> {
-    let bounds = ctx.image.content_bounds;
-    let min_dim = bounds.width.min(bounds.height) as f32;
-    let overlay_size = (min_dim * config.placement.scale) as u32;
-
-    let width = ctx.image.data.width();
-    let height = ctx.image.data.height();
-    let mut tile = RgbaImage::new(width, height);
-
-    if overlay_size == 0 {
-        return Ok(tile);
-    }
-
-    let overlay_img = config.source.render_at_size(overlay_size)?;
-    let (x, y) = pixel_position(&config.placement, &bounds, &overlay_img);
-    image::imageops::overlay(&mut tile, &overlay_img, i64::from(x), i64::from(y));
-
-    Ok(tile)
 }
 
 /// Pixel origin of an already-rasterized `image` placed within `bounds`.

@@ -16,34 +16,25 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 
-use super::SvgLayer;
+use super::SvgPaint;
 use crate::error::RenderError;
 use crate::layer::{ImageOverlayConfig, ImageSource};
 use crate::placement::Placement;
 
-impl SvgLayer<ImageOverlayConfig> {
-    /// Renders the overlay as an SVG `<image>` fragment, or `None` if inactive.
+impl SvgPaint for ImageOverlayConfig {
+    /// The overlay as an `<image>` element with a `data:` URI source.
     ///
     /// # Errors
     ///
     /// Returns an error if an emoji/SVG source cannot be resolved.
-    pub fn render_fragment(&self) -> Result<Option<String>, RenderError> {
-        if !self.is_active() {
-            return Ok(None);
-        }
-        let config = self.config().expect("active layer always has a config");
-        Ok(Some(overlay_fragment(config)?))
-    }
-}
-
-/// Builds the `<image>` fragment for an overlay.
-fn overlay_fragment(config: &ImageOverlayConfig) -> Result<String, RenderError> {
-    let href = source_data_uri(&config.source)?;
-    let (x, y, size) = percent_rect(&config.placement);
-    Ok(format!(
-        "<image href=\"{href}\" x=\"{x:.4}%\" y=\"{y:.4}%\" \
+    fn fragment(&self) -> Result<String, RenderError> {
+        let href = source_data_uri(&self.source)?;
+        let (x, y, size) = percent_rect(&self.placement);
+        Ok(format!(
+            "<image href=\"{href}\" x=\"{x:.4}%\" y=\"{y:.4}%\" \
 width=\"{size:.4}%\" height=\"{size:.4}%\" preserveAspectRatio=\"xMidYMid meet\"/>"
-    ))
+        ))
+    }
 }
 
 /// Encodes an image source as a `data:` URI suitable for an `<image href>`.
@@ -73,6 +64,7 @@ pub(super) fn percent_rect(placement: &Placement) -> (f32, f32, f32) {
 mod tests {
     use super::*;
     use crate::layer::{OverlayAnchorMode, OverlayPosition};
+    use crate::svg_layer::{SvgLayer, SvgStage};
     use image::{Rgba, RgbaImage};
 
     fn red_png_source() -> ImageSource {
@@ -83,7 +75,7 @@ mod tests {
     #[test]
     fn inactive_layer_renders_nothing() {
         let layer: SvgLayer<ImageOverlayConfig> = SvgLayer::default();
-        assert_eq!(layer.render_fragment().unwrap(), None);
+        assert_eq!(layer.fragment().unwrap(), None);
     }
 
     #[test]
@@ -93,7 +85,7 @@ mod tests {
             "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
             Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5),
         )));
-        let fragment = layer.render_fragment().unwrap().unwrap();
+        let fragment = layer.fragment().unwrap().unwrap();
 
         assert!(fragment.starts_with("<image"));
         assert!(fragment.contains("data:image/svg+xml;base64,"));
@@ -107,7 +99,7 @@ mod tests {
             red_png_source(),
             Placement::new(OverlayPosition::BottomRight, OverlayAnchorMode::Inset, 0.25),
         )));
-        let fragment = layer.render_fragment().unwrap().unwrap();
+        let fragment = layer.fragment().unwrap().unwrap();
 
         assert!(fragment.contains("data:image/png;base64,"));
     }

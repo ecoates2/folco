@@ -5,14 +5,12 @@
 //! stays scalable markup, decorated with SVG layers, and is written as SVG.
 
 use crate::capabilities::{IconBaseKind, IconCapabilities};
-use crate::customizer::layer_set_versions;
 use crate::error::RenderError;
 use crate::layer::svg::render_svg;
 use crate::layer::{ColorDotConfig, ImageOverlayConfig};
-use crate::medium::SvgCanvas;
 use crate::profile::{CustomProfile, CustomizationProfile};
 use crate::svg_folder_customizer::{SvgIconCustomizer, SvgLayerSet};
-use crate::svg_layer::SvgLayer;
+use crate::svg_layer::{SvgLayer, SvgStage};
 
 // ============================================================================
 // SvgCustomLayers
@@ -29,17 +27,9 @@ pub struct SvgCustomLayers {
 }
 
 impl SvgLayerSet for SvgCustomLayers {
-    fn execute(&mut self, canvas: &mut SvgCanvas<'_>) -> Result<(), RenderError> {
-        if let Some(fragment) = self.color_dot.render_fragment() {
-            canvas.push_overlay(fragment);
-        }
-        if let Some(fragment) = self.overlay.render_fragment()? {
-            canvas.push_overlay(fragment);
-        }
-        Ok(())
+    fn stages(&self) -> Vec<&dyn SvgStage> {
+        vec![&self.color_dot, &self.overlay]
     }
-
-    layer_set_versions!(color_dot, overlay);
 }
 
 // ============================================================================
@@ -100,22 +90,21 @@ mod tests {
 
     const BASE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#00ff00"/></svg>"##;
 
-    /// Catches a layer added to the struct and `execute()` but left out of
-    /// `layer_set_versions!`.
+    /// Catches a layer added to the struct but left out of `stages()`.
     #[test]
-    fn every_layer_changes_combined_version() {
-        let baseline = SvgCustomLayers::default().combined_version();
+    fn every_layer_is_a_stage() {
+        let baseline = SvgCustomLayers::default().versions();
         let placement = Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5);
 
         let mut dot = SvgCustomLayers::default();
         dot.color_dot.set_config(Some(ColorDotConfig::new(1, 2, 3)));
-        assert_ne!(dot.combined_version(), baseline, "color_dot untracked");
+        assert_ne!(dot.versions(), baseline, "color_dot not in stages()");
 
         let mut overlay = SvgCustomLayers::default();
         overlay
             .overlay
             .set_config(Some(ImageOverlayConfig::from_svg("<svg/>", placement)));
-        assert_ne!(overlay.combined_version(), baseline, "overlay untracked");
+        assert_ne!(overlay.versions(), baseline, "overlay not in stages()");
     }
 
     #[test]

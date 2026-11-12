@@ -1,63 +1,104 @@
 //! Generic icon customization engine.
 //!
 //! [`IconCustomizer<L>`] is a generic engine parameterized by a [`LayerSet`]
-//! that defines which layers exist and how they are composed.
+//! that lists which layers exist and in what order. The engine runs them as
+//! stages and caches the [`RenderContext`] after each one, per size, so a
+//! change to layer *k* re-runs only stages *k* and later.
 //!
 //! Concrete customizer types are constructed as type aliases:
 //! - [`FolderIconCustomizer`](crate::FolderIconCustomizer) = `IconCustomizer<FolderLayers>`
 //! - [`CustomIconCustomizer`](crate::CustomIconCustomizer) = `IconCustomizer<CustomLayers>`
 
+use std::collections::HashMap;
+
 use crate::Render;
 use crate::error::RenderError;
 use crate::icon::{IconBase, IconImage, IconSet, SurfaceColor};
-use crate::layer::{CacheKey, CompositeLayer, DependencyVersion, RenderContext};
+use crate::layer::{CacheKey, RenderContext, Stage};
 
 // ============================================================================
 // LayerSet Trait
 // ============================================================================
 
-/// Trait for an ordered set of layers that can render into a context.
+/// An ordered set of raster layers.
 ///
-/// Implementors define which layers exist, their execution order,
-/// and how tiles are composited. The generic [`IconCustomizer<L>`]
-/// calls [`execute()`](LayerSet::execute) without knowing which layers
-/// are involved.
+/// Implementors own the concrete `Layer<C>` fields and hand them back as
+/// [`Stage`]s in execution order. That single list is the pipeline: the engine
+/// runs it, caches after each entry, and compares versions against it. A layer
+/// missing from the list simply never renders, which no test can miss.
 pub trait LayerSet {
-    /// Execute all layers against the render context in order.
-    ///
-    /// Each layer should either mutate `ctx.image` directly (base layers)
-    /// or render a tile and composite it via `image::imageops::overlay`.
-    fn execute(&mut self, ctx: &mut RenderContext, key: CacheKey) -> Result<(), RenderError>;
+    /// The layers to run, in order. Later stages draw over earlier ones.
+    fn stages(&self) -> Vec<&dyn Stage>;
 
-    /// Combined version of all layers.
-    ///
-    /// Used by the composite cache to detect when any layer has changed.
-    fn combined_version(&self) -> DependencyVersion;
-
-    /// Invalidate all layer caches.
-    fn invalidate_all(&mut self);
+    /// Current version of every stage, in order.
+    fn versions(&self) -> Vec<u64> {
+        self.stages().iter().map(|s| s.version()).collect()
+    }
 }
 
-/// Generates `combined_version` and `invalidate_all` for a layer set from one
-/// list of its layer fields, **in execution order**.
+// ============================================================================
+// StageCache
+// ============================================================================
+
+/// Context snapshots after each stage, per base size.
 ///
-/// Expands inside an `impl LayerSet for ...` or `impl SvgLayerSet for ...`
-/// block. Keeping a single list is what stops a new layer from being added to
-/// `execute()` but forgotten by the cache bookkeeping — and because
-/// [`DependencyVersion::combine`] is order-sensitive, the order must match
-/// `execute()` so the composite cache key means what it says.
-macro_rules! layer_set_versions {
-    ($($layer:ident),+ $(,)?) => {
-        fn combined_version(&self) -> $crate::layer::DependencyVersion {
-            $crate::layer::DependencyVersion::combine(&[$(self.$layer.version()),+])
+/// `snapshots[i]` is the context after stage `i` ran at `versions[i]`. A
+/// render reuses the longest prefix whose versions still match and rebuilds
+/// from there, so editing the last layer costs exactly one stage.
+#[derive(Default)]
+struct StageCache {
+    by_size: HashMap<CacheKey, Vec<Snapshot>>,
+}
+
+struct Snapshot {
+    version: u64,
+    ctx: RenderContext,
+}
+
+impl StageCache {
+    /// Renders `base` through `stages`, reusing cached prefixes where valid.
+    fn render(
+        &mut self,
+        base: &IconImage,
+        surface_color: Option<SurfaceColor>,
+        stages: &[&dyn Stage],
+    ) -> Result<IconImage, RenderError> {
+        let snapshots = self.by_size.entry(CacheKey::from_icon(base)).or_default();
+
+        let valid = snapshots
+            .iter()
+            .zip(stages)
+            .take_while(|(snap, stage)| snap.version == stage.version())
+            .count();
+        snapshots.truncate(valid);
+
+        if valid == stages.len() {
+            return Ok(match snapshots.last() {
+                Some(snap) => snap.ctx.image.clone(),
+                None => base.clone(),
+            });
         }
 
-        fn invalidate_all(&mut self) {
-            $(self.$layer.invalidate();)+
+        let mut ctx = match snapshots.last() {
+            Some(snap) => snap.ctx.clone(),
+            None => RenderContext {
+                image: base.clone(),
+                surface_color,
+                dominant_color: None,
+            },
+        };
+
+        for stage in &stages[valid..] {
+            stage.run(&mut ctx)?;
+            snapshots.push(Snapshot {
+                version: stage.version(),
+                ctx: ctx.clone(),
+            });
         }
-    };
+
+        Ok(ctx.image)
+    }
 }
-pub(crate) use layer_set_versions;
 
 // ============================================================================
 // IconCustomizer<L>
@@ -67,7 +108,7 @@ pub(crate) use layer_set_versions;
 ///
 /// Holds a base icon set (via [`IconBase`]) and an ordered set of layers
 /// (via the [`LayerSet`] trait). The engine handles rendering, size lookup,
-/// and composite caching — the layer set handles layer-specific logic.
+/// and per-stage caching — the layer set handles layer-specific logic.
 ///
 /// Specialized customizer types are constructed as type aliases:
 /// - [`FolderIconCustomizer`](crate::FolderIconCustomizer) = `IconCustomizer<FolderLayers>`
@@ -111,8 +152,7 @@ pub struct IconCustomizer<L: LayerSet> {
     /// The layer set. Access layers directly to configure them.
     pub layers: L,
 
-    /// Composite cache for final rendered images.
-    composite: CompositeLayer,
+    cache: StageCache,
 }
 
 impl<L: LayerSet> IconCustomizer<L> {
@@ -121,7 +161,7 @@ impl<L: LayerSet> IconCustomizer<L> {
         Self {
             base,
             layers,
-            composite: CompositeLayer::default(),
+            cache: StageCache::default(),
         }
     }
 
@@ -154,16 +194,13 @@ impl<L: LayerSet> IconCustomizer<L> {
     /// Returns [`RenderError::NoBaseIcon`] if no base icon matches the size,
     /// or a render error if a layer fails.
     fn render(&mut self, logical_size: u32) -> Result<IconImage, RenderError> {
-        let Self {
-            base,
-            layers,
-            composite,
-        } = self;
-        let icon = base
+        let icon = self
+            .base
             .icons()
             .find_by_logical_size(logical_size)
             .ok_or(RenderError::NoBaseIcon { logical_size })?;
-        Self::render_icon(layers, composite, base.surface_color(), icon)
+        self.cache
+            .render(icon, self.base.surface_color().copied(), &self.layers.stages())
     }
 
     /// Renders all sizes in the base icon set with customizations applied.
@@ -174,55 +211,20 @@ impl<L: LayerSet> IconCustomizer<L> {
     ///
     /// Returns a render error if any layer fails.
     fn render_all(&mut self) -> Result<IconSet, RenderError> {
-        let Self {
-            base,
-            layers,
-            composite,
-        } = self;
-        let rendered = base
+        let surface = self.base.surface_color().copied();
+        let stages = self.layers.stages();
+        let rendered = self
+            .base
             .icons()
             .iter()
-            .map(|icon| Self::render_icon(layers, composite, base.surface_color(), icon))
+            .map(|icon| self.cache.render(icon, surface, &stages))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(IconSet::from_images(rendered))
     }
 
-    /// Renders a single icon through the layer set with composite caching.
-    ///
-    /// Takes the customizer's fields separately so callers can keep borrowing
-    /// `base` while the layers and cache are mutated.
-    fn render_icon(
-        layers: &mut L,
-        composite: &mut CompositeLayer,
-        surface_color: Option<&SurfaceColor>,
-        base: &IconImage,
-    ) -> Result<IconImage, RenderError> {
-        let key = CacheKey::from_icon(base);
-        let composite_deps = layers.combined_version();
-
-        // Check composite cache first
-        if let Some(cached) = composite.get_cached(key, composite_deps) {
-            return Ok(cached.clone());
-        }
-
-        // Create render context; set surface color if folder-based
-        let mut ctx = RenderContext::new(base.clone());
-        if let Some(sc) = surface_color {
-            ctx.set(*sc);
-        }
-
-        // Execute the layer set
-        layers.execute(&mut ctx, key)?;
-
-        // Cache the final result
-        composite.store(key, ctx.image.clone(), composite_deps);
-        Ok(ctx.image)
-    }
-
-    /// Clears all layer caches and the composite cache.
+    /// Drops every cached stage snapshot.
     pub fn clear_cache(&mut self) {
-        self.layers.invalidate_all();
-        self.composite.invalidate();
+        self.cache.by_size.clear();
     }
 }
 
@@ -234,5 +236,148 @@ impl<L: LayerSet> Render for IconCustomizer<L> {
     }
     fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
         self.render(size)
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::icon::RectPx;
+    use image::RgbaImage;
+    use std::cell::Cell;
+
+    /// A stage that records how often it ran and paints its id into pixel (0, 0).
+    struct Counting {
+        id: u8,
+        version: Cell<u64>,
+        runs: Cell<usize>,
+    }
+
+    impl Counting {
+        fn new(id: u8) -> Self {
+            Self {
+                id,
+                version: Cell::new(0),
+                runs: Cell::new(0),
+            }
+        }
+
+        fn bump(&self) {
+            self.version.set(self.version.get() + 1);
+        }
+    }
+
+    impl Stage for Counting {
+        fn version(&self) -> u64 {
+            self.version.get()
+        }
+
+        fn run(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+            self.runs.set(self.runs.get() + 1);
+            let px = ctx.image.data.get_pixel_mut(0, 0);
+            px.0[self.id as usize] = px.0[self.id as usize].wrapping_add(1);
+            Ok(())
+        }
+    }
+
+    fn base(size: u32) -> IconImage {
+        IconImage::new(
+            RgbaImage::new(size, size),
+            1.0,
+            RectPx::from_size(size, size),
+        )
+    }
+
+    fn runs(stages: &[Counting]) -> Vec<usize> {
+        stages.iter().map(|s| s.runs.get()).collect()
+    }
+
+    #[test]
+    fn unchanged_pipeline_runs_nothing_twice() {
+        let stages = [Counting::new(0), Counting::new(1), Counting::new(2)];
+        let refs: Vec<&dyn Stage> = stages.iter().map(|s| s as &dyn Stage).collect();
+        let mut cache = StageCache::default();
+
+        let first = cache.render(&base(8), None, &refs).unwrap();
+        let second = cache.render(&base(8), None, &refs).unwrap();
+
+        assert_eq!(runs(&stages), [1, 1, 1]);
+        assert_eq!(first.data.as_raw(), second.data.as_raw());
+        // Each stage painted exactly once into the cached image.
+        assert_eq!(first.data.get_pixel(0, 0).0, [1, 1, 1, 0]);
+    }
+
+    #[test]
+    fn changing_a_stage_reruns_only_it_and_later_stages() {
+        let stages = [Counting::new(0), Counting::new(1), Counting::new(2)];
+        let refs: Vec<&dyn Stage> = stages.iter().map(|s| s as &dyn Stage).collect();
+        let mut cache = StageCache::default();
+
+        cache.render(&base(8), None, &refs).unwrap();
+        stages[1].bump();
+        let image = cache.render(&base(8), None, &refs).unwrap();
+
+        assert_eq!(runs(&stages), [1, 2, 2]);
+        // Stage 0's output was reused, not re-painted on top of itself.
+        assert_eq!(image.data.get_pixel(0, 0).0, [1, 1, 1, 0]);
+    }
+
+    #[test]
+    fn changing_the_last_stage_costs_one_stage() {
+        let stages = [Counting::new(0), Counting::new(1), Counting::new(2)];
+        let refs: Vec<&dyn Stage> = stages.iter().map(|s| s as &dyn Stage).collect();
+        let mut cache = StageCache::default();
+
+        cache.render(&base(8), None, &refs).unwrap();
+        stages[2].bump();
+        cache.render(&base(8), None, &refs).unwrap();
+
+        assert_eq!(runs(&stages), [1, 1, 2]);
+    }
+
+    #[test]
+    fn sizes_are_cached_independently() {
+        let stages = [Counting::new(0)];
+        let refs: Vec<&dyn Stage> = stages.iter().map(|s| s as &dyn Stage).collect();
+        let mut cache = StageCache::default();
+
+        cache.render(&base(8), None, &refs).unwrap();
+        cache.render(&base(16), None, &refs).unwrap();
+        cache.render(&base(8), None, &refs).unwrap();
+
+        assert_eq!(runs(&stages), [2]);
+    }
+
+    #[test]
+    fn empty_pipeline_returns_the_base() {
+        let mut cache = StageCache::default();
+        let image = cache.render(&base(8), None, &[]).unwrap();
+        assert_eq!(image.data.as_raw(), base(8).data.as_raw());
+    }
+
+    #[test]
+    fn surface_color_reaches_the_first_stage() {
+        struct Probe(Cell<Option<SurfaceColor>>);
+        impl Stage for Probe {
+            fn version(&self) -> u64 {
+                0
+            }
+            fn run(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+                self.0.set(ctx.surface_color);
+                Ok(())
+            }
+        }
+
+        let probe = Probe(Cell::new(None));
+        let surface = SurfaceColor::new(1, 2, 3);
+        StageCache::default()
+            .render(&base(8), Some(surface), &[&probe])
+            .unwrap();
+
+        assert_eq!(probe.0.get(), Some(surface));
     }
 }

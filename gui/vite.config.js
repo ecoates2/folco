@@ -11,6 +11,12 @@ export default defineConfig(async () => ({
     sveltekit(),
   ],
 
+  // The wasm-bindgen glue locates the .wasm via `new URL(..., import.meta.url)`.
+  // Pre-bundling would move the JS into .vite/deps/ without the .wasm beside it.
+  optimizeDeps: {
+    exclude: ["folco-renderer-wasm"],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

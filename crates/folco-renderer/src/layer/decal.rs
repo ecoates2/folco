@@ -1,10 +1,8 @@
 //! Decal imprint layer — configuration and rendering.
 
 use super::svg::{SvgSource, render_source_with_color};
-use super::{CacheKey, DependencyVersion, DominantColor, Layer, LayerConfig, RenderContext};
+use super::{LayerConfig, RasterPaint, RenderContext};
 use crate::error::RenderError;
-use crate::icon::SurfaceColor;
-use image::RgbaImage;
 use palette::{Hsl, IntoColor, Srgb};
 
 const DECAL_DARKEN_AMOUNT: f32 = 0.25;
@@ -15,11 +13,10 @@ const DECAL_DARKEN_AMOUNT: f32 = 0.25;
 
 /// Configuration for decal imprint — pure data.
 ///
-/// Stores the SVG source and scale factor. Rendering logic
-/// (color derivation, positioning, compositing) lives on
-/// [`Layer<DecalConfig>`].
+/// Stores the SVG source and scale factor. Rendering (color derivation,
+/// positioning, compositing) happens in [`RasterPaint::paint`].
 ///
-/// For full-color SVGs or emojis, use [`ImageOverlayConfig`] instead.
+/// For full-color SVGs or emojis, use [`ImageOverlayConfig`](super::ImageOverlayConfig) instead.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
@@ -53,62 +50,44 @@ impl LayerConfig for DecalConfig {
 // Layer Rendering
 // ============================================================================
 
-impl Layer<DecalConfig> {
-    /// Render this decal layer, returning a tile for compositing.
+impl RasterPaint for DecalConfig {
+    /// Imprints the decal at the center of the content bounds.
     ///
-    /// Returns `None` if inactive. The tile is a transparent canvas with
-    /// the decal rendered at the center using a darkened version of the
-    /// upstream [`DominantColor`] (or the [`SurfaceColor`] fallback).
-    pub fn render_tile(
-        &mut self,
-        ctx: &mut RenderContext,
-        key: CacheKey,
-        deps: DependencyVersion,
-    ) -> Result<Option<&RgbaImage>, RenderError> {
-        self.cached_tile(key, deps, |config| render_decal(config, ctx))
+    /// Tinted with a darkened [`RenderContext::dominant_color`] when a
+    /// recolor ran upstream, otherwise with the darkened surface color.
+    fn paint(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {
+        let dominant_color = ctx
+            .dominant_color
+            .map(|c| c.as_tuple())
+            .unwrap_or_else(|| {
+                let sc = ctx
+                    .surface_color
+                    .expect("SurfaceColor must be set in RenderContext");
+                (sc.r, sc.g, sc.b, 255)
+            });
+
+        let darkened = darken_color(dominant_color, DECAL_DARKEN_AMOUNT);
+
+        let bounds = ctx.image.content_bounds;
+        let min_dim = bounds.width.min(bounds.height) as f32;
+        let decal_size = (min_dim * self.scale) as u32;
+        if decal_size == 0 {
+            return Ok(());
+        }
+
+        let decal_img = render_source_with_color(&self.source, decal_size, Some(darkened))?;
+
+        let center_x = bounds.x as i32 + (bounds.width as i32 - decal_img.width() as i32) / 2;
+        let center_y = bounds.y as i32 + (bounds.height as i32 - decal_img.height() as i32) / 2;
+
+        image::imageops::overlay(
+            &mut ctx.image.data,
+            &decal_img,
+            i64::from(center_x),
+            i64::from(center_y),
+        );
+        Ok(())
     }
-}
-
-/// Renders a decal onto a transparent tile matching the icon dimensions.
-///
-/// Uses [`DominantColor`] from the context if available, otherwise falls
-/// back to the [`SurfaceColor`]. The color is darkened before rendering.
-pub(crate) fn render_decal(
-    config: &DecalConfig,
-    ctx: &RenderContext,
-) -> Result<RgbaImage, RenderError> {
-    let dominant_color = ctx
-        .get::<DominantColor>()
-        .map(|c| c.as_tuple())
-        .unwrap_or_else(|| {
-            let sc = ctx
-                .get::<SurfaceColor>()
-                .expect("SurfaceColor must be set in RenderContext");
-            (sc.r, sc.g, sc.b, 255)
-        });
-
-    let darkened = darken_color(dominant_color, DECAL_DARKEN_AMOUNT);
-
-    let bounds = ctx.image.content_bounds;
-    let min_dim = bounds.width.min(bounds.height) as f32;
-    let decal_size = (min_dim * config.scale) as u32;
-
-    let width = ctx.image.data.width();
-    let height = ctx.image.data.height();
-    let mut tile = RgbaImage::new(width, height);
-
-    if decal_size == 0 {
-        return Ok(tile);
-    }
-
-    let decal_img = render_source_with_color(&config.source, decal_size, Some(darkened))?;
-
-    let center_x = bounds.x as i32 + (bounds.width as i32 - decal_img.width() as i32) / 2;
-    let center_y = bounds.y as i32 + (bounds.height as i32 - decal_img.height() as i32) / 2;
-
-    image::imageops::overlay(&mut tile, &decal_img, i64::from(center_x), i64::from(center_y));
-
-    Ok(tile)
 }
 
 // ============================================================================

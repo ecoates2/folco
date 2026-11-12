@@ -11,43 +11,41 @@
 //! [`SvgFolderLayers`] holds SVG-compatible layers that realize medium-neutral
 //! profile intents in vector form. Currently:
 //! - **Color dot** — a colored badge in the bottom-right, drawn as a nested
-//!   `<svg>` rather than a rasterized tile.
+//!   `<svg>` rather than rasterized pixels.
 //! - **Overlay** — the vector analogue of the raster image overlay. The source
 //!   (SVG, emoji, or raster) is embedded as an SVG `<image>` element.
 //!
 //! The solid-color intent has no vector analogue: an arbitrary SVG can't be
 //! HSL-shifted, so profiles carrying one are applied without it.
 
+use std::collections::HashMap;
+
 use crate::capabilities::{IconBaseKind, IconCapabilities};
-use crate::customizer::layer_set_versions;
 use crate::error::RenderError;
 use crate::icon::{IconImage, SvgFolderIconBase};
-use crate::layer::{
-    CacheKey, ColorDotConfig, CompositeLayer, DependencyVersion, ImageOverlayConfig,
-};
+use crate::layer::{ColorDotConfig, ImageOverlayConfig};
 use crate::medium::SvgCanvas;
 use crate::profile::CustomizationProfile;
-use crate::svg_layer::SvgLayer;
+use crate::svg_layer::{SvgLayer, SvgStage};
 use crate::{FolderProfile, ImageSource, Render};
 
 // ============================================================================
 // SvgLayerSet
 // ============================================================================
 
-/// Trait for an ordered set of SVG-medium layers.
+/// An ordered set of SVG-medium layers.
 ///
-/// The vector counterpart to [`LayerSet`](crate::LayerSet). Implementors append
-/// markup to the [`SvgCanvas`] in order; the customizer serializes the result
-/// once (SVG output is resolution-independent, so there is no per-size loop).
+/// The vector counterpart to [`LayerSet`](crate::LayerSet): implementors hand
+/// back their layers as [`SvgStage`]s in composition order, and the customizer
+/// appends each fragment to the [`SvgCanvas`] in turn.
 pub trait SvgLayerSet {
-    /// Execute all layers against the canvas in order.
-    fn execute(&mut self, canvas: &mut SvgCanvas<'_>) -> Result<(), RenderError>;
+    /// The layers to run, in order. Later fragments paint over earlier ones.
+    fn stages(&self) -> Vec<&dyn SvgStage>;
 
-    /// Combined version of all layers, used to detect changes for caching.
-    fn combined_version(&self) -> DependencyVersion;
-
-    /// Invalidate all layer caches.
-    fn invalidate_all(&mut self);
+    /// Current version of every stage, in order.
+    fn versions(&self) -> Vec<u64> {
+        self.stages().iter().map(|s| s.version()).collect()
+    }
 }
 
 pub struct SvgRenderOutput {
@@ -71,17 +69,30 @@ pub struct SvgFolderLayers {
 }
 
 impl SvgLayerSet for SvgFolderLayers {
-    fn execute(&mut self, canvas: &mut SvgCanvas<'_>) -> Result<(), RenderError> {
-        if let Some(fragment) = self.color_dot.render_fragment() {
-            canvas.push_overlay(fragment);
-        }
-        if let Some(fragment) = self.overlay.render_fragment()? {
-            canvas.push_overlay(fragment);
-        }
-        Ok(())
+    fn stages(&self) -> Vec<&dyn SvgStage> {
+        vec![&self.color_dot, &self.overlay]
     }
+}
 
-    layer_set_versions!(color_dot, overlay);
+// ============================================================================
+// PreviewCache
+// ============================================================================
+
+/// Rasterized previews by size, valid for one set of layer versions.
+#[derive(Default)]
+struct PreviewCache {
+    versions: Vec<u64>,
+    by_size: HashMap<u32, IconImage>,
+}
+
+impl PreviewCache {
+    /// Drops every preview if the layers have changed since they were made.
+    fn sync(&mut self, versions: Vec<u64>) {
+        if self.versions != versions {
+            self.versions = versions;
+            self.by_size.clear();
+        }
+    }
 }
 
 // ============================================================================
@@ -100,8 +111,7 @@ pub struct SvgIconCustomizer<L> {
     /// The SVG layer set. Access layers directly to configure them.
     pub layers: L,
 
-    /// Rasterized previews, keyed by size and invalidated by layer changes.
-    preview: CompositeLayer,
+    preview: PreviewCache,
 }
 
 impl<L: SvgLayerSet> SvgIconCustomizer<L> {
@@ -109,7 +119,7 @@ impl<L: SvgLayerSet> SvgIconCustomizer<L> {
         Self {
             base_svg,
             layers,
-            preview: CompositeLayer::default(),
+            preview: PreviewCache::default(),
         }
     }
 
@@ -127,7 +137,11 @@ impl<L: SvgLayerSet> SvgIconCustomizer<L> {
     /// Returns a render error if a layer fails.
     fn render_output(&mut self) -> Result<SvgRenderOutput, RenderError> {
         let mut canvas = SvgCanvas::new(&self.base_svg);
-        self.layers.execute(&mut canvas)?;
+        for stage in self.layers.stages() {
+            if let Some(fragment) = stage.fragment()? {
+                canvas.push_overlay(fragment);
+            }
+        }
         Ok(SvgRenderOutput {
             rendered_svg: canvas.into_svg(),
         })
@@ -145,10 +159,8 @@ impl<L: SvgLayerSet> SvgIconCustomizer<L> {
     ///
     /// Returns a render error if a layer fails or the SVG cannot be rasterized.
     fn render_raster_preview(&mut self, size: u32) -> Result<IconImage, RenderError> {
-        let key = CacheKey::new(size, size, 1.0);
-        let deps = self.layers.combined_version();
-
-        if let Some(cached) = self.preview.get_cached(key, deps) {
+        self.preview.sync(self.layers.versions());
+        if let Some(cached) = self.preview.by_size.get(&size) {
             return Ok(cached.clone());
         }
 
@@ -156,14 +168,13 @@ impl<L: SvgLayerSet> SvgIconCustomizer<L> {
         let rgba = ImageSource::svg(svg.rendered_svg).render_at_size(size)?;
         let image = IconImage::new_full_content(rgba, 1.0);
 
-        self.preview.store(key, image.clone(), deps);
+        self.preview.by_size.insert(size, image.clone());
         Ok(image)
     }
 
-    /// Clears all layer caches.
+    /// Drops every cached preview.
     pub fn clear_cache(&mut self) {
-        self.layers.invalidate_all();
-        self.preview.invalidate();
+        self.preview.by_size.clear();
     }
 }
 
@@ -260,22 +271,21 @@ mod tests {
         SvgFolderIconBase::new(BASE_SVG)
     }
 
-    /// Catches a layer added to the struct and `execute()` but left out of
-    /// `layer_set_versions!`.
+    /// Catches a layer added to the struct but left out of `stages()`.
     #[test]
-    fn every_layer_changes_combined_version() {
-        let baseline = SvgFolderLayers::default().combined_version();
+    fn every_layer_is_a_stage() {
+        let baseline = SvgFolderLayers::default().versions();
         let placement = Placement::new(OverlayPosition::Center, OverlayAnchorMode::Inset, 0.5);
 
         let mut dot = SvgFolderLayers::default();
         dot.color_dot.set_config(Some(ColorDotConfig::new(1, 2, 3)));
-        assert_ne!(dot.combined_version(), baseline, "color_dot untracked");
+        assert_ne!(dot.versions(), baseline, "color_dot not in stages()");
 
         let mut overlay = SvgFolderLayers::default();
         overlay
             .overlay
             .set_config(Some(ImageOverlayConfig::from_svg("<svg/>", placement)));
-        assert_ne!(overlay.combined_version(), baseline, "overlay untracked");
+        assert_ne!(overlay.versions(), baseline, "overlay not in stages()");
     }
 
     #[test]
@@ -289,16 +299,9 @@ mod tests {
         let mut customizer = SvgFolderIconCustomizer::from_folder(test_base());
         customizer.render_raster_preview(32).unwrap();
 
-        let key = CacheKey::new(32, 32, 1.0);
-        let deps = customizer.layers.combined_version();
-        assert!(customizer.preview.get_cached(key, deps).is_some());
+        assert!(customizer.preview.by_size.contains_key(&32));
         // A size we never asked for must not be served from the 32px entry.
-        assert!(
-            customizer
-                .preview
-                .get_cached(CacheKey::new(64, 64, 1.0), deps)
-                .is_none()
-        );
+        assert!(!customizer.preview.by_size.contains_key(&64));
     }
 
     #[test]
@@ -325,9 +328,7 @@ mod tests {
         customizer.render_raster_preview(32).unwrap();
         customizer.clear_cache();
 
-        let key = CacheKey::new(32, 32, 1.0);
-        let deps = customizer.layers.combined_version();
-        assert!(customizer.preview.get_cached(key, deps).is_none());
+        assert!(customizer.preview.by_size.is_empty());
     }
 
     #[test]

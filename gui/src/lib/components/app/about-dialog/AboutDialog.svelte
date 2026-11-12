@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getVersion } from '@tauri-apps/api/app';
+	import { getVersion, getTauriVersion } from '@tauri-apps/api/app';
 	import { resolveResource } from '@tauri-apps/api/path';
 	import { readTextFile } from '@tauri-apps/plugin-fs';
 	import { openUrl } from '@tauri-apps/plugin-opener';
@@ -14,6 +14,7 @@
 	let { open = $bindable(false) }: Props = $props();
 
 	let version = $state<string | null>(null);
+	let tauriVersion = $state<string | null>(null);
 	let metadata = $state<AppMetadata | null>(null);
 	let iconUrl = $state<string | null>(null);
 
@@ -41,6 +42,7 @@
 		// These reject outside Tauri (browser dev server); missing pieces are just omitted.
 		const ignore = () => {};
 		getVersion().then((v) => (version = v), ignore);
+		getTauriVersion().then((v) => (tauriVersion = v), ignore);
 		getAppMetadata().then((m) => (metadata = m), ignore);
 		loadIconUrl().then((url) => (iconUrl = url), ignore);
 	});
@@ -63,6 +65,11 @@
 							Debug build
 						</span>
 					{/if}
+				</p>
+			{/if}
+			{#if tauriVersion}
+				<p class="flex items-center gap-2 text-sm text-muted-foreground">
+					Tauri {tauriVersion}
 				</p>
 			{/if}
 			<Dialog.Description class="pt-2">

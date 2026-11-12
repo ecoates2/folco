@@ -97,7 +97,25 @@ This phase is the lever for everything downstream. Order matters; each step is i
 - [x] `layer_set_versions!(a, b, ...)` in `customizer.rs`, `pub(crate) use`d. It expands to the `combined_version` / `invalidate_all` **trait methods directly inside the `impl LayerSet for` / `impl SvgLayerSet for` block** (both traits share those method names), so there's no inherent `versions()` helper — one list per layer set, period. All four sets use it in execution order; `FolderLayers` is now `solid_color, decal, color_dot, overlay`, fixing the ordering mismatch. `FolderLayers::versions()` deleted.
 - [x] `every_layer_changes_combined_version` test in each of the four layer-set files. Mutation-checked: removing `decal` from the `FolderLayers` list makes exactly that test fail.
 
-### 2e. The `AnyCustomizer` trait (the big one)
+### 2d′. Stage-snapshot cache (replaces the per-layer cache hierarchy) — done 2026-11-11
+
+Prompted by the "is the layer system over-engineered?" review. The three-mechanism cache (per-layer `HashMap<CacheKey, CachedOutput>` + `DependencyVersion` FNV hashing with hand-wired decal→solid edges + `CompositeLayer`) was replaced by one mechanism that is both simpler and faster for live editing.
+
+- [x] **Engine** (`customizer.rs`): `StageCache` keeps, per base size, a `Vec<Snapshot { version, ctx }>` — the `RenderContext` after each stage. A render walks the stage list, reuses the longest prefix whose versions still match, and rebuilds from there. Editing layer *k* re-runs stages ≥ *k* only; editing the last layer costs exactly one stage plus one composite. The composite cache falls out for free (the last snapshot *is* the final image). Six engine tests with a counting `Stage` prove the reuse/rebuild boundaries, size independence, and surface-color plumbing.
+- [x] **Layers**: `Layer<C>` is now just `{ config, version }` (the former `LayerState`); `SvgLayer<C>` is an alias. Rendering moved onto the *config* via `RasterPaint::paint(&self, &mut RenderContext)` / `SvgPaint::fragment(&self)`. Blanket impls `Stage for Layer<C: RasterPaint>` and `SvgStage for Layer<C: SvgPaint>` handle "inactive ⇒ skip" once. Tile layers now draw straight into `ctx.image` at their placement — no full-size transparent tile allocation + 65k-pixel blend per layer per render.
+- [x] **Layer sets**: `LayerSet { fn stages(&self) -> Vec<&dyn Stage> }` and `SvgLayerSet { fn stages(&self) -> Vec<&dyn SvgStage> }`. One list per set, in execution order; it *is* the pipeline. `execute()`, `combined_version()`, `invalidate_all()`, the 2d macro, and the explicit decal→solid wiring are gone — dependency is implied by order. Default `versions()` on both traits backs the SVG preview cache and the "every layer is a stage" tests.
+- [x] **`RenderContext`**: `{ image, surface_color: Option<SurfaceColor>, dominant_color: Option<DominantColor> }`. The `HashMap<TypeId, Box<dyn Any>>` property bag carried exactly those two values.
+- [x] **SVG preview cache**: `PreviewCache { versions: Vec<u64>, by_size }` — plain `Vec<u64>` equality instead of FNV hashing, so the injectivity tests are moot and deleted.
+- Deleted: `DependencyVersion`, `CachedOutput`, `CompositeLayer`, `Layer::cached_tile`/`get_cached`/`store`, `layer_set_versions!`, `render_decal`, `render_color_dot`, `render_overlay`, `layer/state.rs`. Renderer `src/`: −992 / +648 lines net.
+- Behaviour: all pixel-sampling tests pass unchanged. Drawing directly instead of via a transparent tile removes one source-over pass per layer, which is *more* accurate (the tile path could lose 1 LSB in `image`'s blend). `clear_cache()` no longer bumps layer versions — it just drops snapshots, which is what callers meant.
+
+### 2e. The `AnyCustomizer` trait — **to be re-scoped**
+
+The design below predates 2d′ and the simplification review. Before implementing, revisit the review's other points, which shrink this step substantially:
+- `SvgFolderLayers` ≡ `SvgCustomLayers`; `CustomLayers` ⊂ `FolderLayers`. Collapsing to one raster set + one vector set (with `apply_profile` dropping intents via `capabilities()` instead of the type system) means two customizers, not four — and `AnyCustomizer` may be a two-variant enum rather than an object-safe trait.
+- `FolderProfile` / `CustomProfile` are field-copy wrappers that the conformance test shows are redundant with runtime capability filtering.
+
+Original 2e sketch (kept for reference):
 
 Object-safe trait implemented by all four concrete customizers, so `folco-core` and the WASM crate hold `Box<dyn AnyCustomizer>` and stop matching.
 
