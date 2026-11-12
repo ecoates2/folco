@@ -6,66 +6,48 @@
 //! # Example
 //!
 //! ```
-//! use folco_renderer::{FolderIconCustomizer, FolderIconBase, IconSet, SolidColorConfig, DecalConfig, SurfaceColor, Render};
+//! use folco_renderer::{Customizer, RasterCustomizer, FolderIconBase, IconSet, SurfaceColor};
+//! use folco_renderer::{CustomizationProfile, SolidColorConfig, DecalConfig};
 //!
 //! let surface = SurfaceColor::new(255, 217, 112);
 //! let base = FolderIconBase::new(IconSet::new(), surface);
-//! let mut customizer = FolderIconCustomizer::from_folder(base);
+//! let mut customizer: Customizer = RasterCustomizer::from_folder(base).into();
 //!
-//! // Configure layers directly through the layers field
-//! customizer.layers.solid_color.set_config(Some(SolidColorConfig::new(33, 150, 243)));
-//! customizer.layers.decal.set_config(Some(DecalConfig::new("<svg>...</svg>", 0.5)));
+//! // Apply a profile. Intents this base can't realize are dropped.
+//! customizer.apply_profile(
+//!     CustomizationProfile::new()
+//!         .with_solid_color(SolidColorConfig::new(33, 150, 243))
+//!         .with_decal(DecalConfig::new("<svg>...</svg>", 0.5)),
+//! );
 //!
-//! let output = customizer.render_full_output();
+//! // Export what renders, e.g. to send to a backend.
+//! let json = customizer.export_profile().to_json().unwrap();
+//!
+//! // Render the artifact written to the system, in the base's medium.
+//! let output = customizer.render_output();
 //! ```
 //!
-//! # Serializable Profiles
-//!
-//! For frontend-backend communication, use [`CustomizationProfile`]
-//! with the inherent `apply_profile` / `export_profile` methods.
-//! For WASM bindings, see the `folco-renderer-wasm` crate.
-//!
-//! ```
-//! use folco_renderer::{
-//!     FolderIconCustomizer, FolderIconBase, IconSet, SurfaceColor,
-//!     FolderProfile, SolidColorConfig,
-//! };
-//!
-//! let surface = SurfaceColor::new(255, 217, 112);
-//! let mut customizer = FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
-//!
-//! // Apply a profile
-//! let profile = FolderProfile::new()
-//!     .with_solid_color(SolidColorConfig::new(33, 150, 243));
-//! customizer.apply_profile(profile);
-//!
-//! // Export current settings
-//! let exported = customizer.export_profile();
-//! let json = exported.to_json().unwrap();
-//! ```
+//! [`Customizer`] is the one entry point over both media. Reach for
+//! [`RasterCustomizer`] / [`SvgCustomizer`] directly only when you need the
+//! concrete pipeline — e.g. for direct access to [`Layers`] in tests.
 
 mod capabilities;
-mod custom_customizer;
 mod customizer;
 mod error;
 pub mod folder_color;
-mod folder_customizer;
 mod icon;
 pub mod layer;
 pub mod medium;
-pub mod output;
 mod placement;
 mod profile;
-mod svg_custom_customizer;
-mod svg_folder_customizer;
+mod raster_customizer;
+mod svg_customizer;
 pub mod svg_layer;
 
 pub use capabilities::{IconBaseKind, IconCapabilities, LayerKind, LayerRejections};
-pub use custom_customizer::{CustomIconCustomizer, CustomLayers};
-pub use customizer::{IconCustomizer, LayerSet};
+pub use customizer::{Customizer, LayerIntent, Layers, RenderedOutput};
 pub use error::RenderError;
 pub use folder_color::{FolderColor, FolderColorExt, FolderColorMetadata};
-pub use folder_customizer::{FolderIconCustomizer, FolderLayers};
 pub use icon::{
     FolderIconBase, IconBase, IconImage, IconSet, IconSizeSpec, RectPx, SizePx, SurfaceColor,
     SvgFolderIconBase,
@@ -76,11 +58,8 @@ pub use layer::{
     SolidColorConfig, Stage, SvgSource,
 };
 pub use medium::SvgCanvas;
-pub use output::Render;
 pub use placement::{DefaultPlacements, Placement};
-pub use profile::{CustomProfile, CustomizationProfile, FolderProfile};
-pub use svg_custom_customizer::{SvgCustomIconCustomizer, SvgCustomLayers};
-pub use svg_folder_customizer::{
-    SvgFolderIconCustomizer, SvgFolderLayers, SvgIconCustomizer, SvgLayerSet, SvgRenderOutput,
-};
+pub use profile::CustomizationProfile;
+pub use raster_customizer::RasterCustomizer;
+pub use svg_customizer::SvgCustomizer;
 pub use svg_layer::{SvgLayer, SvgPaint, SvgStage};

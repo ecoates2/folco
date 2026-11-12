@@ -225,13 +225,13 @@ impl IconCapabilities {
             .collect()
     }
 
-    /// A copy of `profile` with unrealizable intents removed.
-    pub fn filter(&self, profile: &CustomizationProfile) -> CustomizationProfile {
+    /// `profile` with unrealizable intents removed.
+    pub fn filter(&self, profile: CustomizationProfile) -> CustomizationProfile {
         CustomizationProfile {
-            solid_color: self.solid_color.then_some(profile.solid_color).flatten(),
-            color_dot: self.color_dot.then_some(profile.color_dot).flatten(),
-            decal: self.decal.then(|| profile.decal.clone()).flatten(),
-            overlay: self.overlay.then(|| profile.overlay.clone()).flatten(),
+            solid_color: profile.solid_color.filter(|_| self.solid_color),
+            color_dot: profile.color_dot.filter(|_| self.color_dot),
+            decal: profile.decal.filter(|_| self.decal),
+            overlay: profile.overlay.filter(|_| self.overlay),
         }
     }
 }
@@ -307,7 +307,7 @@ mod tests {
     fn filter_drops_exactly_the_unsupported_layers() {
         let filtered = IconBaseKind::RasterCustomImage
             .capabilities()
-            .filter(&full_profile());
+            .filter(full_profile());
 
         assert!(filtered.solid_color.is_none());
         assert!(filtered.decal.is_none());
@@ -339,52 +339,30 @@ mod tests {
     #[test]
     fn capabilities_match_what_customizers_keep() {
         use crate::icon::{FolderIconBase, IconSet, SurfaceColor, SvgFolderIconBase};
-        use crate::{
-            CustomIconCustomizer, CustomProfile, CustomizationProfile, FolderIconCustomizer,
-            FolderProfile, SvgCustomIconCustomizer, SvgFolderIconCustomizer,
-        };
+        use crate::{Customizer, RasterCustomizer, SvgCustomizer};
 
-        fn assert_keeps_exactly(caps: IconCapabilities, exported: &CustomizationProfile) {
-            for layer in LayerKind::ALL {
-                assert_eq!(exported.carries(layer), caps.supports(layer), "{layer}");
-            }
-        }
-
-        let wire = full_profile();
+        const SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#;
         let surface = SurfaceColor::new(255, 217, 112);
 
-        let mut folder =
-            FolderIconCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface));
-        folder.apply_profile(FolderProfile::from(&wire));
-        assert_keeps_exactly(
-            FolderIconCustomizer::capabilities(),
-            &folder.export_profile(),
-        );
+        let customizers: [Customizer; 4] = [
+            RasterCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface)).into(),
+            SvgCustomizer::from_folder(SvgFolderIconBase::new(SVG)).into(),
+            RasterCustomizer::from_icon_set(IconSet::new()).into(),
+            SvgCustomizer::from_svg(SVG).unwrap().into(),
+        ];
 
-        let mut svg = SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
-        ));
-        svg.apply_profile(FolderProfile::from(&wire));
-        assert_keeps_exactly(
-            SvgFolderIconCustomizer::capabilities(),
-            &svg.export_profile(),
-        );
-
-        let mut custom = CustomIconCustomizer::from_icon_set(IconSet::new());
-        custom.apply_profile(CustomProfile::from(&wire));
-        assert_keeps_exactly(
-            CustomIconCustomizer::capabilities(),
-            &custom.export_profile(),
-        );
-
-        let mut svg_custom = SvgCustomIconCustomizer::from_svg(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>"#,
-        )
-        .unwrap();
-        svg_custom.apply_profile(CustomProfile::from(wire));
-        assert_keeps_exactly(
-            SvgCustomIconCustomizer::capabilities(),
-            &svg_custom.export_profile(),
-        );
+        for mut c in customizers {
+            c.apply_profile(full_profile());
+            let caps = c.capabilities();
+            let exported = c.export_profile();
+            for layer in LayerKind::ALL {
+                assert_eq!(
+                    exported.carries(layer),
+                    caps.supports(layer),
+                    "{:?} / {layer}",
+                    c.base_kind()
+                );
+            }
+        }
     }
 }

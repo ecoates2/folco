@@ -56,10 +56,9 @@ pub use sys::{OutputMedium, PlatformSizeSpec, WriteCapabilities};
 // Re-export key types from folco-renderer for convenience
 // This allows consumers to use profiles without importing the renderer crate directly
 pub use folco_renderer::{
-    ColorDotConfig, CustomIconCustomizer, CustomLayers, CustomProfile, CustomizationProfile,
-    DecalConfig, DefaultPlacements, FolderColor, FolderColorExt, FolderColorMetadata,
-    FolderIconBase, FolderIconCustomizer, FolderLayers, FolderProfile, IconBase, IconBaseKind,
-    IconCapabilities, IconCustomizer, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerKind,
-    LayerSet, OverlayAnchorMode, OverlayPosition, Placement, RectPx, SolidColorConfig,
-    SurfaceColor, SvgSource,
+    ColorDotConfig, Customizer, CustomizationProfile, DecalConfig, DefaultPlacements,
+    FolderColor, FolderColorExt, FolderColorMetadata, FolderIconBase, IconBase, IconBaseKind,
+    IconCapabilities, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerIntent, LayerKind,
+    Layers, OverlayAnchorMode, OverlayPosition, Placement, RasterCustomizer, RectPx,
+    RenderedOutput, SolidColorConfig, SurfaceColor, SvgCustomizer, SvgSource,
 };

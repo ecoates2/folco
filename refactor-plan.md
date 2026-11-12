@@ -109,13 +109,26 @@ Prompted by the "is the layer system over-engineered?" review. The three-mechani
 - Deleted: `DependencyVersion`, `CachedOutput`, `CompositeLayer`, `Layer::cached_tile`/`get_cached`/`store`, `layer_set_versions!`, `render_decal`, `render_color_dot`, `render_overlay`, `layer/state.rs`. Renderer `src/`: −992 / +648 lines net.
 - Behaviour: all pixel-sampling tests pass unchanged. Drawing directly instead of via a transparent tile removes one source-over pass per layer, which is *more* accurate (the tile path could lose 1 LSB in `image`'s blend). `clear_cache()` no longer bumps layer versions — it just drops snapshots, which is what callers meant.
 
-### 2e. The `AnyCustomizer` trait — **to be re-scoped**
+### 2e. One customizer API — done 2026-11-11 (as a two-variant enum, not a trait)
 
-The design below predates 2d′ and the simplification review. Before implementing, revisit the review's other points, which shrink this step substantially:
-- `SvgFolderLayers` ≡ `SvgCustomLayers`; `CustomLayers` ⊂ `FolderLayers`. Collapsing to one raster set + one vector set (with `apply_profile` dropping intents via `capabilities()` instead of the type system) means two customizers, not four — and `AnyCustomizer` may be a two-variant enum rather than an object-safe trait.
-- `FolderProfile` / `CustomProfile` are field-copy wrappers that the conformance test shows are redundant with runtime capability filtering.
+Implemented after the re-scope. Four customizers collapsed to two; the shared surface is an enum.
 
-Original 2e sketch (kept for reference):
+- [x] **`Layers`** (`customizer.rs`): one struct with all four `Layer<C>` slots, owned by *both* pipelines. `set(LayerIntent)`, `apply(profile)`, `export()`, `clear()`. The vector pipeline simply never lists `solid_color`/`decal` as stages.
+- [x] **`RasterCustomizer`** (`raster_customizer.rs`): `{ base: IconBase, layers, cache: StageCache }`. Constructors `from_folder`, `from_image`, `from_icon_set`; `base_kind()` is derived from `IconBase::{Folder, Custom}` at runtime instead of being a per-type constant. Replaces `IconCustomizer<L>`, `FolderIconCustomizer`, `CustomIconCustomizer`, `FolderLayers`, `CustomLayers`, and the `LayerSet` trait.
+- [x] **`SvgCustomizer`** (`svg_customizer.rs`): `{ kind: IconBaseKind, base_svg, layers, preview }`. Constructors `from_folder`, `from_svg`. Replaces `SvgIconCustomizer<L>`, both aliases, both layer sets, `SvgLayerSet`, and `SvgRenderOutput` (now a plain `String`).
+- [x] **`Customizer`** enum `{ Raster, Vector }` with `From` impls and the plan's full method list: `base_kind` / `capabilities` / `rejections` / `default_placements` (derived), `set_layer(LayerIntent) -> bool` (refuses unrealizable layers), `apply_profile` (filters via `capabilities().filter`), `export_profile` (also filtered, so a direct `layers.x.set_config` on an unrealizable layer can't leak into export), `clear_layers`, `render_preview`, `render_output -> RenderedOutput`, `clear_cache`, `base_icons`, `base_svg`. Every medium-dependent method is a two-arm match, in one file.
+- [x] `FolderProfile` / `CustomProfile` deleted. `CustomizationProfile` is the only profile type.
+- [x] `Render` trait and `output.rs` deleted — the associated `Output` type was the object-safety blocker, and with an enum there's nothing to be object-safe about.
+- [x] Conformance test rewritten against `Customizer` for all four bases; `capabilities_match_what_customizers_keep` likewise. Seven new unit tests on `Customizer` pin the refuse/filter/export semantics.
+- **Why an enum instead of `Box<dyn AnyCustomizer>`:** two variants, exhaustively matched, no vtable, no `Box`, and `Customizer::Raster(c)` is still reachable where a caller legitimately needs the concrete type (core's `folder_icon_base()`).
+
+**Absorbed from later phases** (the consumers had to change to compile, and the natural change was the planned one):
+- Phase 3, first bullet: `FolderStrategy` → `Customizer`. `context.rs` 732 → 604; `create_custom_icon_customizer` / `customize_folders_custom_async` deleted; the custom-image path is one `custom_image_customizer(source) -> Customizer` + one `render_and_write`. `SystemFormat for RenderedOutput` added in `convert.rs`.
+- Phase 4, first and third bullets: `ActiveCustomizer` → `Customizer`. `canvas.rs` 736 → 611; zero multi-arm matches remain. **`.d.ts` diffed before/after: only the `CanvasRenderer` doc comment changed.** `bun run check` clean.
+
+Renderer public surface is now: `Customizer`, `RasterCustomizer`, `SvgCustomizer`, `Layers`, `LayerIntent`, `RenderedOutput`, the config types, `CustomizationProfile`, and the capability/placement types.
+
+<details><summary>Original 2e sketch (superseded)</summary>
 
 Object-safe trait implemented by all four concrete customizers, so `folco-core` and the WASM crate hold `Box<dyn AnyCustomizer>` and stop matching.
 
@@ -152,29 +165,31 @@ Object-safe trait implemented by all four concrete customizers, so `folco-core` 
 
 After 2e the renderer's public surface is: four constructors, one trait, the config types, the profile types. That is the API the next two phases consume.
 
-## 5. Phase 3 — `folco-core`: shrink `context.rs` around the trait
+</details>
 
-- [ ] Replace `FolderStrategy` with `strategy: Box<dyn AnyCustomizer>`. All ten `match self.strategy` blocks (`context.rs:235-300, 641`) become one-liners. `from_sys_icon_set` is the only place that still branches (on `SysIconSet.svg.is_some()`), which is correct — that's the platform decision.
-- [ ] `folder_icon_base()` / `folder_icon_svg()` become `strategy.base_icons()` / `strategy.base_svg()` — the Tauri DTO layer already handles the Option.
+## 5. Phase 3 — `folco-core`: shrink `context.rs` around `Customizer`
+
+- [x] (done in 2e) `FolderStrategy` → `customizer: Customizer`. The only branch left is `folder_customizer(sys_set)`, which is the platform decision.
+- [x] (done in 2e) `folder_icon_svg()` is `customizer.base_svg()`. `folder_icon_base()` keeps a two-arm match because the Tauri DTO wants the `FolderIconBase` (icons + surface colour), which only the raster variant has.
 - [ ] Split the file by responsibility (after the above, each part is small enough to be obvious):
   - `context/mod.rs` — `CustomizationContext` struct, `AppInfo`, Debug impl.
   - `context/builder.rs` — `CustomizationContextBuilder` (`:85-160`).
   - `context/operations.rs` — `customize_folders_async`, `reset_folders_async`, `customize_folders_with_image_async`, `render_and_write`, `FolderIconWriter` from Phase 0.
   - `context/custom_image.rs` — `custom_image_medium`, `custom_image_size_spec`, and the medium→customizer construction currently inlined in `customize_folders_with_image_async:787-818`.
-- [ ] `customize_folders_with_image_async` currently constructs either an `SvgCustomIconCustomizer` or a `CustomIconCustomizer` inline and then calls `render_and_write` on two different paths. With the trait it becomes: `let mut c: Box<dyn AnyCustomizer> = self.custom_customizer_for(source)?; c.apply_profile(p); render_and_write(.., || c.render_output()?.into_sys(), ..)`. One path.
-- [ ] Add `impl RenderedOutput { fn into_sys(self) -> SysIconSet }` in core (`convert.rs`) so the `into_sys` calls scattered at `:277, 771, 801` collapse.
+- [x] (done in 2e) `customize_folders_with_image_async` is one path: `custom_image_customizer(source)? → apply_profile → render_and_write`. `create_custom_icon_customizer` and `customize_folders_custom_async` deleted.
+- [x] (done in 2e) `impl SystemFormat for RenderedOutput` in `convert.rs`.
 
-Expected: `context.rs` 925 → four files of ~100-200 lines, zero `match` on medium outside `from_sys_icon_set`.
+Remaining: the file split. `context.rs` is 604 lines; still worth doing but no longer urgent.
 
 ## 6. Phase 4 — WASM: `CanvasRenderer` as a thin shell
 
-- [ ] `ActiveCustomizer` → `active: Box<dyn AnyCustomizer>`. Delete all 45 match arms. Each `set*` method becomes `self.active.set_layer(LayerIntent::X(cfg))`; `supports*`/`capabilities`/`layerRejections`/`defaultPlacements` read `self.active.base_kind()`; `renderOutputSvg` matches on `RenderedOutput` once.
+- [x] (done in 2e) `ActiveCustomizer` → `active: Customizer`. All match arms gone; every `set*` is `self.active.set_layer(LayerIntent::X(cfg))`, the `supports*`/`capabilities`/`layerRejections`/`defaultPlacements` read through `self.active`, `renderOutputSvg` matches `RenderedOutput` once.
 - [ ] The repeated `.map_err(|e| JsError::new(&format!("Failed to …: {e}")))` becomes one `fn js_err(context: &str) -> impl FnOnce(RenderError) -> JsError` helper.
-- [ ] `base_dimensions` (`canvas.rs:630-642`) uses `base_icons()`: `Some(set) => closest size, None => (size, size)`.
-- [ ] Keep the six constructors (`fromPng`, `fromPngMultiple`, `fromFolderIconBase`, `fromSvgFolderIconBase`, `fromCustomImage`, `fromCustomSvg`, `fromCustomSvgRasterized`) — they are the one place that legitimately knows the concrete types.
-- [ ] Re-run `wasm-pack build` and diff `pkg/folco_renderer_wasm.d.ts`: it must be unchanged (the JS API is the contract with the GUI). If anything differs, that's a behaviour change — stop.
+- [x] (done in 2e) `getRenderedDimensions` uses `base_icons()`: `Some(set) => closest size, None => (size, size)`.
+- [x] Kept the seven constructors — they are the one place that legitimately knows the concrete types.
+- [x] (done in 2e) `wasm-pack build` + `.d.ts` diff: only the `CanvasRenderer` doc comment changed.
 
-Expected: `canvas.rs` 736 → ~350 lines.
+`canvas.rs` 736 → 611; the remainder is constructors, parsing, and doc comments.
 
 ## 7. Phase 5 — CLI
 

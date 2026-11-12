@@ -15,7 +15,7 @@ pub use folco_model::SurfaceColor;
 
 /// A base icon set combined with metadata about the icon's appearance.
 ///
-/// This is the primary input to [`FolderIconCustomizer`](crate::FolderIconCustomizer),
+/// This is the primary input to [`RasterCustomizer::from_folder`](crate::RasterCustomizer::from_folder),
 /// pairing the icon images with the surface color needed to compute
 /// color target deltas from target colors.
 #[derive(Debug, Clone, PartialEq)]

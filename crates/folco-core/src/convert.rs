@@ -3,7 +3,7 @@
 //! The opposite direction lives with the base it produces:
 //! [`raster_base`](crate::raster_base) and [`svg_base`](crate::svg_base).
 
-use folco_renderer::{IconSet as RendererIconSet, SvgRenderOutput};
+use folco_renderer::{IconSet as RendererIconSet, RenderedOutput};
 use icon_sys::IconSet as SysIconSet;
 
 /// Trait for types convertible to icon-sys
@@ -27,11 +27,14 @@ impl SystemFormat for RendererIconSet {
     }
 }
 
-impl SystemFormat for SvgRenderOutput {
+impl SystemFormat for RenderedOutput {
     fn into_sys(self) -> SysIconSet {
-        SysIconSet {
-            images: Vec::new(),
-            svg: Some(self.rendered_svg),
+        match self {
+            RenderedOutput::Raster(icons) => icons.into_sys(),
+            RenderedOutput::Vector(svg) => SysIconSet {
+                images: Vec::new(),
+                svg: Some(svg),
+            },
         }
     }
 }
@@ -64,30 +67,15 @@ mod tests {
         let renderer_img = RendererIconImage::new_full_content(rgba, 1.0);
         let renderer_set = RendererIconSet::from_images(vec![renderer_img]);
 
-        let sys_set = renderer_set.into_sys();
+        let sys_set = RenderedOutput::Raster(renderer_set).into_sys();
         assert_eq!(sys_set.images.len(), 1);
         assert!(sys_set.svg.is_none());
     }
 
     #[test]
     fn test_renderer_output_to_sys_vector() {
-        let output = SvgRenderOutput {
-            rendered_svg: "<svg/>".to_string(),
-        };
-        let sys_set = output.into_sys();
+        let sys_set = RenderedOutput::Vector("<svg/>".to_string()).into_sys();
         assert_eq!(sys_set.images.len(), 0);
         assert_eq!(sys_set.svg.as_deref(), Some("<svg/>"));
-    }
-
-    #[test]
-    fn test_convert_svg_to_sys() {
-        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg"></svg>"#;
-        let sys_set = SvgRenderOutput {
-            rendered_svg: svg.to_string(),
-        }
-        .into_sys();
-
-        assert!(sys_set.images.is_empty());
-        assert_eq!(sys_set.svg.as_deref(), Some(svg));
     }
 }

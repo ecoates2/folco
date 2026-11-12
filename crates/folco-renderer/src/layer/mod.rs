@@ -126,6 +126,12 @@ pub trait Stage {
     /// Changes whenever this stage's output could change.
     fn version(&self) -> u64;
 
+    /// Whether [`run`](Self::run) would paint anything. The engine skips
+    /// inactive stages without copying the context.
+    fn is_active(&self) -> bool {
+        true
+    }
+
     /// Runs the stage against `ctx`.
     fn run(&self, ctx: &mut RenderContext) -> Result<(), RenderError>;
 }
@@ -133,6 +139,10 @@ pub trait Stage {
 impl<C: LayerConfig + RasterPaint> Stage for Layer<C> {
     fn version(&self) -> u64 {
         Layer::version(self)
+    }
+
+    fn is_active(&self) -> bool {
+        Layer::is_active(self)
     }
 
     fn run(&self, ctx: &mut RenderContext) -> Result<(), RenderError> {

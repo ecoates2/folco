@@ -13,11 +13,9 @@ use crate::sys::{OutputMedium, RasterFolderMetadata, WriteCapabilities};
 use crate::{raster_base, svg_base};
 
 use folco_renderer::{
-    CustomIconCustomizer, CustomProfile, CustomizationProfile, FolderIconBase,
-    FolderIconCustomizer, FolderProfile, IconBase, IconBaseKind, LayerKind,
-    SvgCustomIconCustomizer, SvgFolderIconCustomizer,
+    Customizer, CustomizationProfile, FolderIconBase, IconBase, ImageSource, LayerKind,
+    RasterCustomizer, SvgCustomizer,
 };
-use folco_renderer::{ImageSource, Render};
 use icon_sys::IconSet as SysIconSet;
 use icon_sys::folder_settings::{FolderSettingsProvider, PlatformFolderSettingsProvider};
 
@@ -145,14 +143,14 @@ impl CustomizationContextBuilder {
         let cache = IconCache::new(cache_config);
         let sys_set = cache.get_sys_icon_set()?;
 
-        // Choose the customization strategy based on the icon medium.
-        let strategy = FolderStrategy::from_sys_icon_set(sys_set)?;
+        // Choose the customization pipeline based on the icon medium.
+        let customizer = folder_customizer(sys_set)?;
 
         // Create the folder settings provider
         let folder_provider = PlatformFolderSettingsProvider::new();
 
         Ok(CustomizationContext {
-            strategy,
+            customizer,
             folder_provider,
         })
     }
@@ -185,110 +183,27 @@ impl std::fmt::Display for UnsupportedLayer {
     }
 }
 
-/// The active folder customization strategy.
+/// Builds the folder customizer for this platform from a system icon set.
 ///
-/// Chosen once at build/refresh time by platform: platforms with raster
-/// metadata for their stock folder icon (Windows) use the raster pipeline,
-/// every other platform uses the vector pipeline over a scalable SVG icon.
-/// This enum is the single place that decides the icon medium — the renderer
-/// stays platform-agnostic.
-enum FolderStrategy {
-    /// Pixel-based pipeline over system PNG icons.
-    Raster(Box<FolderIconCustomizer>),
-    /// Vector pipeline over a scalable system SVG icon.
-    Svg(SvgFolderIconCustomizer),
-}
-
-impl FolderStrategy {
-    /// Builds the appropriate strategy from a system icon set.
-    ///
-    /// Platforms with raster metadata for their stock folder icon (Windows)
-    /// use the raster pipeline. Every other platform must supply a scalable
-    /// SVG and uses the vector pipeline, disregarding raster images.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::MissingScalableFolderIcon`] on vector-only platforms if
-    /// the set has no SVG variant.
-    fn from_sys_icon_set(sys_set: SysIconSet) -> Result<Self> {
-        match RasterFolderMetadata::current_platform() {
-            Some(metadata) => {
-                let base = raster_base::from_sys_icon_set(sys_set, &metadata);
-                Ok(FolderStrategy::Raster(Box::new(
-                    FolderIconCustomizer::from_folder(base),
-                )))
-            }
-            None => {
-                let base = svg_base::from_sys_icon_set(sys_set)?;
-                Ok(FolderStrategy::Svg(SvgFolderIconCustomizer::from_folder(
-                    base,
-                )))
-            }
+/// This is the single place that decides the icon medium: platforms with
+/// raster metadata for their stock folder icon (Windows) use the raster
+/// pipeline; every other platform must supply a scalable SVG and uses the
+/// vector pipeline, disregarding raster images. The renderer stays
+/// platform-agnostic.
+///
+/// # Errors
+///
+/// Returns [`Error::MissingScalableFolderIcon`] on vector-only platforms if
+/// the set has no SVG variant.
+fn folder_customizer(sys_set: SysIconSet) -> Result<Customizer> {
+    match RasterFolderMetadata::current_platform() {
+        Some(metadata) => {
+            let base = raster_base::from_sys_icon_set(sys_set, &metadata);
+            Ok(RasterCustomizer::from_folder(base).into())
         }
-    }
-
-    /// Applies a customization profile to the underlying customizer.
-    ///
-    /// Converts the wire-format [`CustomizationProfile`] into a
-    /// [`FolderProfile`] so the customizer receives the workflow-specific type.
-    fn apply_profile(&mut self, profile: CustomizationProfile) {
-        let folder = FolderProfile::from(profile);
-        match self {
-            FolderStrategy::Raster(c) => c.apply_profile(folder),
-            FolderStrategy::Svg(c) => c.apply_profile(folder),
-        }
-    }
-
-    /// Returns the profile entries [`apply_profile`](Self::apply_profile) would
-    /// silently drop.
-    fn unsupported_layers(&self, profile: &CustomizationProfile) -> Vec<UnsupportedLayer> {
-        let kind = self.base_kind();
-        kind.unsupported_in(profile)
-            .into_iter()
-            .map(|(layer, reason)| UnsupportedLayer { layer, reason })
-            .collect()
-    }
-
-    /// What the active strategy resolved to operate on.
-    fn base_kind(&self) -> IconBaseKind {
-        match self {
-            FolderStrategy::Raster(_) => FolderIconCustomizer::base_kind(),
-            FolderStrategy::Svg(_) => SvgFolderIconCustomizer::base_kind(),
-        }
-    }
-
-    /// Renders the artifact written to the system, in `icon-sys` format.
-    fn render_output(&mut self) -> Result<SysIconSet> {
-        match self {
-            FolderStrategy::Raster(c) => {
-                let rendered = c.render_full_output()?;
-                Ok(rendered.into_sys())
-            }
-            FolderStrategy::Svg(c) => {
-                let svg = c.render_full_output()?;
-                Ok(svg.into_sys())
-            }
-        }
-    }
-
-    /// Returns the raster base, or `None` when the active strategy is SVG-based.
-    fn folder_icon_base(&self) -> Option<&FolderIconBase> {
-        match self {
-            FolderStrategy::Raster(c) => match c.base() {
-                IconBase::Folder(base) => Some(base),
-                IconBase::Custom(_) => {
-                    unreachable!("raster folder customizer always has a folder base")
-                }
-            },
-            FolderStrategy::Svg(_) => None,
-        }
-    }
-
-    /// Returns the base SVG markup when the active strategy is SVG-based.
-    fn base_svg(&self) -> Option<String> {
-        match self {
-            FolderStrategy::Raster(_) => None,
-            FolderStrategy::Svg(c) => Some(c.base_svg().to_owned()),
+        None => {
+            let base = svg_base::from_sys_icon_set(sys_set)?;
+            Ok(SvgCustomizer::from_folder(base).into())
         }
     }
 }
@@ -323,7 +238,7 @@ impl FolderStrategy {
 /// ctx.reset_folders_async(folders, tx).await;
 /// ```
 pub struct CustomizationContext {
-    strategy: FolderStrategy,
+    customizer: Customizer,
     folder_provider: PlatformFolderSettingsProvider,
 }
 
@@ -336,7 +251,13 @@ impl CustomizationContext {
     /// Returns `None` when the platform provided a vector folder icon — use
     /// [`folder_icon_svg`](Self::folder_icon_svg) in that case.
     pub fn folder_icon_base(&self) -> Option<&FolderIconBase> {
-        self.strategy.folder_icon_base()
+        match &self.customizer {
+            Customizer::Raster(c) => match c.base() {
+                IconBase::Folder(base) => Some(base),
+                IconBase::Custom(_) => unreachable!("the folder customizer has a folder base"),
+            },
+            Customizer::Vector(_) => None,
+        }
     }
 
     /// Returns the base folder icon as scalable SVG markup, if available.
@@ -346,7 +267,7 @@ impl CustomizationContext {
     /// this markup directly for crisp scaling, falling back to
     /// [`folder_icon_base`](Self::folder_icon_base) when it returns `None`.
     pub fn folder_icon_svg(&self) -> Option<String> {
-        self.strategy.base_svg()
+        self.customizer.base_svg().map(str::to_owned)
     }
 
     /// Applies a customization profile to the customizer.
@@ -356,7 +277,7 @@ impl CustomizationContext {
     /// [`unsupported_layers`](Self::unsupported_layers) first if that should be
     /// reported rather than ignored.
     pub fn apply_profile(&mut self, profile: CustomizationProfile) {
-        self.strategy.apply_profile(profile);
+        self.customizer.apply_profile(profile);
     }
 
     /// Returns the profile entries this platform's folder icon medium can't
@@ -366,7 +287,12 @@ impl CustomizationContext {
     /// treat a non-empty result as an error: applying anyway produces a
     /// stock-looking icon and reports success.
     pub fn unsupported_layers(&self, profile: &CustomizationProfile) -> Vec<UnsupportedLayer> {
-        self.strategy.unsupported_layers(profile)
+        self.customizer
+            .base_kind()
+            .unsupported_in(profile)
+            .into_iter()
+            .map(|(layer, reason)| UnsupportedLayer { layer, reason })
+            .collect()
     }
 
     /// Resets the icons for the specified folders to system default with progress reporting.
@@ -479,11 +405,11 @@ impl CustomizationContext {
         progress: ProgressSender,
     ) {
         self.apply_profile(profile);
-        let strategy = &mut self.strategy;
+        let customizer = &mut self.customizer;
         render_and_write(
             &self.folder_provider,
             folders,
-            || strategy.render_output(),
+            || Ok(customizer.render_output()?.into_sys()),
             progress,
         )
         .await;
@@ -511,73 +437,30 @@ impl CustomizationContext {
 
     /// Returns the sizes a user-supplied image is rasterized to on this platform.
     ///
-    /// Pass the returned specs to [`IconCustomizer::from_image()`] or
-    /// [`IconSet::from_image_source()`] to generate platform-compatible sizes.
+    /// Pass the returned specs to [`RasterCustomizer::from_image()`] or
+    /// [`IconSet::from_image_source()`](folco_renderer::IconSet::from_image_source)
+    /// to generate platform-compatible sizes.
     pub fn custom_image_size_spec(&self) -> crate::sys::PlatformSizeSpec {
         crate::sys::PlatformSizeSpec::custom_image()
     }
 
-    /// Creates a [`CustomIconCustomizer`] from a user-provided image.
-    ///
-    /// Generates the platform-appropriate set of icon sizes automatically.
-    /// The returned customizer uses the `Custom` base variant — only
-    /// the overlay layer is effective.
+    /// Builds a customizer over `source` in the medium this platform writes it in.
     ///
     /// # Errors
     ///
-    /// Returns an error if the image source cannot be decoded or rendered.
-    pub fn create_custom_icon_customizer(
-        &self,
-        source: &ImageSource,
-    ) -> Result<CustomIconCustomizer> {
-        let specs = self.custom_image_size_spec();
-        Ok(CustomIconCustomizer::from_image(source, specs.sizes())?)
-    }
-
-    /// Applies custom icons to the specified folders with progress reporting.
-    ///
-    /// Renders the customizer once, converts to system format, and writes to
-    /// each folder, reporting progress through a tokio channel.
-    ///
-    /// # Arguments
-    ///
-    /// * `folders` - Collection of folder paths to customize
-    /// * `customizer` - A configured [`CustomIconCustomizer`] (typically from [`create_custom_icon_customizer`](Self::create_custom_icon_customizer))
-    /// * `progress` - Channel sender for progress updates
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use folco_core::{CustomizationContextBuilder, ImageSource, progress::progress_channel};
-    ///
-    /// let ctx = CustomizationContextBuilder::new().build()?;
-    /// let source = ImageSource::svg("<svg>...</svg>");
-    /// let mut customizer = ctx.create_custom_icon_customizer(&source)?;
-    ///
-    /// let (tx, mut rx) = progress_channel(32);
-    ///
-    /// let handle = tokio::spawn(async move {
-    ///     while let Some(p) = rx.recv().await {
-    ///         println!("{:?}", p);
-    ///     }
-    /// });
-    ///
-    /// ctx.customize_folders_custom_async(folders, &mut customizer, tx).await;
-    /// handle.await?;
-    /// ```
-    pub async fn customize_folders_custom_async<P: AsRef<std::path::Path>>(
-        &self,
-        folders: Vec<P>,
-        customizer: &mut CustomIconCustomizer,
-        progress: ProgressSender,
-    ) {
-        render_and_write(
-            &self.folder_provider,
-            folders,
-            || Ok(customizer.render_full_output()?.into_sys()),
-            progress,
-        )
-        .await;
+    /// Returns an error if `source` can't be written on this platform or can't
+    /// be decoded.
+    fn custom_image_customizer(&self, source: &ImageSource) -> Result<Customizer> {
+        let medium = self.custom_image_medium(source)?;
+        Ok(match (medium, source) {
+            (OutputMedium::Vector, ImageSource::Svg(svg)) => {
+                SvgCustomizer::from_svg(svg.resolve()?)?.into()
+            }
+            _ => {
+                let specs = self.custom_image_size_spec();
+                RasterCustomizer::from_image(source, specs.sizes())?.into()
+            }
+        })
     }
 
     /// Uses `source` as the folder icon, decorated per `profile`, on every folder.
@@ -598,26 +481,15 @@ impl CustomizationContext {
         profile: CustomizationProfile,
         progress: ProgressSender,
     ) -> Result<()> {
-        let medium = self.custom_image_medium(source)?;
-        let profile = CustomProfile::from(profile);
-
-        if let (OutputMedium::Vector, ImageSource::Svg(svg)) = (medium, source) {
-            let mut customizer = SvgCustomIconCustomizer::from_svg(svg.resolve()?)?;
-            customizer.apply_profile(profile);
-            render_and_write(
-                &self.folder_provider,
-                folders,
-                || Ok(customizer.render_full_output()?.into_sys()),
-                progress,
-            )
-            .await;
-            return Ok(());
-        }
-
-        let mut customizer = self.create_custom_icon_customizer(source)?;
+        let mut customizer = self.custom_image_customizer(source)?;
         customizer.apply_profile(profile);
-        self.customize_folders_custom_async(folders, &mut customizer, progress)
-            .await;
+        render_and_write(
+            &self.folder_provider,
+            folders,
+            || Ok(customizer.render_output()?.into_sys()),
+            progress,
+        )
+        .await;
         Ok(())
     }
 }

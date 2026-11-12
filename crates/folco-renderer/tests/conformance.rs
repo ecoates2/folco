@@ -1,20 +1,18 @@
-//! Customizer conformance: every customizer must round-trip a profile through
+//! Customizer conformance: every base must round-trip a profile through
 //! `apply_profile` / `export_profile`, keeping exactly the layers its
 //! [`IconBaseKind`] can realize and dropping the ones it rejects.
 //!
-//! This pins the contract a shared customizer trait must preserve.
+//! This is the contract the shared [`Customizer`] API exists to preserve.
 
 use folco_renderer::{
-    ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
-    FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind, IconSet,
-    ImageOverlayConfig, LayerKind, OverlayAnchorMode, OverlayPosition, Placement,
-    SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer, SvgFolderIconBase,
-    SvgFolderIconCustomizer,
+    ColorDotConfig, Customizer, CustomizationProfile, DecalConfig, FolderIconBase, IconBaseKind,
+    IconSet, ImageOverlayConfig, LayerKind, OverlayAnchorMode, OverlayPosition, Placement,
+    RasterCustomizer, SolidColorConfig, SurfaceColor, SvgCustomizer, SvgFolderIconBase,
 };
 
 const BASE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd970"/></svg>"##;
 
-/// A profile carrying every layer, so each customizer has something to reject.
+/// A profile carrying every layer, so each base has something to reject.
 fn full_profile() -> CustomizationProfile {
     CustomizationProfile::new()
         .with_solid_color(SolidColorConfig::new(33, 150, 243))
@@ -51,68 +49,61 @@ fn assert_profiles_eq(actual: &CustomizationProfile, expected: &CustomizationPro
     );
 }
 
-fn assert_conforms<C>(
-    c: &mut C,
-    kind: IconBaseKind,
-    apply: impl Fn(&mut C, &CustomizationProfile),
-    export: impl Fn(&C) -> CustomizationProfile,
-) {
-    let who = format!("{kind:?}");
-
-    let full = full_profile();
-    apply(c, &full);
-    assert_profiles_eq(&export(c), &minus_rejected(full, kind), &who);
-
-    // The profile is authoritative: an empty one clears everything.
-    apply(c, &CustomizationProfile::new());
-    assert_profiles_eq(&export(c), &CustomizationProfile::new(), &who);
+fn every_base() -> [(IconBaseKind, Customizer); 4] {
+    let surface = SurfaceColor::new(255, 217, 112);
+    [
+        (
+            IconBaseKind::RasterFolder,
+            RasterCustomizer::from_folder(FolderIconBase::new(IconSet::new(), surface)).into(),
+        ),
+        (
+            IconBaseKind::VectorFolder,
+            SvgCustomizer::from_folder(SvgFolderIconBase::new(BASE_SVG)).into(),
+        ),
+        (
+            IconBaseKind::RasterCustomImage,
+            RasterCustomizer::from_icon_set(IconSet::new()).into(),
+        ),
+        (
+            IconBaseKind::VectorCustomImage,
+            SvgCustomizer::from_svg(BASE_SVG).unwrap().into(),
+        ),
+    ]
 }
 
 #[test]
-fn raster_folder_conforms() {
-    let mut c = FolderIconCustomizer::from_folder(FolderIconBase::new(
-        IconSet::new(),
-        SurfaceColor::new(255, 217, 112),
-    ));
-    assert_conforms(
-        &mut c,
-        FolderIconCustomizer::base_kind(),
-        |c, p| c.apply_profile(FolderProfile::from(p)),
-        |c| c.export_profile(),
-    );
+fn every_base_reports_its_kind() {
+    for (kind, c) in every_base() {
+        assert_eq!(c.base_kind(), kind);
+    }
 }
 
 #[test]
-fn vector_folder_conforms() {
-    let mut c = SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(BASE_SVG));
-    assert_conforms(
-        &mut c,
-        SvgFolderIconCustomizer::base_kind(),
-        |c, p| c.apply_profile(FolderProfile::from(p)),
-        |c| c.export_profile(),
-    );
+fn every_base_keeps_exactly_what_it_can_realize() {
+    for (kind, mut c) in every_base() {
+        let who = format!("{kind:?}");
+
+        let full = full_profile();
+        c.apply_profile(full.clone());
+        assert_profiles_eq(&c.export_profile(), &minus_rejected(full, kind), &who);
+
+        // The profile is authoritative: an empty one clears everything.
+        c.apply_profile(CustomizationProfile::new());
+        assert_profiles_eq(&c.export_profile(), &CustomizationProfile::new(), &who);
+    }
 }
 
 #[test]
-fn raster_custom_image_conforms() {
-    let mut c = CustomIconCustomizer::from_icon_set(IconSet::new());
-    assert_conforms(
-        &mut c,
-        CustomIconCustomizer::base_kind(),
-        |c, p| c.apply_profile(CustomProfile::from(p)),
-        |c| c.export_profile(),
-    );
-}
-
-#[test]
-fn vector_custom_image_conforms() {
-    let mut c = SvgCustomIconCustomizer::from_svg(BASE_SVG).unwrap();
-    assert_conforms(
-        &mut c,
-        SvgCustomIconCustomizer::base_kind(),
-        |c, p| c.apply_profile(CustomProfile::from(p)),
-        |c| c.export_profile(),
-    );
+fn every_base_renders_a_preview_after_a_full_profile() {
+    for (kind, mut c) in every_base() {
+        c.apply_profile(full_profile());
+        // Empty raster sets have no sizes to render; only check bases that can.
+        if c.base_icons().is_some_and(IconSet::is_empty) {
+            continue;
+        }
+        c.render_preview(32)
+            .unwrap_or_else(|e| panic!("{kind:?}: preview failed: {e}"));
+    }
 }
 
 #[test]

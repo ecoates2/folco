@@ -32,7 +32,6 @@
 //! const profileJson = renderer.export_profile_json();
 //! ```
 
-use folco_renderer::Render;
 use tsify::Ts;
 use tsify::Tsify;
 use wasm_bindgen::Clamped;
@@ -40,12 +39,11 @@ use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use folco_renderer::{
-    ColorDotConfig, CustomIconCustomizer, CustomProfile, CustomizationProfile, DecalConfig,
-    DefaultPlacements, FolderIconBase, FolderIconCustomizer, FolderProfile, IconBaseKind,
-    IconCapabilities, IconImage,
-    IconSet, IconSizeSpec, ImageOverlayConfig, ImageSource, LayerRejections, OverlayAnchorMode,
-    OverlayPosition, Placement, RectPx, SolidColorConfig, SurfaceColor, SvgCustomIconCustomizer,
-    SvgFolderIconBase, SvgFolderIconCustomizer,
+    ColorDotConfig, Customizer, CustomizationProfile, DecalConfig, DefaultPlacements,
+    FolderIconBase, IconCapabilities, IconImage, IconSet, IconSizeSpec, ImageOverlayConfig,
+    ImageSource, LayerIntent, LayerRejections, OverlayAnchorMode, OverlayPosition, Placement,
+    RasterCustomizer, RectPx, RenderedOutput, SolidColorConfig, SurfaceColor,
+    SvgCustomizer, SvgFolderIconBase,
 };
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
@@ -74,7 +72,10 @@ pub(crate) fn parse_overlay_anchor_mode(anchor_mode: &str) -> Result<OverlayAnch
 }
 
 /// Resizes `canvas` to the image and blits its pixels into the 2d context.
-fn draw_rgba_to_canvas(canvas: &HtmlCanvasElement, image: image::RgbaImage) -> Result<(), JsError> {
+fn draw_rgba_to_canvas(
+    canvas: &HtmlCanvasElement,
+    image: &image::RgbaImage,
+) -> Result<(), JsError> {
     let width = image.width();
     let height = image.height();
 
@@ -88,9 +89,8 @@ fn draw_rgba_to_canvas(canvas: &HtmlCanvasElement, image: image::RgbaImage) -> R
         .dyn_into()
         .map_err(|_| JsError::new("Failed to cast to CanvasRenderingContext2d"))?;
 
-    let raw_pixels: Vec<u8> = image.into_raw();
     let image_data =
-        ImageData::new_with_u8_clamped_array_and_sh(Clamped(&raw_pixels), width, height)
+        ImageData::new_with_u8_clamped_array_and_sh(Clamped(image.as_raw()), width, height)
             .map_err(|_| JsError::new("Failed to create ImageData"))?;
 
     ctx.put_image_data(&image_data, 0.0, 0.0)
@@ -103,39 +103,23 @@ fn draw_rgba_to_canvas(canvas: &HtmlCanvasElement, image: image::RgbaImage) -> R
 // CanvasRenderer
 // ============================================================================
 
-/// The customizer backing this renderer, chosen at construction.
-///
-/// Origin (system folder or user image) crossed with medium (raster or
-/// vector). `Folder` and `Custom` are both raster — they differ in whether a
-/// surface color exists to shift against, which is what gates the solid-color
-/// and decal layers.
-enum ActiveCustomizer {
-    /// Pixel pipeline over the system's PNG folder icons.
-    Folder(Box<FolderIconCustomizer>),
-    /// Vector pipeline over the system's scalable SVG folder icon.
-    SvgFolder(Box<SvgFolderIconCustomizer>),
-    /// Pixel pipeline over a user-supplied image.
-    Custom(Box<CustomIconCustomizer>),
-    /// Vector pipeline over a user-supplied SVG.
-    SvgCustom(Box<SvgCustomIconCustomizer>),
-}
-
 /// A live-preview icon renderer targeting an HTML canvas element.
 ///
-/// Wraps whichever customizer matches the icon's origin and medium, and exposes
-/// one layer-configuration API over all of them. Layers the active customizer
-/// can't realize are ignored, so callers configure the same way regardless;
-/// query the `supports*` flags to disable controls rather than let them
-/// silently do nothing. This type is exposed to JavaScript via wasm-bindgen.
+/// Wraps a [`Customizer`] over whichever base the icon came from — system
+/// folder (raster or vector) or user image — and exposes one layer
+/// configuration API. Layers the active base can't realize are ignored, so
+/// callers configure the same way regardless; query the `supports*` flags to
+/// disable controls rather than let them silently do nothing. This type is
+/// exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
 pub struct CanvasRenderer {
-    active: ActiveCustomizer,
+    active: Customizer,
 }
 
 impl CanvasRenderer {
-    fn folder(customizer: FolderIconCustomizer) -> Self {
+    fn wrap(customizer: impl Into<Customizer>) -> Self {
         Self {
-            active: ActiveCustomizer::Folder(Box::new(customizer)),
+            active: customizer.into(),
         }
     }
 
@@ -152,55 +136,15 @@ impl CanvasRenderer {
             return Err(JsError::new("At least one icon size spec is required"));
         }
 
-        let customizer = CustomIconCustomizer::from_image(&source, &specs)
+        let customizer = RasterCustomizer::from_image(&source, &specs)
             .map_err(|e| JsError::new(&format!("Failed to build custom icon: {e}")))?;
-
-        Ok(Self {
-            active: ActiveCustomizer::Custom(Box::new(customizer)),
-        })
+        Ok(Self::wrap(customizer))
     }
 
-    fn set_overlay_config(&mut self, config: Option<ImageOverlayConfig>) {
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => {
-                c.layers.overlay.set_config(config);
-            }
-            ActiveCustomizer::SvgFolder(c) => {
-                c.layers.overlay.set_config(config);
-            }
-            ActiveCustomizer::Custom(c) => {
-                c.layers.overlay.set_config(config);
-            }
-            ActiveCustomizer::SvgCustom(c) => {
-                c.layers.overlay.set_config(config);
-            }
-        }
-    }
-
-    fn render_preview(&mut self, size: u32) -> Result<IconImage, JsError> {
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.render_raster_preview(size),
-            ActiveCustomizer::SvgFolder(c) => c.render_raster_preview(size),
-            ActiveCustomizer::Custom(c) => c.render_raster_preview(size),
-            ActiveCustomizer::SvgCustom(c) => c.render_raster_preview(size),
-        }
-        .map_err(|e| JsError::new(&e.to_string()))
-    }
-
-    fn base_dimensions(icons: &IconSet, size: u32) -> Result<(u32, u32), JsError> {
-        let icon = icons
-            .find_by_logical_size(size)
-            .ok_or_else(|| JsError::new("No icon available at requested size"))?;
-        Ok((icon.data.width(), icon.data.height()))
-    }
-
-    fn base_kind(&self) -> IconBaseKind {
-        match &self.active {
-            ActiveCustomizer::Folder(_) => FolderIconCustomizer::base_kind(),
-            ActiveCustomizer::SvgFolder(_) => SvgFolderIconCustomizer::base_kind(),
-            ActiveCustomizer::Custom(_) => CustomIconCustomizer::base_kind(),
-            ActiveCustomizer::SvgCustom(_) => SvgCustomIconCustomizer::base_kind(),
-        }
+    fn render_preview(&mut self, size: u32) -> Result<&IconImage, JsError> {
+        self.active
+            .render_preview(size)
+            .map_err(|e| JsError::new(&e.to_string()))
     }
 }
 
@@ -239,7 +183,7 @@ impl CanvasRenderer {
         let mut icon_set = IconSet::new();
         icon_set.add_image(icon);
 
-        Ok(Self::folder(FolderIconCustomizer::from_folder(
+        Ok(Self::wrap(RasterCustomizer::from_folder(
             FolderIconBase::new(icon_set, surface_color),
         )))
     }
@@ -281,7 +225,7 @@ impl CanvasRenderer {
             icon_set.add_image(icon);
         }
 
-        Ok(Self::folder(FolderIconCustomizer::from_folder(
+        Ok(Self::wrap(RasterCustomizer::from_folder(
             FolderIconBase::new(icon_set, surface_color),
         )))
     }
@@ -303,7 +247,7 @@ impl CanvasRenderer {
             .into_folder_icon_base()
             .map_err(|e| JsError::new(&format!("Failed to decode icon base: {e}")))?;
 
-        Ok(Self::folder(FolderIconCustomizer::from_folder(base)))
+        Ok(Self::wrap(RasterCustomizer::from_folder(base)))
     }
 
     /// Creates a new renderer from a scalable (SVG) folder icon base.
@@ -314,11 +258,9 @@ impl CanvasRenderer {
         base: Ts<SerializableSvgFolderIconBase>,
     ) -> Result<CanvasRenderer, JsError> {
         let base_rust = base.to_rust()?;
-        let customizer =
-            SvgFolderIconCustomizer::from_folder(SvgFolderIconBase::new(base_rust.svg));
-        Ok(Self {
-            active: ActiveCustomizer::SvgFolder(Box::new(customizer)),
-        })
+        Ok(Self::wrap(SvgCustomizer::from_folder(SvgFolderIconBase::new(
+            base_rust.svg,
+        ))))
     }
 
     /// Creates a renderer for a user-supplied raster image.
@@ -350,11 +292,9 @@ impl CanvasRenderer {
     /// * `svg` - Raw SVG markup
     #[wasm_bindgen(js_name = "fromCustomSvg")]
     pub fn from_custom_svg(svg: String) -> Result<CanvasRenderer, JsError> {
-        let customizer = SvgCustomIconCustomizer::from_svg(svg)
+        let customizer = SvgCustomizer::from_svg(svg)
             .map_err(|e| JsError::new(&format!("Failed to build custom icon: {e}")))?;
-        Ok(Self {
-            active: ActiveCustomizer::SvgCustom(Box::new(customizer)),
-        })
+        Ok(Self::wrap(customizer))
     }
 
     /// Creates a renderer that rasterizes a user-supplied SVG to each size spec.
@@ -380,7 +320,7 @@ impl CanvasRenderer {
     /// control rather than let it silently do nothing.
     #[wasm_bindgen(js_name = "supportsDecal")]
     pub fn supports_decal(&self) -> bool {
-        self.base_kind().capabilities().decal
+        self.active.capabilities().decal
     }
 
     /// Returns `true` if the active customizer supports the solid color layer.
@@ -391,7 +331,7 @@ impl CanvasRenderer {
     /// Every other case offers the color dot instead.
     #[wasm_bindgen(js_name = "supportsSolidColor")]
     pub fn supports_solid_color(&self) -> bool {
-        self.base_kind().capabilities().solid_color
+        self.active.capabilities().solid_color
     }
 
     /// Which layers the resolved base can realize.
@@ -401,13 +341,13 @@ impl CanvasRenderer {
     /// than being reassembled on the JS side.
     #[wasm_bindgen(js_name = "capabilities")]
     pub fn capabilities(&self) -> Result<Ts<IconCapabilities>, JsError> {
-        Ok(self.base_kind().capabilities().into_ts()?)
+        Ok(self.active.capabilities().into_ts()?)
     }
 
     /// Why each unrealizable layer is unavailable, for explaining disabled controls.
     #[wasm_bindgen(js_name = "layerRejections")]
     pub fn layer_rejections(&self) -> Result<Ts<LayerRejections>, JsError> {
-        Ok(self.base_kind().rejections().into_ts()?)
+        Ok(self.active.rejections().into_ts()?)
     }
 
     /// Default overlay and color dot placement for this base's medium.
@@ -415,19 +355,19 @@ impl CanvasRenderer {
     /// The backend applies the same defaults, so the CLI matches the GUI.
     #[wasm_bindgen(js_name = "defaultPlacements")]
     pub fn default_placements(&self) -> Result<Ts<DefaultPlacements>, JsError> {
-        Ok(self.base_kind().default_placements().into_ts()?)
+        Ok(self.active.default_placements().into_ts()?)
     }
 
     /// Returns `true` if the active customizer uses the vector pipeline.
     #[wasm_bindgen(js_name = "isSvg")]
     pub fn is_svg(&self) -> bool {
-        self.base_kind().is_vector()
+        self.active.base_kind().is_vector()
     }
 
     /// Returns `true` if the base icon came from the user rather than the system.
     #[wasm_bindgen(js_name = "isCustom")]
     pub fn is_custom(&self) -> bool {
-        self.base_kind().is_custom()
+        self.active.base_kind().is_custom()
     }
 
     // ---- Layer Configuration ----
@@ -443,19 +383,15 @@ impl CanvasRenderer {
     /// * `target_b` - Target blue channel (0–255)
     #[wasm_bindgen(js_name = "setSolidColor")]
     pub fn set_solid_color(&mut self, target_r: u8, target_g: u8, target_b: u8) {
-        if let ActiveCustomizer::Folder(c) = &mut self.active {
-            c.layers
-                .solid_color
-                .set_config(Some(SolidColorConfig::new(target_r, target_g, target_b)));
-        }
+        self.active.set_layer(LayerIntent::SolidColor(Some(SolidColorConfig::new(
+            target_r, target_g, target_b,
+        ))));
     }
 
     /// Clears the solid color configuration, deactivating the layer.
     #[wasm_bindgen(js_name = "clearSolidColor")]
     pub fn clear_solid_color(&mut self) {
-        if let ActiveCustomizer::Folder(c) = &mut self.active {
-            c.layers.solid_color.set_config(None);
-        }
+        self.active.set_layer(LayerIntent::SolidColor(None));
     }
 
     /// Sets the color-dot badge drawn on top of the icon.
@@ -483,43 +419,16 @@ impl CanvasRenderer {
     ) -> Result<(), JsError> {
         let pos = parse_overlay_position(position)?;
         let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
-        let config = Some(
-            ColorDotConfig::new(r, g, b).with_placement(Placement::new(pos, anchor_mode, scale)),
-        );
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => {
-                c.layers.color_dot.set_config(config);
-            }
-            ActiveCustomizer::SvgFolder(c) => {
-                c.layers.color_dot.set_config(config);
-            }
-            ActiveCustomizer::Custom(c) => {
-                c.layers.color_dot.set_config(config);
-            }
-            ActiveCustomizer::SvgCustom(c) => {
-                c.layers.color_dot.set_config(config);
-            }
-        }
+        let config =
+            ColorDotConfig::new(r, g, b).with_placement(Placement::new(pos, anchor_mode, scale));
+        self.active.set_layer(LayerIntent::ColorDot(Some(config)));
         Ok(())
     }
 
     /// Clears the color-dot configuration, deactivating the layer.
     #[wasm_bindgen(js_name = "clearColorDot")]
     pub fn clear_color_dot(&mut self) {
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => {
-                c.layers.color_dot.set_config(None);
-            }
-            ActiveCustomizer::SvgFolder(c) => {
-                c.layers.color_dot.set_config(None);
-            }
-            ActiveCustomizer::Custom(c) => {
-                c.layers.color_dot.set_config(None);
-            }
-            ActiveCustomizer::SvgCustom(c) => {
-                c.layers.color_dot.set_config(None);
-            }
-        }
+        self.active.set_layer(LayerIntent::ColorDot(None));
     }
 
     /// Sets the decal configuration.
@@ -532,14 +441,11 @@ impl CanvasRenderer {
     /// * `scale` - Scale factor relative to icon bounds (0.0-1.0)
     #[wasm_bindgen(js_name = "setDecal")]
     pub fn set_decal(&mut self, svg_data: Option<String>, scale: f32) {
-        let ActiveCustomizer::Folder(c) = &mut self.active else {
-            return;
-        };
         let config = match svg_data {
             Some(svg) if !svg.is_empty() => Some(DecalConfig::new(svg, scale)),
             _ => None,
         };
-        c.layers.decal.set_config(config);
+        self.active.set_layer(LayerIntent::Decal(config));
     }
 
     /// Sets the overlay configuration.
@@ -572,7 +478,7 @@ impl CanvasRenderer {
             _ => None,
         };
 
-        self.set_overlay_config(config);
+        self.active.set_layer(LayerIntent::Overlay(config));
         Ok(())
     }
 
@@ -600,7 +506,7 @@ impl CanvasRenderer {
         let config =
             ImageOverlayConfig::from_emoji(emoji, Placement::new(pos, anchor_mode, scale))
                 .map_err(|e| JsError::new(&e.to_string()))?;
-        self.set_overlay_config(Some(config));
+        self.active.set_layer(LayerIntent::Overlay(Some(config)));
         Ok(())
     }
 
@@ -619,7 +525,7 @@ impl CanvasRenderer {
         size: u32,
     ) -> Result<(), JsError> {
         let rendered = self.render_preview(size)?;
-        draw_rgba_to_canvas(canvas, rendered.data)
+        draw_rgba_to_canvas(canvas, &rendered.data)
     }
 
     /// Renders a rasterized preview and returns raw RGBA pixel data.
@@ -629,20 +535,24 @@ impl CanvasRenderer {
     pub fn render_to_pixels(&mut self, size: u32) -> Result<js_sys::Uint8Array, JsError> {
         let rendered = self.render_preview(size)?;
 
-        let raw_pixels = rendered.data.into_raw();
+        let raw_pixels = rendered.data.as_raw();
         let array = js_sys::Uint8Array::new_with_length(raw_pixels.len() as u32);
-        array.copy_from(&raw_pixels);
+        array.copy_from(raw_pixels);
         Ok(array)
     }
 
     /// Returns the dimensions of the rendered preview at the given logical size.
     #[wasm_bindgen(js_name = "getRenderedDimensions")]
     pub fn get_rendered_dimensions(&self, size: u32) -> Result<js_sys::Array, JsError> {
-        let (width, height) = match &self.active {
-            ActiveCustomizer::Folder(c) => Self::base_dimensions(c.base_icons(), size)?,
-            ActiveCustomizer::Custom(c) => Self::base_dimensions(c.base_icons(), size)?,
+        let (width, height) = match self.active.base_icons() {
+            Some(icons) => {
+                let icon = icons
+                    .find_by_logical_size(size)
+                    .ok_or_else(|| JsError::new("No icon available at requested size"))?;
+                (icon.data.width(), icon.data.height())
+            }
             // Vector icons are resolution-independent, so any size is valid.
-            ActiveCustomizer::SvgFolder(_) | ActiveCustomizer::SvgCustom(_) => (size, size),
+            None => (size, size),
         };
 
         let arr = js_sys::Array::new();
@@ -657,16 +567,13 @@ impl CanvasRenderer {
     /// produced by the backend.
     #[wasm_bindgen(js_name = "renderOutputSvg")]
     pub fn render_output_svg(&mut self) -> Result<Option<String>, JsError> {
-        match &mut self.active {
-            ActiveCustomizer::Folder(_) | ActiveCustomizer::Custom(_) => Ok(None),
-            ActiveCustomizer::SvgFolder(c) => c
-                .render_full_output()
-                .map(|svg_render_output| Some(svg_render_output.rendered_svg))
-                .map_err(|e| JsError::new(&e.to_string())),
-            ActiveCustomizer::SvgCustom(c) => c
-                .render_full_output()
-                .map(|svg_render_output| Some(svg_render_output.rendered_svg))
-                .map_err(|e| JsError::new(&e.to_string())),
+        if !self.active.base_kind().is_vector() {
+            return Ok(None);
+        }
+        match self.active.render_output() {
+            Ok(RenderedOutput::Vector(svg)) => Ok(Some(svg)),
+            Ok(RenderedOutput::Raster(_)) => Ok(None),
+            Err(e) => Err(JsError::new(&e.to_string())),
         }
     }
 
@@ -675,13 +582,8 @@ impl CanvasRenderer {
     /// Exports the current settings as a JSON string.
     #[wasm_bindgen(js_name = "exportProfileJson")]
     pub fn export_profile_json(&self) -> Result<String, JsError> {
-        let profile = match &self.active {
-            ActiveCustomizer::Folder(c) => c.export_profile(),
-            ActiveCustomizer::SvgFolder(c) => c.export_profile(),
-            ActiveCustomizer::Custom(c) => c.export_profile(),
-            ActiveCustomizer::SvgCustom(c) => c.export_profile(),
-        };
-        profile
+        self.active
+            .export_profile()
             .to_json()
             .map_err(|e| JsError::new(&format!("Failed to serialize profile: {}", e)))
     }
@@ -694,47 +596,18 @@ impl CanvasRenderer {
     pub fn import_profile_json(&mut self, json: &str) -> Result<(), JsError> {
         let wire = CustomizationProfile::from_json(json)
             .map_err(|e| JsError::new(&format!("Failed to parse profile: {}", e)))?;
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.apply_profile(FolderProfile::from(wire)),
-            ActiveCustomizer::SvgFolder(c) => c.apply_profile(FolderProfile::from(wire)),
-            ActiveCustomizer::Custom(c) => c.apply_profile(CustomProfile::from(wire)),
-            ActiveCustomizer::SvgCustom(c) => c.apply_profile(CustomProfile::from(wire)),
-        }
+        self.active.apply_profile(wire);
         Ok(())
     }
 
     /// Clears all customizations and returns to the base icon.
     pub fn reset(&mut self) {
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => {
-                c.layers.solid_color.set_config(None);
-                c.layers.color_dot.set_config(None);
-                c.layers.decal.set_config(None);
-                c.layers.overlay.set_config(None);
-            }
-            ActiveCustomizer::SvgFolder(c) => {
-                c.layers.color_dot.set_config(None);
-                c.layers.overlay.set_config(None);
-            }
-            ActiveCustomizer::Custom(c) => {
-                c.layers.color_dot.set_config(None);
-                c.layers.overlay.set_config(None);
-            }
-            ActiveCustomizer::SvgCustom(c) => {
-                c.layers.color_dot.set_config(None);
-                c.layers.overlay.set_config(None);
-            }
-        }
+        self.active.clear_layers();
     }
 
     /// Clears the render cache to free memory.
     #[wasm_bindgen(js_name = "clearCache")]
     pub fn clear_cache(&mut self) {
-        match &mut self.active {
-            ActiveCustomizer::Folder(c) => c.clear_cache(),
-            ActiveCustomizer::SvgFolder(c) => c.clear_cache(),
-            ActiveCustomizer::Custom(c) => c.clear_cache(),
-            ActiveCustomizer::SvgCustom(c) => c.clear_cache(),
-        }
+        self.active.clear_cache();
     }
 }

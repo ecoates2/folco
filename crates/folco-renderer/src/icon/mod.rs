@@ -27,7 +27,7 @@ pub use svg_folder::SvgFolderIconBase;
 // IconBase
 // ============================================================================
 
-/// The base icon data for an [`IconCustomizer`](crate::IconCustomizer).
+/// The base icon data for a [`RasterCustomizer`](crate::RasterCustomizer).
 ///
 /// This enum distinguishes between folder icons (which carry surface color
 /// metadata for the solid color and decal layers) and user-provided custom

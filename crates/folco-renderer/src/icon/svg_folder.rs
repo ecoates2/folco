@@ -11,7 +11,7 @@
 /// A scalable folder icon.
 ///
 /// This is the primary input to
-/// [`SvgFolderIconCustomizer`](crate::SvgFolderIconCustomizer). It is used when
+/// [`SvgCustomizer::from_folder`](crate::SvgCustomizer::from_folder). It is used when
 /// the platform provides a vector folder icon (e.g. GNOME icon themes), in
 /// which case raster PNGs are disregarded in favor of the SVG.
 #[derive(Debug, Clone, PartialEq)]
