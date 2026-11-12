@@ -48,6 +48,11 @@ use folco_renderer::{
 
 use folco_transfer::{SerializableFolderIconBase, SerializableSvgFolderIconBase};
 
+/// Prefixes an error with what was being attempted, for `map_err`.
+fn js_err<E: std::fmt::Display>(context: &str) -> impl FnOnce(E) -> JsError + '_ {
+    move |e| JsError::new(&format!("{context}: {e}"))
+}
+
 fn parse_overlay_position(position: &str) -> Result<OverlayPosition, JsError> {
     match position {
         "top-left" => Ok(OverlayPosition::TopLeft),
@@ -129,7 +134,7 @@ impl CanvasRenderer {
         size_specs: JsValue,
     ) -> Result<CanvasRenderer, JsError> {
         let specs: Vec<IconSizeSpec> = serde_wasm_bindgen::from_value(size_specs)
-            .map_err(|e| JsError::new(&format!("Failed to parse icon size specs: {e}")))?;
+            .map_err(js_err("Failed to parse icon size specs"))?;
 
         // An empty set would build a renderer whose every render fails later.
         if specs.is_empty() {
@@ -137,14 +142,12 @@ impl CanvasRenderer {
         }
 
         let customizer = RasterCustomizer::from_image(&source, &specs)
-            .map_err(|e| JsError::new(&format!("Failed to build custom icon: {e}")))?;
+            .map_err(js_err("Failed to build custom icon"))?;
         Ok(Self::wrap(customizer))
     }
 
     fn render_preview(&mut self, size: u32) -> Result<&IconImage, JsError> {
-        self.active
-            .render_preview(size)
-            .map_err(|e| JsError::new(&e.to_string()))
+        Ok(self.active.render_preview(size)?)
     }
 }
 
@@ -173,7 +176,7 @@ impl CanvasRenderer {
     ) -> Result<CanvasRenderer, JsError> {
         let surface_color = SurfaceColor::new(surface_r, surface_g, surface_b);
         let img = image::load_from_memory(png_data)
-            .map_err(|e| JsError::new(&format!("Failed to decode PNG: {}", e)))?
+            .map_err(js_err("Failed to decode PNG"))?
             .into_rgba8();
 
         let width = img.width();
@@ -216,7 +219,7 @@ impl CanvasRenderer {
 
             let bytes = png_data.to_vec();
             let img = image::load_from_memory(&bytes)
-                .map_err(|e| JsError::new(&format!("Failed to decode PNG at index {}: {}", i, e)))?
+                .map_err(js_err(&format!("Failed to decode PNG at index {i}")))?
                 .into_rgba8();
 
             let width = img.width();
@@ -245,7 +248,7 @@ impl CanvasRenderer {
         let base = folder_icon_base
             .to_rust()?
             .into_folder_icon_base()
-            .map_err(|e| JsError::new(&format!("Failed to decode icon base: {e}")))?;
+            .map_err(js_err("Failed to decode icon base"))?;
 
         Ok(Self::wrap(RasterCustomizer::from_folder(base)))
     }
@@ -292,8 +295,8 @@ impl CanvasRenderer {
     /// * `svg` - Raw SVG markup
     #[wasm_bindgen(js_name = "fromCustomSvg")]
     pub fn from_custom_svg(svg: String) -> Result<CanvasRenderer, JsError> {
-        let customizer = SvgCustomizer::from_svg(svg)
-            .map_err(|e| JsError::new(&format!("Failed to build custom icon: {e}")))?;
+        let customizer =
+            SvgCustomizer::from_svg(svg).map_err(js_err("Failed to build custom icon"))?;
         Ok(Self::wrap(customizer))
     }
 
@@ -504,8 +507,7 @@ impl CanvasRenderer {
         let pos = parse_overlay_position(position)?;
         let anchor_mode = parse_overlay_anchor_mode(anchor_mode)?;
         let config =
-            ImageOverlayConfig::from_emoji(emoji, Placement::new(pos, anchor_mode, scale))
-                .map_err(|e| JsError::new(&e.to_string()))?;
+            ImageOverlayConfig::from_emoji(emoji, Placement::new(pos, anchor_mode, scale))?;
         self.active.set_layer(LayerIntent::Overlay(Some(config)));
         Ok(())
     }
@@ -585,7 +587,7 @@ impl CanvasRenderer {
         self.active
             .export_profile()
             .to_json()
-            .map_err(|e| JsError::new(&format!("Failed to serialize profile: {}", e)))
+            .map_err(js_err("Failed to serialize profile"))
     }
 
     /// Imports settings from a JSON string.
@@ -594,8 +596,8 @@ impl CanvasRenderer {
     /// saved from one icon still applies to another.
     #[wasm_bindgen(js_name = "importProfileJson")]
     pub fn import_profile_json(&mut self, json: &str) -> Result<(), JsError> {
-        let wire = CustomizationProfile::from_json(json)
-            .map_err(|e| JsError::new(&format!("Failed to parse profile: {}", e)))?;
+        let wire =
+            CustomizationProfile::from_json(json).map_err(js_err("Failed to parse profile"))?;
         self.active.apply_profile(wire);
         Ok(())
     }

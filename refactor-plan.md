@@ -187,19 +187,22 @@ Note: the repo was not `cargo fmt`-clean at HEAD (14 files). The four new `conte
 ## 6. Phase 4 — WASM: `CanvasRenderer` as a thin shell
 
 - [x] (done in 2e) `ActiveCustomizer` → `active: Customizer`. All match arms gone; every `set*` is `self.active.set_layer(LayerIntent::X(cfg))`, the `supports*`/`capabilities`/`layerRejections`/`defaultPlacements` read through `self.active`, `renderOutputSvg` matches `RenderedOutput` once.
-- [ ] The repeated `.map_err(|e| JsError::new(&format!("Failed to …: {e}")))` becomes one `fn js_err(context: &str) -> impl FnOnce(RenderError) -> JsError` helper.
+- [x] `fn js_err<E: Display>(context: &str) -> impl FnOnce(E) -> JsError` replaces every `map_err(|e| JsError::new(&format!("…: {e}")))`. Bare `map_err(|e| JsError::new(&e.to_string()))` on `RenderError` is gone too — `JsError: From<E: Error>` already exists, so `?` does it.
 - [x] (done in 2e) `getRenderedDimensions` uses `base_icons()`: `Some(set) => closest size, None => (size, size)`.
 - [x] Kept the seven constructors — they are the one place that legitimately knows the concrete types.
 - [x] (done in 2e) `wasm-pack build` + `.d.ts` diff: only the `CanvasRenderer` doc comment changed.
 
 `canvas.rs` 736 → 611; the remainder is constructors, parsing, and doc comments.
 
-## 7. Phase 5 — CLI
+## 7. Phase 5 — CLI — done 2026-11-11
 
-- [ ] Extract `async fn run_with_progress_bar(total, verbose, labels: ProgressLabels, op: impl FnOnce(ProgressSender) -> Fut) -> Result<()>` holding the `progress_channel` + `create_progress_bar` + `tokio::spawn` + match block. `ProgressLabels { processing: &'static str }` carries the one string that differs ("Processing" vs "Resetting"). The `Rendering`/`RenderFailed` arms are harmless no-ops for reset, so drop the `_ => {}`. Deletes ~130 lines.
-- [ ] Extract profile construction into a `#[derive(clap::Args)] struct LayerArgs` (the colour / colour-dot / decal / overlay / placement flags) with `fn into_profile(self, mode: Mode) -> Result<CustomizationProfile>`. Folder mode and custom-image mode (`main.rs:343-374`, `393-409`) share the builder; the "at least one layer" rule becomes a match on `mode`. This is also what makes the CLI testable: `LayerArgs::try_parse_from([...]).into_profile(..)` needs no filesystem.
-- [ ] Add those tests (per flag → expected profile field; experimental-gated flags rejected without `--experimental`; empty profile rejected in folder mode, allowed in custom-image mode).
-- [ ] Route the custom-image medium decision through the context method retained in Phase 1 instead of `WriteCapabilities` directly.
+- [x] `run_with_progress_bar(total, verbose, processing: &'static str, op)` owns the channel, bar, spawned handler, and the `op(tx).await` / `handler.await` ordering. `update_bar(pb, progress, processing, verbose)` is the one match. The reset loop's `_ => {}` is gone; `Rendering`/`RenderFailed` are simply never sent for a reset.
+- [x] `#[derive(clap::Args)] struct LayerArgs` is `#[command(flatten)]`ed into `Customize`. `into_profile(self, mode: Mode, experimental: bool) -> Result<CustomizationProfile>` holds every rule: experimental gating, medium defaults (via `Mode::{Folder, CustomIcon { medium }}`), the folder-mode "at least one layer" check. The two JSON-profile flags stay on the command and bypass it.
+- [x] 11 tests, parsing the real `Cli` so `requires`/`conflicts`/`group` rules are exercised: every flag → profile field, medium defaults per mode, explicit placement overrides, experimental gate both ways, empty-profile rule per mode, mode exclusivity.
+- [x] **Bug found by those tests**: `requires = "folder"` on `--color`, `--decal`, `--decal-scale`, `--folder-customization-profile` never fired. `--folder` is a `SetTrue` flag and clap treats its implicit `false` default as "present", so `--custom-icon x --color red` was accepted and `--color` silently ignored (the custom customizer drops it). Replaced with `conflicts_with = "custom_icon"`, which is what the `requires` was trying to say; the default `--decal-scale` correctly does *not* count as a conflict. Regression test added.
+- [x] ~~Route the custom-image medium decision through the context method~~ N/A: Phase 1 made that method private and settled on `WriteCapabilities` as the caller-facing entry point. The CLI needs `caps.custom_image_extensions()` for its error message anyway.
+
+`main.rs` 669 → 789 lines, but ~200 of the new total is tests and the three copy-pasted progress loops (~130 lines) are gone.
 
 ## 8. Phase 6 — GUI (light touch)
 

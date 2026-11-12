@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use folco_core::{
@@ -9,8 +9,12 @@ use folco_core::{
     ImageFormat, ImageOverlayConfig, ImageSource, LayerKind, OutputMedium, OverlayAnchorMode,
     OverlayPosition, Placement, SvgSource, WriteCapabilities,
     folder_color::{FolderColor, FolderColorExt},
-    progress::{Progress, progress_channel},
+    progress::{Progress, ProgressSender, progress_channel},
 };
+
+// ============================================================================
+// Command line
+// ============================================================================
 
 #[derive(Parser)]
 #[command(name = "folco")]
@@ -56,7 +60,7 @@ enum Commands {
         // === Folder-mode JSON profile ===
         /// JSON-serialized CustomizationProfile for folder mode
         /// (alternative to individual --color / --decal / --overlay options)
-        #[arg(long, value_name = "JSON", requires = "folder")]
+        #[arg(long, value_name = "JSON", conflicts_with = "custom_icon")]
         folder_customization_profile: Option<String>,
 
         // === Custom-icon JSON profile ===
@@ -66,63 +70,8 @@ enum Commands {
         #[arg(long, value_name = "JSON", requires = "custom_icon")]
         custom_icon_profile: Option<String>,
 
-        // === Solid Color Options (folder-mode only) ===
-        /// Recolor the whole folder icon to this color by performing an HSL shift against computed averages.
-        /// Only supported on Windows
-        #[arg(long, value_enum, value_name = "COLOR", requires = "folder")]
-        color: Option<FolderColor>,
-
-        // === Color Dot Options (both modes) ===
-        /// Add a colored dot badge. Centered on Windows and placed at the bottom right on Linux
-        #[arg(long, value_enum, value_name = "COLOR")]
-        color_dot: Option<FolderColor>,
-
-        /// Color dot position [experimental; default depends on platform]
-        #[arg(long, value_name = "POSITION", hide = true)]
-        color_dot_position: Option<PositionArg>,
-
-        /// Color dot anchor mode [experimental; default: inset]
-        #[arg(long, value_name = "MODE", hide = true)]
-        color_dot_anchor_mode: Option<AnchorModeArg>,
-
-        /// Color dot scale factor (0.0-1.0) [experimental; default depends on platform]
-        #[arg(long, value_name = "SCALE", hide = true)]
-        color_dot_scale: Option<f32>,
-
-        // === Decal Options (folder-mode only) ===
-        /// Decal source: an SVG file path or raw SVG markup.
-        /// This gets centered on the folder and tinted to a slightly darker color, making it appear imprinted.
-        /// This is only supported on Windows
-        #[arg(long, value_name = "SOURCE", requires = "folder")]
-        decal: Option<String>,
-
-        /// Decal scale factor (0.0-1.0)
-        #[arg(
-            long,
-            value_name = "SCALE",
-            default_value = "0.70",
-            requires = "folder"
-        )]
-        decal_scale: f32,
-
-        // === Overlay Options (both modes) ===
-        /// Overlay source: an SVG file path, raw SVG markup, emoji character, or
-        /// emoji name (e.g. "duck").
-        /// See https://emojibase.dev/emojis for accepted emoji names
-        #[arg(long, value_name = "SOURCE")]
-        overlay: Option<String>,
-
-        /// Overlay position [experimental; default depends on the icon medium]
-        #[arg(long, value_name = "POSITION", hide = true)]
-        overlay_position: Option<PositionArg>,
-
-        /// Overlay anchor mode [experimental; default: inset]
-        #[arg(long, value_name = "MODE", hide = true)]
-        overlay_anchor_mode: Option<AnchorModeArg>,
-
-        /// Overlay scale factor (0.0-1.0) [experimental; default depends on the icon medium]
-        #[arg(long, value_name = "SCALE", hide = true)]
-        overlay_scale: Option<f32>,
+        #[command(flatten)]
+        layers: LayerArgs,
     },
 
     /// Reset folder icons to system default
@@ -135,6 +84,213 @@ enum Commands {
     /// Print the JSON Schema for CustomizationProfile
     Schema,
 }
+
+/// The per-layer flags shared by both customize modes.
+///
+/// Turned into a [`CustomizationProfile`] by [`into_profile`](Self::into_profile),
+/// which is where the mode-specific rules live.
+///
+/// Folder-only flags are `conflicts_with = "custom_icon"` rather than
+/// `requires = "folder"`: `--folder` is a `SetTrue` flag, which clap counts as
+/// always present through its default, so `requires` on it never fires.
+#[derive(Args, Debug, Default)]
+struct LayerArgs {
+    // === Solid Color Options (folder-mode only) ===
+    /// Recolor the whole folder icon to this color by performing an HSL shift against computed averages.
+    /// Only supported on Windows
+    #[arg(long, value_enum, value_name = "COLOR", conflicts_with = "custom_icon")]
+    color: Option<FolderColor>,
+
+    // === Color Dot Options (both modes) ===
+    /// Add a colored dot badge. Centered on Windows and placed at the bottom right on Linux
+    #[arg(long, value_enum, value_name = "COLOR")]
+    color_dot: Option<FolderColor>,
+
+    /// Color dot position [experimental; default depends on platform]
+    #[arg(long, value_name = "POSITION", hide = true)]
+    color_dot_position: Option<PositionArg>,
+
+    /// Color dot anchor mode [experimental; default: inset]
+    #[arg(long, value_name = "MODE", hide = true)]
+    color_dot_anchor_mode: Option<AnchorModeArg>,
+
+    /// Color dot scale factor (0.0-1.0) [experimental; default depends on platform]
+    #[arg(long, value_name = "SCALE", hide = true)]
+    color_dot_scale: Option<f32>,
+
+    // === Decal Options (folder-mode only) ===
+    /// Decal source: an SVG file path or raw SVG markup.
+    /// This gets centered on the folder and tinted to a slightly darker color, making it appear imprinted.
+    /// This is only supported on Windows
+    #[arg(long, value_name = "SOURCE", conflicts_with = "custom_icon")]
+    decal: Option<String>,
+
+    /// Decal scale factor (0.0-1.0)
+    #[arg(
+        long,
+        value_name = "SCALE",
+        default_value = "0.70",
+        conflicts_with = "custom_icon"
+    )]
+    decal_scale: f32,
+
+    // === Overlay Options (both modes) ===
+    /// Overlay source: an SVG file path, raw SVG markup, emoji character, or
+    /// emoji name (e.g. "duck").
+    /// See https://emojibase.dev/emojis for accepted emoji names
+    #[arg(long, value_name = "SOURCE")]
+    overlay: Option<String>,
+
+    /// Overlay position [experimental; default depends on the icon medium]
+    #[arg(long, value_name = "POSITION", hide = true)]
+    overlay_position: Option<PositionArg>,
+
+    /// Overlay anchor mode [experimental; default: inset]
+    #[arg(long, value_name = "MODE", hide = true)]
+    overlay_anchor_mode: Option<AnchorModeArg>,
+
+    /// Overlay scale factor (0.0-1.0) [experimental; default depends on the icon medium]
+    #[arg(long, value_name = "SCALE", hide = true)]
+    overlay_scale: Option<f32>,
+}
+
+/// Which base the customization targets, which fixes the placement defaults
+/// and which flags are meaningful.
+#[derive(Debug, Clone, Copy)]
+enum Mode {
+    /// The system folder icon.
+    Folder,
+    /// A user-supplied image, written in `medium`.
+    CustomIcon { medium: OutputMedium },
+}
+
+impl Mode {
+    fn default_placements(self) -> DefaultPlacements {
+        match self {
+            Mode::Folder => OutputMedium::system_folder_icon().default_placements(),
+            Mode::CustomIcon { medium } => medium.default_placements(),
+        }
+    }
+}
+
+impl LayerArgs {
+    /// Flags that are hidden behind `--experimental`, with whether each was set.
+    fn experimental_flags(&self) -> [(&'static str, bool); 6] {
+        [
+            ("--overlay-position", self.overlay_position.is_some()),
+            ("--overlay-anchor-mode", self.overlay_anchor_mode.is_some()),
+            ("--overlay-scale", self.overlay_scale.is_some()),
+            ("--color-dot-position", self.color_dot_position.is_some()),
+            (
+                "--color-dot-anchor-mode",
+                self.color_dot_anchor_mode.is_some(),
+            ),
+            ("--color-dot-scale", self.color_dot_scale.is_some()),
+        ]
+    }
+
+    /// Builds the profile these flags describe.
+    ///
+    /// Unset placement flags fall back to the defaults for `mode`'s medium.
+    /// Folder mode requires at least one layer; custom-icon mode allows none
+    /// (the image itself is the customization). Surface-relative flags
+    /// conflict with `--custom-icon` at the parser, so they are always `None`
+    /// here in custom-icon mode.
+    fn into_profile(self, mode: Mode, experimental: bool) -> Result<CustomizationProfile> {
+        for (flag, set) in self.experimental_flags() {
+            if set && !experimental {
+                bail!(
+                    "{flag} is experimental; pass --experimental or set {}=1",
+                    folco_core::experimental::ENV_VAR
+                );
+            }
+        }
+
+        let defaults = mode.default_placements();
+        let mut profile = CustomizationProfile::new();
+
+        if let Some(color) = self.color {
+            profile = profile.with_solid_color(color.to_solid_color_config());
+        }
+
+        if let Some(color) = self.color_dot {
+            let placement = Placement::new(
+                self.color_dot_position
+                    .map_or(defaults.color_dot.position, Into::into),
+                self.color_dot_anchor_mode.unwrap_or_default().into(),
+                self.color_dot_scale.unwrap_or(defaults.color_dot.scale),
+            );
+            profile = profile.with_color_dot(color.to_color_dot_config().with_placement(placement));
+        }
+
+        if let Some(source) = &self.decal {
+            let svg = resolve_svg_source(source)?;
+            profile = profile.with_decal(DecalConfig::new(svg, self.decal_scale));
+        }
+
+        if let Some(source) = &self.overlay {
+            let source = resolve_overlay_source(source)?;
+            let placement = Placement::new(
+                self.overlay_position
+                    .map_or(defaults.overlay.position, Into::into),
+                self.overlay_anchor_mode.unwrap_or_default().into(),
+                self.overlay_scale.unwrap_or(defaults.overlay.scale),
+            );
+            profile = profile.with_overlay(ImageOverlayConfig::new(source, placement));
+        }
+
+        if matches!(mode, Mode::Folder) && LayerKind::ALL.iter().all(|&l| !profile.carries(l)) {
+            bail!(
+                "--folder mode requires at least one of --color, --color-dot, \
+                 --decal, --overlay, or --folder-customization-profile"
+            );
+        }
+
+        Ok(profile)
+    }
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, Default)]
+enum PositionArg {
+    BottomLeft,
+    #[default]
+    BottomRight,
+    TopLeft,
+    TopRight,
+    Center,
+}
+
+impl From<PositionArg> for OverlayPosition {
+    fn from(pos: PositionArg) -> Self {
+        match pos {
+            PositionArg::BottomLeft => OverlayPosition::BottomLeft,
+            PositionArg::BottomRight => OverlayPosition::BottomRight,
+            PositionArg::TopLeft => OverlayPosition::TopLeft,
+            PositionArg::TopRight => OverlayPosition::TopRight,
+            PositionArg::Center => OverlayPosition::Center,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, Default)]
+enum AnchorModeArg {
+    #[default]
+    Inset,
+    Centered,
+}
+
+impl From<AnchorModeArg> for OverlayAnchorMode {
+    fn from(mode: AnchorModeArg) -> Self {
+        match mode {
+            AnchorModeArg::Inset => OverlayAnchorMode::Inset,
+            AnchorModeArg::Centered => OverlayAnchorMode::Centered,
+        }
+    }
+}
+
+// ============================================================================
+// Source resolution
+// ============================================================================
 
 /// The flag that gets closest to `layer` on every icon medium.
 fn alternative_flag(layer: LayerKind) -> &'static str {
@@ -230,42 +386,37 @@ fn resolve_overlay_source(input: &str) -> Result<ImageSource> {
     Ok(ImageSource::from(SvgSource::EmojiName(trimmed.to_string())))
 }
 
-#[derive(Clone, ValueEnum, Default)]
-enum PositionArg {
-    BottomLeft,
-    #[default]
-    BottomRight,
-    TopLeft,
-    TopRight,
-    Center,
-}
+// ============================================================================
+// Progress display
+// ============================================================================
 
-impl From<PositionArg> for OverlayPosition {
-    fn from(pos: PositionArg) -> Self {
-        match pos {
-            PositionArg::BottomLeft => OverlayPosition::BottomLeft,
-            PositionArg::BottomRight => OverlayPosition::BottomRight,
-            PositionArg::TopLeft => OverlayPosition::TopLeft,
-            PositionArg::TopRight => OverlayPosition::TopRight,
-            PositionArg::Center => OverlayPosition::Center,
+/// Runs `op` while mirroring its [`Progress`] stream onto a terminal bar.
+///
+/// `processing` is the verb shown per folder ("Processing", "Resetting").
+/// The bar is finished by the stream's `Completed` event, which core always
+/// sends — including after a render failure — so the handler drains cleanly.
+async fn run_with_progress_bar<F, Fut>(
+    total: usize,
+    verbose: bool,
+    processing: &'static str,
+    op: F,
+) -> Result<()>
+where
+    F: FnOnce(ProgressSender) -> Fut,
+    Fut: Future<Output = Result<()>>,
+{
+    let (tx, mut rx) = progress_channel(32);
+    let pb = create_progress_bar(total as u64);
+
+    let handler = tokio::spawn(async move {
+        while let Some(progress) = rx.recv().await {
+            update_bar(&pb, progress, processing, verbose);
         }
-    }
-}
+    });
 
-#[derive(Clone, ValueEnum, Default)]
-enum AnchorModeArg {
-    #[default]
-    Inset,
-    Centered,
-}
-
-impl From<AnchorModeArg> for OverlayAnchorMode {
-    fn from(mode: AnchorModeArg) -> Self {
-        match mode {
-            AnchorModeArg::Inset => OverlayAnchorMode::Inset,
-            AnchorModeArg::Centered => OverlayAnchorMode::Centered,
-        }
-    }
+    let result = op(tx).await;
+    handler.await?;
+    result
 }
 
 fn create_progress_bar(total: u64) -> ProgressBar {
@@ -277,6 +428,54 @@ fn create_progress_bar(total: u64) -> ProgressBar {
     );
     pb
 }
+
+fn update_bar(pb: &ProgressBar, progress: Progress, processing: &str, verbose: bool) {
+    match progress {
+        Progress::Started { total } => {
+            pb.set_length(total as u64);
+            pb.set_message("Starting...");
+        }
+        Progress::Rendering => {
+            pb.set_message("Rendering icons...");
+        }
+        Progress::RenderFailed { error } => {
+            pb.suspend(|| {
+                if verbose {
+                    eprintln!("Render failed: {error}");
+                } else {
+                    eprintln!("Render failed");
+                }
+            });
+        }
+        Progress::Processing { path, .. } => {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.display().to_string());
+            pb.set_message(format!("{processing}: {name}"));
+        }
+        Progress::FolderComplete { .. } => {
+            pb.inc(1);
+        }
+        Progress::FolderFailed { path, error, .. } => {
+            pb.inc(1);
+            pb.suspend(|| {
+                if verbose {
+                    eprintln!("Failed {}: {error}", path.display());
+                } else {
+                    eprintln!("Failed {}", path.display());
+                }
+            });
+        }
+        Progress::Completed { succeeded, failed } => {
+            pb.finish_with_message(format!("Completed: {succeeded} succeeded, {failed} failed"));
+        }
+    }
+}
+
+// ============================================================================
+// Entry point
+// ============================================================================
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -290,104 +489,17 @@ async fn main() -> Result<()> {
             custom_icon,
             folder_customization_profile,
             custom_icon_profile,
-            color,
-            color_dot,
-            color_dot_position,
-            color_dot_anchor_mode,
-            color_dot_scale,
-            decal,
-            decal_scale,
-            overlay,
-            overlay_position,
-            overlay_anchor_mode,
-            overlay_scale,
+            layers,
         } => {
-            for (flag, set) in [
-                ("--overlay-position", overlay_position.is_some()),
-                ("--overlay-anchor-mode", overlay_anchor_mode.is_some()),
-                ("--overlay-scale", overlay_scale.is_some()),
-                ("--color-dot-position", color_dot_position.is_some()),
-                ("--color-dot-anchor-mode", color_dot_anchor_mode.is_some()),
-                ("--color-dot-scale", color_dot_scale.is_some()),
-            ] {
-                if set && !experimental {
-                    bail!(
-                        "{flag} is experimental; pass --experimental or set {}=1",
-                        folco_core::experimental::ENV_VAR
-                    );
-                }
-            }
-            let overlay_anchor_mode = overlay_anchor_mode.unwrap_or_default();
-            // Unset placement flags fall back to the defaults for the base's medium,
-            // which is only known once the mode (and custom image) is resolved.
-            let color_dot_config = |color: FolderColor, defaults: &DefaultPlacements| {
-                color.to_color_dot_config().with_placement(Placement::new(
-                    color_dot_position
-                        .clone()
-                        .map_or(defaults.color_dot.position, Into::into),
-                    color_dot_anchor_mode.clone().unwrap_or_default().into(),
-                    color_dot_scale.unwrap_or(defaults.color_dot.scale),
-                ))
-            };
-            let overlay_config = |source: ImageSource, defaults: &DefaultPlacements| {
-                ImageOverlayConfig::new(
-                    source,
-                    Placement::new(
-                        overlay_position
-                            .clone()
-                            .map_or(defaults.overlay.position, Into::into),
-                        overlay_anchor_mode.clone().into(),
-                        overlay_scale.unwrap_or(defaults.overlay.scale),
-                    ),
-                )
-            };
-
             if folder {
-                // ── Folder mode ────────────────────────────────────
-                let defaults = OutputMedium::system_folder_icon().default_placements();
-                let profile = if let Some(json) = folder_customization_profile {
-                    CustomizationProfile::from_json(&json)
-                        .context("Failed to parse CustomizationProfile JSON")?
-                } else {
-                    let mut p = CustomizationProfile::new();
-
-                    if let Some(color) = color {
-                        p = p.with_solid_color(color.to_solid_color_config());
-                    }
-
-                    if let Some(color) = color_dot {
-                        p = p.with_color_dot(color_dot_config(color, &defaults));
-                    }
-
-                    if let Some(ref source) = decal {
-                        let svg = resolve_svg_source(source)?;
-                        p = p.with_decal(DecalConfig::new(svg, decal_scale));
-                    }
-
-                    if let Some(ref source) = overlay {
-                        let source = resolve_overlay_source(source)?;
-                        p = p.with_overlay(overlay_config(source, &defaults));
-                    }
-
-                    // Require at least one layer when not using a JSON profile
-                    if p.solid_color.is_none()
-                        && p.color_dot.is_none()
-                        && p.decal.is_none()
-                        && p.overlay.is_none()
-                    {
-                        bail!(
-                            "--folder mode requires at least one of --color, --color-dot, \
-                             --decal, --overlay, or --folder-customization-profile"
-                        );
-                    }
-
-                    p
+                let profile = match folder_customization_profile {
+                    Some(json) => CustomizationProfile::from_json(&json)
+                        .context("Failed to parse CustomizationProfile JSON")?,
+                    None => layers.into_profile(Mode::Folder, experimental)?,
                 };
-
                 customize_folders(directories, profile, cli.verbose).await?;
-            } else if let Some(ref source) = custom_icon {
-                // ── Custom-icon mode ───────────────────────────────
-                let image_source = resolve_overlay_source(source)
+            } else if let Some(source) = custom_icon {
+                let image_source = resolve_overlay_source(&source)
                     .context("Failed to resolve --custom-icon source")?;
 
                 let format = ImageFormat::of_source(&image_source);
@@ -399,26 +511,12 @@ async fn main() -> Result<()> {
                         caps.custom_image_extensions().join(", ")
                     );
                 };
-                let defaults = medium.default_placements();
 
-                let profile = if let Some(json) = custom_icon_profile {
-                    CustomizationProfile::from_json(&json)
-                        .context("Failed to parse CustomizationProfile JSON")?
-                } else {
-                    let mut p = CustomizationProfile::new();
-
-                    if let Some(color) = color_dot {
-                        p = p.with_color_dot(color_dot_config(color, &defaults));
-                    }
-
-                    if let Some(ref source) = overlay {
-                        let source = resolve_overlay_source(source)?;
-                        p = p.with_overlay(overlay_config(source, &defaults));
-                    }
-
-                    p
+                let profile = match custom_icon_profile {
+                    Some(json) => CustomizationProfile::from_json(&json)
+                        .context("Failed to parse CustomizationProfile JSON")?,
+                    None => layers.into_profile(Mode::CustomIcon { medium }, experimental)?,
                 };
-
                 customize_custom_icon(directories, image_source, profile, cli.verbose).await?;
             }
         }
@@ -466,68 +564,11 @@ async fn customize_folders(
         );
     }
 
-    let (tx, mut rx) = progress_channel(32);
-
-    let total = directories.len() as u64;
-    let pb = create_progress_bar(total);
-
-    // Spawn progress handler
-    let progress_handle = tokio::spawn(async move {
-        while let Some(progress) = rx.recv().await {
-            match progress {
-                Progress::Started { total } => {
-                    pb.set_length(total as u64);
-                    pb.set_message("Starting...");
-                }
-                Progress::Rendering => {
-                    pb.set_message("Rendering icons...");
-                }
-                Progress::RenderFailed { error } => {
-                    pb.suspend(|| {
-                        if verbose {
-                            eprintln!("Render failed: {}", error);
-                        } else {
-                            eprintln!("Render failed");
-                        }
-                    });
-                }
-                Progress::Processing { path, .. } => {
-                    let name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_else(|| path.display().to_string());
-                    pb.set_message(format!("Processing: {}", name));
-                }
-                Progress::FolderComplete { .. } => {
-                    pb.inc(1);
-                }
-                Progress::FolderFailed { path, error, .. } => {
-                    pb.inc(1);
-                    pb.suspend(|| {
-                        if verbose {
-                            eprintln!("Failed {}: {}", path.display(), error);
-                        } else {
-                            eprintln!("Failed {}", path.display());
-                        }
-                    });
-                }
-                Progress::Completed { succeeded, failed } => {
-                    pb.finish_with_message(format!(
-                        "Completed: {} succeeded, {} failed",
-                        succeeded, failed
-                    ));
-                }
-            }
-        }
-    });
-
-    // Run customization
-    ctx.customize_folders_async(directories, profile, tx).await;
-
-    // Wait for progress handler to finish
-    progress_handle.await?;
-
-    Ok(())
+    run_with_progress_bar(directories.len(), verbose, "Processing", |tx| async {
+        ctx.customize_folders_async(directories, profile, tx).await;
+        Ok(())
+    })
+    .await
 }
 
 async fn customize_custom_icon(
@@ -542,70 +583,12 @@ async fn customize_custom_icon(
         .build()
         .context("Failed to initialize customization context")?;
 
-    let (tx, mut rx) = progress_channel(32);
-
-    let total = directories.len() as u64;
-    let pb = create_progress_bar(total);
-
-    // Spawn progress handler
-    let progress_handle = tokio::spawn(async move {
-        while let Some(progress) = rx.recv().await {
-            match progress {
-                Progress::Started { total } => {
-                    pb.set_length(total as u64);
-                    pb.set_message("Starting...");
-                }
-                Progress::Rendering => {
-                    pb.set_message("Rendering icons...");
-                }
-                Progress::RenderFailed { error } => {
-                    pb.suspend(|| {
-                        if verbose {
-                            eprintln!("Render failed: {}", error);
-                        } else {
-                            eprintln!("Render failed");
-                        }
-                    });
-                }
-                Progress::Processing { path, .. } => {
-                    let name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_else(|| path.display().to_string());
-                    pb.set_message(format!("Processing: {}", name));
-                }
-                Progress::FolderComplete { .. } => {
-                    pb.inc(1);
-                }
-                Progress::FolderFailed { path, error, .. } => {
-                    pb.inc(1);
-                    pb.suspend(|| {
-                        if verbose {
-                            eprintln!("Failed {}: {}", path.display(), error);
-                        } else {
-                            eprintln!("Failed {}", path.display());
-                        }
-                    });
-                }
-                Progress::Completed { succeeded, failed } => {
-                    pb.finish_with_message(format!(
-                        "Completed: {} succeeded, {} failed",
-                        succeeded, failed
-                    ));
-                }
-            }
-        }
-    });
-
-    // Run customization
-    ctx.customize_folders_with_image_async(directories, &image_source, profile, tx)
-        .await
-        .context("Failed to apply custom icon")?;
-
-    // Wait for progress handler to finish
-    progress_handle.await?;
-
-    Ok(())
+    run_with_progress_bar(directories.len(), verbose, "Processing", |tx| async {
+        ctx.customize_folders_with_image_async(directories, &image_source, profile, tx)
+            .await
+            .context("Failed to apply custom icon")
+    })
+    .await
 }
 
 async fn reset_folders(directories: Vec<PathBuf>, verbose: bool) -> Result<()> {
@@ -615,55 +598,192 @@ async fn reset_folders(directories: Vec<PathBuf>, verbose: bool) -> Result<()> {
         .build()
         .context("Failed to initialize customization context")?;
 
-    let (tx, mut rx) = progress_channel(32);
+    run_with_progress_bar(directories.len(), verbose, "Resetting", |tx| async {
+        ctx.reset_folders_async(directories, tx).await;
+        Ok(())
+    })
+    .await
+}
 
-    let total = directories.len() as u64;
-    let pb = create_progress_bar(total);
+// ============================================================================
+// Tests
+// ============================================================================
 
-    // Spawn progress handler
-    let progress_handle = tokio::spawn(async move {
-        while let Some(progress) = rx.recv().await {
-            match progress {
-                Progress::Started { total } => {
-                    pb.set_length(total as u64);
-                    pb.set_message("Starting...");
-                }
-                Progress::Processing { path, .. } => {
-                    let name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_else(|| path.display().to_string());
-                    pb.set_message(format!("Resetting: {}", name));
-                }
-                Progress::FolderComplete { .. } => {
-                    pb.inc(1);
-                }
-                Progress::FolderFailed { path, error, .. } => {
-                    pb.inc(1);
-                    pb.suspend(|| {
-                        if verbose {
-                            eprintln!("Failed {}: {}", path.display(), error);
-                        } else {
-                            eprintln!("Failed {}", path.display());
-                        }
-                    });
-                }
-                Progress::Completed { succeeded, failed } => {
-                    pb.finish_with_message(format!(
-                        "Completed: {} succeeded, {} failed",
-                        succeeded, failed
-                    ));
-                }
-                _ => {}
-            }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Parses a full `folco customize ...` command line and returns the layer flags.
+    fn layer_args(args: &[&str]) -> LayerArgs {
+        let cli = Cli::try_parse_from(["folco", "customize"].iter().chain(args))
+            .unwrap_or_else(|e| panic!("{e}"));
+        match cli.command {
+            Commands::Customize { layers, .. } => layers,
+            _ => unreachable!(),
         }
-    });
+    }
 
-    // Run reset
-    ctx.reset_folders_async(directories, tx).await;
+    fn parse_error(args: &[&str]) -> String {
+        Cli::try_parse_from(["folco", "customize"].iter().chain(args))
+            .err()
+            .expect("expected a parse error")
+            .to_string()
+    }
 
-    // Wait for progress handler to finish
-    progress_handle.await?;
+    const RASTER_CUSTOM: Mode = Mode::CustomIcon {
+        medium: OutputMedium::Raster,
+    };
 
-    Ok(())
+    #[test]
+    fn color_maps_to_solid_color() {
+        let profile = layer_args(&["--folder", "--color", "red", "d"])
+            .into_profile(Mode::Folder, false)
+            .unwrap();
+        let solid = profile.solid_color.unwrap();
+        assert_eq!(
+            (solid.target_r, solid.target_g, solid.target_b),
+            FolderColor::Red.rgb()
+        );
+        assert!(profile.color_dot.is_none());
+    }
+
+    #[test]
+    fn color_dot_uses_the_medium_defaults_when_unset() {
+        let profile = layer_args(&["--folder", "--color-dot", "blue", "d"])
+            .into_profile(Mode::Folder, false)
+            .unwrap();
+        let expected = OutputMedium::system_folder_icon()
+            .default_placements()
+            .color_dot;
+        assert_eq!(profile.color_dot.unwrap().placement, expected);
+    }
+
+    #[test]
+    fn decal_accepts_raw_markup_and_scale() {
+        let profile = layer_args(&["--folder", "--decal", "<svg/>", "--decal-scale", "0.5", "d"])
+            .into_profile(Mode::Folder, false)
+            .unwrap();
+        let decal = profile.decal.unwrap();
+        assert_eq!(decal.source, SvgSource::Raw("<svg/>".into()));
+        assert_eq!(decal.scale, 0.5);
+    }
+
+    #[test]
+    fn overlay_accepts_an_emoji_name() {
+        let profile = layer_args(&["--folder", "--overlay", "duck", "d"])
+            .into_profile(Mode::Folder, false)
+            .unwrap();
+        assert_eq!(
+            profile.overlay.unwrap().source,
+            ImageSource::Svg(SvgSource::EmojiName("duck".into()))
+        );
+    }
+
+    #[test]
+    fn placement_flags_need_experimental() {
+        let args = || {
+            layer_args(&[
+                "--folder",
+                "--overlay",
+                "duck",
+                "--overlay-scale",
+                "0.3",
+                "d",
+            ])
+        };
+
+        let err = args().into_profile(Mode::Folder, false).unwrap_err();
+        assert!(err.to_string().contains("--overlay-scale is experimental"));
+
+        let profile = args().into_profile(Mode::Folder, true).unwrap();
+        assert_eq!(profile.overlay.unwrap().placement.scale, 0.3);
+    }
+
+    #[test]
+    fn explicit_placement_overrides_the_defaults() {
+        let profile = layer_args(&[
+            "--folder",
+            "--color-dot",
+            "red",
+            "--color-dot-position",
+            "top-left",
+            "--color-dot-anchor-mode",
+            "centered",
+            "d",
+        ])
+        .into_profile(Mode::Folder, true)
+        .unwrap();
+        let placement = profile.color_dot.unwrap().placement;
+        assert_eq!(placement.position, OverlayPosition::TopLeft);
+        assert_eq!(placement.anchor_mode, OverlayAnchorMode::Centered);
+    }
+
+    #[test]
+    fn folder_mode_requires_a_layer() {
+        let err = layer_args(&["--folder", "d"])
+            .into_profile(Mode::Folder, false)
+            .unwrap_err();
+        assert!(err.to_string().contains("requires at least one of"));
+    }
+
+    #[test]
+    fn custom_icon_mode_allows_no_layers() {
+        let profile = layer_args(&["--custom-icon", "<svg/>", "d"])
+            .into_profile(RASTER_CUSTOM, false)
+            .unwrap();
+        assert!(LayerKind::ALL.iter().all(|&l| !profile.carries(l)));
+    }
+
+    #[test]
+    fn custom_icon_mode_uses_its_medium_defaults() {
+        let raster = layer_args(&["--custom-icon", "<svg/>", "--color-dot", "red", "d"])
+            .into_profile(RASTER_CUSTOM, false)
+            .unwrap();
+        let vector = layer_args(&["--custom-icon", "<svg/>", "--color-dot", "red", "d"])
+            .into_profile(
+                Mode::CustomIcon {
+                    medium: OutputMedium::Vector,
+                },
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(
+            raster.color_dot.unwrap().placement,
+            DefaultPlacements::RASTER.color_dot
+        );
+        assert_eq!(
+            vector.color_dot.unwrap().placement,
+            DefaultPlacements::VECTOR.color_dot
+        );
+    }
+
+    #[test]
+    fn surface_relative_flags_are_rejected_without_folder() {
+        // Regression: `requires = "folder"` silently passed because `--folder`
+        // is a SetTrue flag with an implicit default.
+        assert!(
+            parse_error(&["--custom-icon", "<svg/>", "--color", "red", "d"])
+                .contains("cannot be used with")
+        );
+        assert!(
+            parse_error(&["--custom-icon", "<svg/>", "--decal", "<svg/>", "d"])
+                .contains("cannot be used with")
+        );
+        assert!(
+            parse_error(&["--custom-icon", "<svg/>", "--decal-scale", "0.5", "d"])
+                .contains("cannot be used with")
+        );
+        // The default decal scale must not count as "using" the flag.
+        layer_args(&["--custom-icon", "<svg/>", "d"]);
+    }
+
+    #[test]
+    fn exactly_one_mode_is_required() {
+        assert!(parse_error(&["d"]).contains("required"));
+        assert!(
+            parse_error(&["--folder", "--custom-icon", "<svg/>", "d"])
+                .contains("cannot be used with")
+        );
+    }
 }
