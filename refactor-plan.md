@@ -171,15 +171,18 @@ After 2e the renderer's public surface is: four constructors, one trait, the con
 
 - [x] (done in 2e) `FolderStrategy` → `customizer: Customizer`. The only branch left is `folder_customizer(sys_set)`, which is the platform decision.
 - [x] (done in 2e) `folder_icon_svg()` is `customizer.base_svg()`. `folder_icon_base()` keeps a two-arm match because the Tauri DTO wants the `FolderIconBase` (icons + surface colour), which only the raster variant has.
-- [ ] Split the file by responsibility (after the above, each part is small enough to be obvious):
-  - `context/mod.rs` — `CustomizationContext` struct, `AppInfo`, Debug impl.
-  - `context/builder.rs` — `CustomizationContextBuilder` (`:85-160`).
-  - `context/operations.rs` — `customize_folders_async`, `reset_folders_async`, `customize_folders_with_image_async`, `render_and_write`, `FolderIconWriter` from Phase 0.
-  - `context/custom_image.rs` — `custom_image_medium`, `custom_image_size_spec`, and the medium→customizer construction currently inlined in `customize_folders_with_image_async:787-818`.
+- [x] Split by responsibility — done 2026-11-11:
+  - `context/mod.rs` (127) — `CustomizationContext`, `UnsupportedLayer`, the read-only accessors (`folder_icon_base`, `folder_icon_svg`, `apply_profile`, `unsupported_layers`).
+  - `context/builder.rs` (213) — `AppInfo`, `CustomizationContextBuilder`, `folder_customizer()` (the platform's medium decision), builder tests.
+  - `context/operations.rs` (176) — `reset_folders_async`, `customize_folders_async`, `render_and_write`, and a new `write_each` that both share: the per-folder `Processing → FolderComplete|FolderFailed` loop and the final `Completed` tally were copy-pasted between reset and render; now written once. Event sequence unchanged.
+  - `context/custom_image.rs` (93) — `custom_image_medium`, `custom_image_size_spec`, `custom_image_customizer`, `customize_folders_with_image_async`.
+  - The Phase 0 `FolderIconWriter` seam was skipped by the user, so `render_and_write` still takes the concrete provider.
 - [x] (done in 2e) `customize_folders_with_image_async` is one path: `custom_image_customizer(source)? → apply_profile → render_and_write`. `create_custom_icon_customizer` and `customize_folders_custom_async` deleted.
 - [x] (done in 2e) `impl SystemFormat for RenderedOutput` in `convert.rs`.
 
-Remaining: the file split. `context.rs` is 604 lines; still worth doing but no longer urgent.
+Result: `context.rs` 925 → four files, 609 lines total, zero `match` on medium outside `builder::folder_customizer` and the one `folder_icon_base()` accessor the Tauri DTO needs.
+
+Note: the repo was not `cargo fmt`-clean at HEAD (14 files). The four new `context/` files are formatted; the rest is left for a dedicated formatting commit so it doesn't mix with refactor diffs.
 
 ## 6. Phase 4 — WASM: `CanvasRenderer` as a thin shell
 
